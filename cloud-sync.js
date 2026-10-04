@@ -14,6 +14,15 @@
 
     const SETTINGS_KEY = "cloudSyncSettings";
 
+    // The project URL and publishable key are public credentials by design
+    // (row level security protects the data), so they are baked in here as a
+    // fallback. If a phone's browser wipes site storage, recovering is just
+    // entering the password — no URL, key, or re-setup.
+    const DEFAULT_CONNECTION = {
+        supabaseUrl: "https://frspbmxtymonlfbfzfpr.supabase.co",
+        supabaseKey: "sb_publishable_csOyxq6yvn4o4M1tkgikzg_-bRd3PBS"
+    };
+
     const SETUP_SQL = [
         "-- The Snake Room: one-time cloud backup setup",
         "create table if not exists snake_room_backups (",
@@ -78,11 +87,24 @@
     ].join("\n");
 
     function readSettings() {
+        let parsed = {};
+
         try {
-            return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
+            parsed = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
         } catch (error) {
-            return {};
+            parsed = {};
         }
+
+        // "Clear Connection" must stay possible, so honour the flag.
+        if (parsed.connectionCleared) {
+            return parsed;
+        }
+
+        return {
+            supabaseUrl: DEFAULT_CONNECTION.supabaseUrl,
+            supabaseKey: DEFAULT_CONNECTION.supabaseKey,
+            ...parsed
+        };
     }
 
     function saveSettings(settings) {
@@ -116,7 +138,15 @@
             throw new Error("Supabase library not loaded. Check your internet connection and reload.");
         }
 
-        client = window.supabase.createClient(url, key);
+        client = window.supabase.createClient(url, key, {
+            auth: {
+                // Sessions live in localStorage and renew themselves, so a
+                // normal sign-in should last indefinitely.
+                persistSession: true,
+                autoRefreshToken: true,
+                detectSessionInUrl: true
+            }
+        });
         clientConfig = { url, key };
         return client;
     }
@@ -226,6 +256,7 @@
         const settings = readSettings();
         const urlInput = document.getElementById("supabaseUrlInput");
         const keyInput = document.getElementById("supabaseKeyInput");
+        const emailInput = document.getElementById("emailInput");
 
         if (urlInput && !urlInput.value) {
             urlInput.value = settings.supabaseUrl || "";
@@ -233,6 +264,10 @@
 
         if (keyInput && !keyInput.value && settings.supabaseKey) {
             keyInput.placeholder = "Key saved (hidden)";
+        }
+
+        if (emailInput && !emailInput.value && settings.lastEmail) {
+            emailInput.value = settings.lastEmail;
         }
     }
 
@@ -279,7 +314,7 @@
                 showStatus(`Connected and signed in as ${session.user.email || session.user.id}. Ready to sync.${stampText}`);
                 updateSignOutVisibility(true);
             } else {
-                showStatus("Connection saved, but not signed in. Send yourself a magic link below.");
+                showStatus("Connection ready, but not signed in. Enter your email and password below and press Sign In With Password.");
                 updateSignOutVisibility(false);
             }
 
@@ -362,7 +397,11 @@
             return;
         }
 
-        saveSettings({ ...settings, supabaseUrl: normalizedUrl, supabaseKey: key });
+        const next = { ...readSettings(), supabaseUrl: normalizedUrl, supabaseKey: key };
+
+        delete next.connectionCleared;
+
+        saveSettings(next);
         client = null;
         clientConfig = null;
         keyInput.value = "";
@@ -380,11 +419,25 @@
         saveSettings({
             ...settings,
             supabaseUrl: "",
-            supabaseKey: ""
+            supabaseKey: "",
+            connectionCleared: true
         });
         client = null;
         clientConfig = null;
         updateConnectionInputs();
+
+        const urlInput = document.getElementById("supabaseUrlInput");
+        const keyInput = document.getElementById("supabaseKeyInput");
+
+        if (urlInput) {
+            urlInput.value = "";
+        }
+
+        if (keyInput) {
+            keyInput.value = "";
+            keyInput.placeholder = "eyJhbGciOi...";
+        }
+
         setSyncReport("Connection cleared.");
         await refreshStatus();
     }
@@ -571,8 +624,18 @@
             }
 
             passwordInput.value = "";
-            setSyncReport(`Signed in as ${email}.`);
+            saveSettings({ ...readSettings(), lastEmail: email });
             await refreshStatus();
+
+            // A wiped phone (or a brand-new device) has no local snakes. Pull
+            // immediately so the user does not have to think about it.
+            if (getCollectionCounts().snakes === 0) {
+                setSyncReport(`Signed in as ${email}. This device has no snakes yet, so your collection is being pulled from the cloud\u2026`);
+                await pullSnapshot();
+                return;
+            }
+
+            setSyncReport(`Signed in as ${email}.`);
         } catch (error) {
             setSyncReport(`Sign in failed: ${error.message}`, true);
             console.error(error);
