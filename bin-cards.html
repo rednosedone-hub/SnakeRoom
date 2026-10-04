@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Snake Room - Bin Cards</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page-container bin-card-page">
+        <div class="hero-section print-hidden">
+            <img src="Images/TheSnakeRoom.jpg" class="hero-image" alt="The Snake Room logo">
+
+            <div class="container">
+                <h1>The Snake Room</h1>
+                <h2>Bin Cards</h2>
+            </div>
+        </div>
+
+        <div class="button-row print-hidden">
+            <a href="index.html" class="main-button">Home</a>
+            <a href="snakes.html" class="main-button">Collection</a>
+            <a href="breeding.html" class="main-button">Breeding</a>
+            <a href="morphCalculator.html" class="main-button">Morph Calculator</a>
+            <a href="cloud-sync.html" class="main-button">Cloud Sync</a>
+        </div>
+
+        <div class="divider print-hidden"></div>
+
+        <section class="form-section print-hidden">
+            <h3>Print Setup</h3>
+
+            <div class="bin-card-controls">
+                <label class="form-field">
+                    <span>Print</span>
+                    <select id="sexFilter">
+                        <option value="All">All Snakes</option>
+                        <option value="Female">Females</option>
+                        <option value="Male">Males</option>
+                        <option value="Unknown">Unknown Sex</option>
+                    </select>
+                </label>
+
+                <label class="form-field">
+                    <span>Status</span>
+                    <select id="statusFilter">
+                        <option value="All">All Statuses</option>
+                        <option value="Hatchling">Hatchling</option>
+                        <option value="Holdback">Holdback</option>
+                        <option value="Breeder">Breeder</option>
+                        <option value="Available">Available</option>
+                        <option value="On Hold">On Hold</option>
+                        <option value="Sold">Sold</option>
+                    </select>
+                </label>
+
+                <label class="form-field checkbox-field bin-checkbox">
+                    <span>Include Photo</span>
+                    <input type="checkbox" id="includePhotoInput" checked>
+                </label>
+
+                <label class="form-field checkbox-field bin-checkbox">
+                    <span>One Card Per Page</span>
+                    <input type="checkbox" id="singleCardPerPageInput">
+                </label>
+
+                <div class="form-field">
+                    <span>&nbsp;</span>
+                    <button type="button" class="main-button" id="printButton">
+                        Print Cards
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <main class="bin-card-sheet" id="binCardSheet"></main>
+    </div>
+
+    <script src="data-helpers.js"></script>
+    <script src="geneCatalog.js?v=3"></script>
+    <script src="genes.js?v=3"></script>
+    <script src="bin-cards.js"></script>
+</body>
+
+</html>

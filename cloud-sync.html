@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Snake Room - Cloud Sync</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page-container">
+        <div class="hero-section">
+            <img src="Images/TheSnakeRoom.jpg" class="hero-image" alt="The Snake Room logo">
+
+            <div class="container">
+                <h1>The Snake Room</h1>
+                <h2>Cloud Sync</h2>
+            </div>
+        </div>
+
+        <div class="button-row">
+            <a href="index.html" class="main-button">Home</a>
+            <a href="data-tools.html" class="main-button">Data Tools</a>
+        </div>
+
+        <div class="divider"></div>
+
+        <main class="snake-form-page">
+            <section class="form-section">
+                <h3>Status</h3>
+                <div class="import-report" id="cloudStatusReport">Checking connection&hellip;</div>
+            </section>
+
+            <section class="form-section">
+                <h3>Sync</h3>
+
+                <p class="empty-message">
+                    The app always runs from this device's local data. Use these buttons to copy the
+                    whole collection (snakes, breeding pairs, clutches, custom genes, sync settings)
+                    between this device and your cloud backup.
+                </p>
+
+                <div class="data-action-grid">
+                    <button type="button" class="main-button" id="pushButton">
+                        Push To Cloud
+                    </button>
+
+                    <button type="button" class="main-button" id="pullButton">
+                        Pull From Cloud
+                    </button>
+
+                    <button type="button" class="secondary-button" id="signOutButton" style="display: none;">
+                        Sign Out
+                    </button>
+                </div>
+
+                <div class="import-report" id="syncReport"></div>
+            </section>
+
+            <section class="form-section">
+                <h3>Connection</h3>
+
+                <p class="empty-message">
+                    Create a free project at supabase.com, then paste the Project URL and anon public
+                    key from the project's Settings &rarr; API page. The anon key is safe to store in
+                    the browser because rows are protected by row level security.
+                </p>
+
+                <div class="form-grid">
+                    <label class="form-field">
+                        <span>Project URL</span>
+                        <input type="text" id="supabaseUrlInput" placeholder="https://your-project.supabase.co">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Anon Public Key</span>
+                        <input type="password" id="supabaseKeyInput" placeholder="eyJhbGciOi...">
+                    </label>
+                </div>
+
+                <div class="form-page-actions">
+                    <button type="button" class="main-button" id="saveConnectionButton">
+                        Save Connection
+                    </button>
+
+                    <button type="button" class="secondary-button" id="clearConnectionButton">
+                        Clear Connection
+                    </button>
+                </div>
+
+                <div class="form-field" style="margin-top:12px;">
+                    <h4>One-Time Database Setup</h4>
+                    <p class="empty-message">
+                        In your Supabase project open the SQL Editor, paste this script, and run it once.
+                        It creates the backup table and row level security rules.
+                    </p>
+                    <pre class="sql-block" id="setupSqlBlock"></pre>
+                    <button type="button" class="gene-action-button" id="copySqlButton">
+                        Copy SQL
+                    </button>
+                </div>
+            </section>
+
+            <section class="form-section">
+                <h3>Account</h3>
+
+                <p class="empty-message">
+                    Preferred: sign in with email and password. Create yourself as a user in the
+                    Supabase dashboard under Authentication &rarr; Users &rarr; Add user, set a
+                    password there, and tick "Auto Confirm User". This needs no email at all.
+                </p>
+
+                <div class="form-grid">
+                    <label class="form-field">
+                        <span>Email</span>
+                        <input type="email" id="emailInput" placeholder="you@example.com">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Password</span>
+                        <input type="password" id="passwordInput" placeholder="Your Supabase password">
+                    </label>
+                </div>
+
+                <div class="form-page-actions">
+                    <button type="button" class="main-button" id="signInPasswordButton">
+                        Sign In With Password
+                    </button>
+
+                    <button type="button" class="secondary-button" id="sendMagicLinkButton">
+                        Send Magic Link
+                    </button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="data-helpers.js"></script>
+    <script src="cloud-sync.js"></script>
+</body>
+
+</html>

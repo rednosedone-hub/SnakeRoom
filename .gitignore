@@ -1,0 +1,13 @@
+# Never upload the full-resolution originals archive
+ImagesOriginals/
+
+# OS junk
+desktop.ini
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+
+# Google Photos metadata sidecars are not used by the app
+Images/**/*.json

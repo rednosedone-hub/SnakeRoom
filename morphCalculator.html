@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Snake Room</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page-container">
+        <div class="hero-section">
+            <img src="Images/TheSnakeRoom.jpg" class="hero-image" alt="The Snake Room logo">
+
+            <div class="container">
+                <h1>The Snake Room</h1>
+                <h2><strong>Ball Python Morph Calculator</strong></h2>
+            </div>
+        </div>
+
+        <div class="paragraph-container">
+            <p>
+                Welcome to the Morph Calculator! Use this tool to 
+                calculate the possible morphs of your ball python pairings.
+            </p>
+        </div>
+
+        <div class="button-row">
+            <a href="index.html" class="main-button">Home</a>
+            <a href="snakes.html" class="main-button">Collection</a>
+            <a href="breeding.html" class="main-button">Breeding</a>
+            <a href="available.html" class="main-button">Available</a>
+            <a href="cloud-sync.html" class="main-button">Cloud Sync</a>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="snake-form-page">
+
+    <section class="form-section">
+
+        <div class="calculator-layout">
+
+    <div class="parent-card" id="femaleCard">
+
+        <h3>Female</h3>
+
+        <label>Select from Collection</label>
+
+        <select id="femaleSnake">
+            <option value="">-- Choose Female --</option>
+        </select>
+
+        <p class="or-divider">OR</p>
+
+        <label>Add Gene</label>
+
+        <input
+            type="text"
+            id="femaleGeneSearch"
+            placeholder="Start typing a gene...">
+
+        <div id="femaleSuggestions" class="gene-suggestions"></div>
+
+        <select id="femaleGeneState"></select>
+
+        <button id="femaleAddGene" class="main-button">
+            Add Gene
+        </button>
+
+        <div id="femaleGeneList" class="selected-gene-list"></div>
+
+    </div>
+
+    <div class="parent-card" id="maleCard">
+
+        <h3>Male</h3>
+
+        <label>Select from Collection</label>
+
+        <select id="maleSnake">
+            <option value="">-- Choose Male --</option>
+        </select>
+
+        <p class="or-divider">OR</p>
+
+        <label>Add Gene</label>
+
+        <input
+            type="text"
+            id="maleGeneSearch"
+            placeholder="Start typing a gene...">
+
+        <div id="maleSuggestions" class="gene-suggestions"></div>
+
+        <select id="maleGeneState"></select>
+
+        <button id="maleAddGene" class="main-button">
+            Add Gene
+        </button>
+
+        <div id="maleGeneList" class="selected-gene-list"></div>        
+
+    </div>
+
+</div>
+
+<div class="calculate-area">
+
+    <button id="calculateButton"
+        class="main-button">
+        Calculate Pairing
+    </button>
+
+</div>
+
+<div id="resultsContainer"></div>
+
+    </section>
+
+
+    <section class="form-section">
+
+        <h3>Possible Offspring</h3>
+
+        <div id="results">
+
+            <p>Select the Morphs for each parent to begin.</p>
+
+        </div>
+
+    </section>
+                
+        </div>
+
+    </div>
+
+    <script src="data-helpers.js"></script>
+    <script src="geneCatalog.js?v=3"></script>
+    <script src="genes.js?v=3"></script>
+    <script src="morphCalculator.js?v=3"></script>
+    <script src="morph-ui.js?v=3"></script>
+
+</body>
+</html>

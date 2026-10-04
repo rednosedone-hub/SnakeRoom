@@ -1,0 +1,297 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Snake Room - Snake Record</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page-container">
+        <div class="hero-section">
+            <img src="Images/TheSnakeRoom.jpg" class="hero-image" alt="The Snake Room logo">
+
+            <div class="container">
+                <h1>The Snake Room</h1>
+                <h2 id="formPageTitle">Snake Record</h2>
+            </div>
+        </div>
+
+        <div class="button-row">
+            <a href="index.html" class="main-button">Home</a>
+            <a href="snakes.html" class="main-button">Collection</a>
+            <a href="breeding.html" class="main-button">Breeding</a>
+            <a href="morphCalculator.html" class="main-button">Morph Calculator</a>
+            <a href="available.html" class="main-button">Available</a>
+            <a href="cloud-sync.html" class="main-button">Cloud Sync</a>
+        </div>
+
+        <div class="divider"></div>
+
+        <main class="snake-form-page">
+            <section class="form-section">
+                <h3>Basic Info</h3>
+
+                <div class="form-grid">
+                    <label class="form-field">
+                        <span>Snake Name</span>
+                        <input type="text" id="nameInput" 
+                        placeholder="Snake Name">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Snake ID</span>
+                        <input type="text" id="snakeIDInput" 
+                        placeholder="Snake ID">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Bin Number</span>
+                        <input type="text" id="binNumberInput" placeholder="Bin Number">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Sex</span>
+                        <select id="sexInput" onchange="updateFeederSuggestion()">
+                            <option value="Female">Female</option>
+                            <option value="Male">Male</option>
+                            <option value="Unknown">Unknown</option>
+                        </select>
+                    </label>
+
+                    <label class="form-field">
+                        <span>Status</span>
+                        <select id="statusInput">
+                            <option value="Hatchling">Hatchling</option>
+                            <option value="Juvenile">Juvenile</option>
+                            <option value="Sub-Adult">Sub-Adult</option>
+                            <option value="Adult">Adult</option>
+                            <option value="Breeder">Breeder</option>
+                            <option value="Holdback">Holdback</option>
+                            <option value="Available">Available</option>
+                            <option value="On Hold">On Hold</option>
+                            <option value="Sold">Sold</option>
+                        </select>
+                    </label>
+
+                    <label class="form-field">
+                        <span>Hatch Date</span>
+                        <input type="date" id="hatchDateInput">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Acquired Date</span>
+                        <input type="date" id="acquiredDateInput">
+                    </label>
+                </div>
+            </section>
+
+            <section class="form-section">
+                <h3>Weight</h3>
+
+                <div class="form-grid">
+                    <label class="form-field">
+                        <span>Weight In Grams</span>
+                        <input
+                            type="number"
+                            id="weightInput"
+                            placeholder="Weight in grams"
+                            oninput="updateFeederSuggestion()">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Weight Date</span>
+                        <input type="date" id="weightDateInput">
+                    </label>
+
+                    <div class="form-field" style="grid-column: 1 / -1; margin-top:12px;">
+                        <button type="button" onclick="addWeightHistoryEntry()" class="gene-action-button">
+                            Add Weight Record
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-field" style="margin-top:12px;">
+                    <h4>Weight History</h4>
+                    <div id="weightHistoryList" class="dashboard-list">
+                        <p class="empty-message">No weight history yet.</p>
+                    </div>
+                </div>
+
+                <div class="weight-chart-frame">
+                    <h4>Weight Growth</h4>
+                    <div id="weightChartContainer" class="weight-chart-container">
+                        <p class="empty-message">No chart data yet.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="form-section">
+                <h3>Feeding</h3>
+
+                <div class="form-grid">
+                    <label class="form-field">
+                        <span>Last Fed</span>
+                        <input type="date" id="lastFedInput">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Feeding Interval</span>
+                        <input type="number" id="feedingIntervalInput" placeholder="Feed every X days">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Feeder Size</span>
+                        <input type="text" id="feederSizeInput" 
+                        placeholder="Feeder size">
+                    </label>
+                    <label class="form-field">
+                        <span>Feeding Result</span>
+                        <select id="feedingResultInput">
+                            <option value="">Select result</option>
+                            <option value="Accepted">Accepted</option>
+                            <option value="Refused">Refused</option>
+                            <option value="Regurgitated">Regurgitated</option>
+                        </select>
+                    </label>
+
+                    <div class="form-field" style="grid-column: 1 / -1; margin-top:12px;">
+                        <button type="button" onclick="addFeedingHistoryEntry()" class="gene-action-button">
+                            Add Feeding Record
+                        </button>
+                    </div>
+                </div>
+
+                <div class="suggestion-row">
+                    <span id="feederSuggestionText">Enter weight to suggest feeder size.</span>
+                    <button type="button" onclick="useSuggestedFeederSize()" class="gene-action-button">
+                        Use Suggested
+                    </button>
+                </div>
+
+                <div class="form-field" style="margin-top:12px;">
+                    <h4>Feeding History</h4>
+                    <div id="feedingHistoryList" class="feeding-list">
+                        <p class="empty-message">No feeding history yet.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="form-section">
+                <h3>Shedding</h3>
+
+                <div class="form-grid">
+                    <label class="form-field">
+                        <span>Shed Date</span>
+                        <input type="date" id="shedDateInput">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Shed Quality</span>
+                        <select id="shedQualityInput">
+                            <option value="">Select quality</option>
+                            <option value="Complete">Complete</option>
+                            <option value="Partial">Partial</option>
+                            <option value="Retained Eye Caps">Retained Eye Caps</option>
+                            <option value="Retained Tail Tip">Retained Tail Tip</option>
+                        </select>
+                    </label>
+
+                    <label class="form-field">
+                        <span>Notes</span>
+                        <input type="text" id="shedNotesInput" placeholder="Optional notes">
+                    </label>
+
+                    <div class="form-field" style="grid-column: 1 / -1; margin-top:12px;">
+                        <button type="button" onclick="addShedHistoryEntry()" class="gene-action-button">
+                            Add Shed Record
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-field" style="margin-top:12px;">
+                    <h4>Shed History</h4>
+                    <div id="shedHistoryList" class="feeding-list">
+                        <p class="empty-message">No shed history yet.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="form-section">
+                <h3>Image</h3>
+
+                <div class="image-form-grid">
+                    <label class="form-field">
+                        <span>Image Path</span>
+                        <input type="text" id="imageInput" placeholder="Image Path" oninput="updateImagePreview()">
+                    </label>
+
+                    <div class="image-preview-frame">
+                        <img src="Images/TheSnakeRoom.jpg" id="imagePreview" alt="Snake preview">
+                    </div>
+                </div>
+            </section>
+
+            <section class="form-section">
+                <h3>Genetics</h3>
+
+                <div class="gene-editor form-gene-editor">
+                    <input
+                        type="text"
+                        id="geneInput"
+                        placeholder="Type gene name"
+                        list="geneOptions"
+                        oninput="updateGeneButtons()">
+
+                    <datalist id="geneOptions"></datalist>
+
+                    <p class="gene-help" id="geneHelp">
+                        Type a gene name to add calculator-ready genetics.
+                    </p>
+
+                    <div class="custom-gene-panel" id="customGenePanel">
+                        <select id="customGeneType">
+                            <option value="codom">Co-dom</option>
+                            <option value="recessive">Recessive</option>
+                        </select>
+
+                        <select id="customSuperType">
+                            <option value="viable">Super Viable</option>
+                            <option value="lethal">Super Lethal</option>
+                            <option value="none">No Super</option>
+                        </select>
+
+                        <input
+                            type="text"
+                            id="customAllelicGroup"
+                            placeholder="Allelic group (optional)">
+                    </div>
+
+                    <div class="gene-button-row" id="geneButtonRow"></div>
+                    <div class="gene-list" id="geneList"></div>
+                </div>
+            </section>
+
+            <div class="form-page-actions">
+                <button onclick="saveSnakeFromPage()" class="main-button">
+                    Save Snake
+                </button>
+
+                <a href="snakes.html" class="secondary-button">
+                    Cancel
+                </a>
+            </div>
+        </main>
+    </div>
+
+    <script src="data-helpers.js"></script>
+    <script src="geneCatalog.js?v=3"></script>
+    <script src="genes.js?v=3"></script>
+    <script src="snake-form.js?v=3"></script>
+</body>
+
+</html>
+
+

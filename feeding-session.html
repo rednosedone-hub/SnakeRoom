@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Snake Room</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page-container">
+        <div class="hero-section">
+            <img src="Images/TheSnakeRoom.jpg" class="hero-image" alt="The Snake Room logo">
+
+            <div class="container">
+                <h1>The Snake Room</h1>
+                <h2><strong>Snakes that need feeding</strong></h2>
+            </div>
+        </div>
+
+        <div class="paragraph-container">
+            <p>
+                
+            </p>
+        </div>
+
+        <div class="button-row">
+            <a href="index.html" class="main-button">Home</a>
+            <a href="snakes.html" class="main-button">Collection</a>
+            <a href="breeding.html" class="main-button">Breeding</a>
+            <a href="available.html" class="main-button">Available</a>
+            <a href="morphCalculator.html" class="main-button">Morph Calculator</a>
+            <a href="cloud-sync.html" class="main-button">Cloud Sync</a>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="bulk-action-bar" id="bulkActionBar" style="display: flex;">
+            <span id="selectedCount">0 selected</span>
+            <input id="bulkFedDateInput" type="date">
+
+            <button onclick="markSelectedFed()" class="secondary-button">
+                Mark Fed
+            </button>
+
+            <button onclick="updateSelectedFeederSizes()" class="secondary-button">
+                Update Feeders
+            </button>
+
+            <button onclick="clearSelectedSnakes()" class="secondary-button">
+                Clear
+            </button>
+
+        </div>
+
+        <h3>Snakes Due to Feed</h3>
+        <div class="snake-table-wrapper" id="snakeTableWrapper"></div>
+    </div>
+
+    <script src="data-helpers.js"></script>
+    <script src="feed-helpers.js"></script>
+    <script src="feeding-session.js"></script>
+</body>
+
+</html>

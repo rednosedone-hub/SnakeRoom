@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Snake Room - Collection</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page-container">
+        <div class="hero-section">
+            <img src="Images/TheSnakeRoom.jpg" class="hero-image" alt="The Snake Room logo">
+
+            <div class="container">
+                <h1>The Snake Room</h1>
+                <h2>Collection Page</h2>
+            </div>
+        </div>
+
+        <div class="button-row">
+            <a href="index.html" class="main-button">Home</a>
+            <a href="breeding.html" class="main-button">Breeding</a>
+            <a href="available.html" class="main-button">Available</a>
+            <a href="morphCalculator.html" class="main-button">Morph Calculator</a>
+            <a href="data-tools.html" class="main-button">Data Tools</a>
+            <a href="weight-sheet.html" class="main-button">Weight Sheet</a>
+            <a href="cloud-sync.html" class="main-button">Cloud Sync</a>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="collection-toolbar">
+            <select id="filterSelect" onchange="renderSnakes()">
+                <option value="All">Show All</option>
+                <option value="Female">Females</option>
+                <option value="Male">Males</option>
+                <option value="Unknown">Unknown</option>
+            </select>
+
+            <select id="statusSelect" onchange="renderSnakes()">
+                <option value="All">All Statuses</option>
+                <option value="Hatchling">Hatchling</option>
+                <option value="Holdback">Holdback</option>
+                <option value="Breeder">Breeder</option>
+                <option value="Available">Available</option>
+                <option value="On Hold">On Hold</option>
+                <option value="Sold">Sold</option>
+            </select>
+
+            <select id="sortSelect" onchange="renderSnakes()">
+                <option value="None">Sort By</option>
+                <option value="nameAsc">Name (A-Z)</option>
+                <option value="nameDesc">Name (Z-A)</option>
+                <option value="morphAsc">ID (A-Z)</option>
+                <option value="morphDesc">ID (Z-A)</option>
+                <option value="binNumberAsc">Bin Number (Low-High)</option>
+                <option value="binNumberDesc">Bin Number (High-Low)</option>
+                <option value="sexAsc">Sex (Female/Male)</option>
+                <option value="sexDesc">Sex (Male/Female)</option>
+                <option value="weightDesc">Weight (High-Low)</option>
+                <option value="weightAsc">Weight (Low-High)</option>
+            </select>
+
+            <button onclick="window.location.href='snake-form.html'" class="main-button">
+                Add Snake
+            </button>
+
+            <button onclick="window.location.href='bin-cards.html'" class="main-button">
+                Bin Cards
+            </button>
+
+            <button onclick="setCollectionView('cards')" class="main-button" id="cardsViewButton">
+                Cards
+            </button>
+
+            <button onclick="setCollectionView('table')" class="main-button" id="tableViewButton">
+                Table
+            </button>
+        </div>
+
+        <div class="bulk-action-bar" id="bulkActionBar">
+            <span id="selectedCount">0 selected</span>
+            <input type="date" id="bulkFedDateInput">
+
+            <button onclick="markSelectedFed()" class="secondary-button">
+                Mark Fed
+            </button>
+
+            <button onclick="updateSelectedFeederSizes()" class="secondary-button">
+                Update Feeders
+            </button>
+
+            <button onclick="clearSelectedSnakes()" class="secondary-button">
+                Clear
+            </button>
+        </div>
+
+        <div class="snake-grid" id="snakeGrid"></div>
+
+        <div class="snake-table-wrapper" id="snakeTableWrapper"></div>
+    </div>
+
+    <script src="data-helpers.js"></script>
+    <script src="geneCatalog.js?v=3"></script>
+    <script src="genes.js?v=3"></script>
+    <script src="snakes.js?v=3"></script>
+</body>
+
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Snake Room</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="page-container">
+        <div class="hero-section">
+            <img src="Images/TheSnakeRoom.jpg" class="hero-image" alt="The Snake Room logo">
+
+            <div class="container">
+                <h1>The Snake Room</h1>
+                <h2><strong>Ball Python Breeding Software</strong></h2>
+            </div>
+        </div>
+
+        <div class="paragraph-container">
+            <p>
+                Welcome to the Snake Room, a breeding software for ball python enthusiasts.
+                This software allows you to manage your collection of ball pythons, track
+                your breeding pairs, and keep detailed records of their offspring.
+            </p>
+        </div>
+
+        <div class="button-row">
+            <a href="snakes.html" class="main-button">Collection</a>
+            <a href="breeding.html" class="main-button">Breeding</a>
+            <a href="available.html" class="main-button">Available</a>
+            <a href="morphCalculator.html" class="main-button">Morph Calculator</a>
+            <a href="bin-cards.html" class="main-button">Bin Cards</a>
+            <a href="data-tools.html" class="main-button">Data Tools</a>
+            <a href="weight-sheet.html" class="main-button">Weight Sheet</a>
+            <a href="cloud-sync.html" class="main-button">Cloud Sync</a>
+        </div>
+
+        <div class="divider"></div>
+
+         <main class="dashboard">
+            <section class="summary-grid">
+                <div class="summary-card">
+                    <a href="snakes.html" class="dashboard-section">
+                        <h3>Snakes</h3>
+                        <p class="summary-number" id="totalSnakes">0</p>
+                        <p id="snakeSummary">No snakes entered yet.</p>
+                    </a>
+                </div>
+
+                <div class="summary-card">
+                     <a href="breeding.html" class="dashboard-section">
+                        <h3>Breeding Plans</h3>
+                        <p class="summary-number" id="activeBreedingPlans">0</p>
+                        <p id="breedingSummary">No active breeding plans yet.</p>
+                    </a>
+                </div>
+
+                <div class="summary-card">
+                    <a href="breeding.html#clutches" class="dashboard-section">
+                        <h3>Clutches</h3>
+                        <p class="summary-number" id="activeClutches">0</p>
+                        <p id="clutchSummary">No clutch records yet.</p>
+                    </a>    
+                </div>
+
+                <div class="summary-card">
+                    <a href="feeding-session.html" class="dashboard-section">
+                        <h3>Feedings Due</h3>
+                        <p class="summary-number" id="feedingsDue">0</p>
+                        <p id="feedingSummary">No feeding records yet.</p>
+                    </a>
+                </div>
+            </section>
+
+            <section class="dashboard-section">
+                <div class="section-heading-row">
+                    <h3>Snakes Due To Feed</h3>
+                    <a href="snakes.html" class="small-link-button">View Collection</a>
+                </div>
+
+                <div class="dashboard-list" id="feedingDueList"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="data-helpers.js"></script>
+    <script src="dashboard.js"></script>
+</body>
+
+</html>
