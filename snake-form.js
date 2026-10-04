@@ -5,6 +5,8 @@ let currentFeedingHistory = [];
 let currentShedHistory = [];
 
 const editingIndex = getEditingIndex();
+const requestedUid = new URLSearchParams(window.location.search).get("uid") || null;
+const requestedUidMissing = requestedUid !== null && editingIndex === null;
 
 const feederRules = {
     Female: [
@@ -457,6 +459,93 @@ async function processPhotoFile(file) {
     }
 }
 
+// ---- QR deep-link recovery -------------------------------------------------
+// Bin-card QRs open snake-form.html?uid=... . If this device does not hold
+// that snake (fresh phone, or it has not pulled recently), offer to pull the
+// collection from the cloud and reopen the snake instead of showing Add mode.
+
+function showQrSnakeReport(html) {
+    const report = document.getElementById("qrSnakeReport");
+
+    if (!report) return;
+
+    report.innerHTML = html;
+    report.style.display = "block";
+}
+
+function bindQrPullButton() {
+    const button = document.getElementById("qrPullButton");
+
+    if (button) {
+        button.addEventListener("click", pullAndOpenRequestedSnake);
+    }
+}
+
+async function pullAndOpenRequestedSnake() {
+    showQrSnakeReport("Pulling your collection from the cloud\u2026");
+
+    try {
+        await window.CloudSync.pullSnapshot();
+
+        const freshSnakes = window.SnakeData.loadSnakesWithIds([]);
+
+        if (requestedUid && window.SnakeData.findSnakeIndexById(freshSnakes, requestedUid) >= 0) {
+            window.location.reload();
+            return;
+        }
+
+        showQrSnakeReport(
+            "Pull finished, but that snake is still not on this device. Either the pull " +
+            "failed (try Pull From Cloud on the <a href=\"cloud-sync.html\">Cloud Sync</a> page), " +
+            "or the card is old and the snake was re-created. " +
+            "<a href=\"snakes.html\">Open the Collection</a> to find the right snake, then print fresh cards."
+        );
+    } catch (error) {
+        showQrSnakeReport(
+            `Pull failed: ${error.message}. Try Pull From Cloud on the ` +
+            "<a href=\"cloud-sync.html\">Cloud Sync</a> page, then scan the card again."
+        );
+    }
+}
+
+async function recoverMissingUidSnake() {
+    const title = document.getElementById("formPageTitle");
+
+    if (title) {
+        title.textContent = "Snake Not On This Device";
+    }
+
+    const syncLink = `<a href="cloud-sync.html">Open Cloud Sync</a>`;
+    const pullButton = `<button type="button" class="gene-action-button" id="qrPullButton" style="margin-left:8px;">Pull From Cloud &amp; Open Snake</button>`;
+
+    try {
+        if (!window.CloudSync || typeof window.CloudSync.getSession !== "function") {
+            showQrSnakeReport(`This snake is not in this device's data yet, and the cloud sync helper did not load. ${syncLink}, then pull your collection and scan the card again.`);
+            return;
+        }
+
+        const settings = window.CloudSync.readSettings();
+
+        if (!settings.supabaseUrl || !settings.supabaseKey) {
+            showQrSnakeReport(`This snake is not in this device's data yet. ${syncLink}, save your connection and sign in, pull your collection, then scan the card again.`);
+            return;
+        }
+
+        const session = await window.CloudSync.getSession();
+
+        if (!session) {
+            showQrSnakeReport(`This snake is not in this device's data yet. ${syncLink} and sign in, then scan the card again and press the pull button. ${pullButton}`);
+            bindQrPullButton();
+            return;
+        }
+
+        showQrSnakeReport(`This snake lives in your cloud backup but is not on this device yet. Pull your collection here to open it. ${pullButton}`);
+        bindQrPullButton();
+    } catch (error) {
+        showQrSnakeReport(`Could not reach the cloud to look for this snake: ${error.message}. ${syncLink} to check your connection, then scan again.`);
+    }
+}
+
 function fillFormForEdit() {
     const photoFileInput = document.getElementById("photoFileInput");
 
@@ -468,6 +557,11 @@ function fillFormForEdit() {
 
     if (editingIndex === null || !snakes[editingIndex]) {
         document.getElementById("formPageTitle").textContent = "Add Snake";
+
+        if (requestedUidMissing) {
+            recoverMissingUidSnake();
+        }
+
         document.getElementById("feedingIntervalInput").value = "14";
         document.getElementById("binNumberInput").value = "";
         currentGenes = [];

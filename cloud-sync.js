@@ -988,6 +988,8 @@
         deleteSnakePhoto,
         migrateImagesFolder,
         getPhotoLimit,
+        getSession,
+        pullSnapshot,
         _setClientForTesting: value => {
             testClient = value;
         }
