@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Snake Record</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=4">
 </head>
 
 <body>
@@ -220,32 +220,43 @@
             </section>
 
             <section class="form-section">
-                <h3>Image</h3>
+                <h3>Photos</h3>
+
+                <p class="empty-message">
+                    Add as many photos as you like &mdash; hatchling shots, age progress,
+                    close-ups. The first photo is the main photo and appears on the collection
+                    cards and bin cards. Photos are dated so you can watch them grow.
+                </p>
 
                 <div class="image-form-grid">
                     <div class="form-field">
-                        <span>Add / Replace Photo</span>
+                        <span>Add Photo</span>
                         <input type="file" id="photoFileInput" accept="image/*">
                         <button type="button" id="cameraPhotoButton" class="gene-action-button" style="margin-top:8px;">
                             Take Photo with Camera
                         </button>
                         <input type="file" id="cameraFileInput" accept="image/*" capture="environment" style="display:none;">
                         <p class="empty-message" id="photoUploadStatus">
-                            Pick a photo from this device, or use Take Photo on a phone. On a
-                            phone the picker opens your camera roll. Photos are shrunk and
-                            uploaded to your cloud storage.
+                            Pick a photo from this device, or use Take Photo on a phone. Photos
+                            are shrunk, uploaded to your cloud storage, and added to the
+                            gallery below.
                         </p>
                     </div>
-
-                    <label class="form-field">
-                        <span>Image Path (filled in automatically)</span>
-                        <input type="text" id="imageInput" placeholder="Image Path" oninput="updateImagePreview()">
-                    </label>
 
                     <div class="image-preview-frame">
                         <img src="Images/TheSnakeRoom.jpg" id="imagePreview" alt="Snake preview">
                     </div>
                 </div>
+
+                <div class="form-field" style="margin-top:12px;">
+                    <h4>Photo Gallery</h4>
+                    <div id="photoGallery" class="photo-gallery"></div>
+                </div>
+
+                <label class="form-field" style="margin-top:12px;">
+                    <span>Main Photo URL (managed automatically &mdash; you can also paste a link)</span>
+                    <input type="text" id="imageInput" placeholder="Image Path" oninput="updateImagePreview()">
+                </label>
             </section>
 
             <section class="form-section">

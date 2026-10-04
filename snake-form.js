@@ -273,9 +273,11 @@ function updateImagePreview() {
     imagePreview.src = imageInput.value || "Images/TheSnakeRoom.jpg";
 }
 
-// ---- Photo picker ----------------------------------------------------------
+// ---- Photo gallery ---------------------------------------------------------
 
-const DEFAULT_PHOTO_HINT = "Pick a photo from this device, or use Take Photo on a phone. On a phone the picker opens your camera roll. Photos are shrunk and uploaded to your cloud storage.";
+const DEFAULT_PHOTO_HINT = "Pick a photo from this device, or use Take Photo on a phone. Photos are shrunk, uploaded to your cloud storage, and added to the gallery below.";
+
+let currentPhotos = [];
 
 function setPhotoStatus(message, isError = false) {
     const status = document.getElementById("photoUploadStatus");
@@ -286,9 +288,7 @@ function setPhotoStatus(message, isError = false) {
     status.classList.toggle("import-error", isError);
 }
 
-async function savePhotoAsDataUrl(file, reason, fallbackValue) {
-    const imageInput = document.getElementById("imageInput");
-    const photoFileInput = document.getElementById("photoFileInput");
+async function savePhotoAsDataUrl(file, reason) {
     const keepLocal = confirm(
         reason + "\n\n" +
         "Keep this photo on this device only? It will not be in your cloud backup " +
@@ -296,13 +296,6 @@ async function savePhotoAsDataUrl(file, reason, fallbackValue) {
     );
 
     if (!keepLocal) {
-        imageInput.value = fallbackValue || "";
-
-        if (photoFileInput) {
-            photoFileInput.value = "";
-        }
-
-        updateImagePreview();
         setPhotoStatus("Photo not added.");
         return;
     }
@@ -327,9 +320,84 @@ async function savePhotoAsDataUrl(file, reason, fallbackValue) {
         reader.readAsDataURL(blob);
     });
 
-    imageInput.value = dataUrl;
+    currentPhotos.push({ url: dataUrl, addedAt: new Date().toISOString() });
+    syncMainPhotoField();
+    setPhotoStatus("Photo saved on this device only. Connect to Cloud Sync and re-add it to store it in the cloud.");
+}
+
+function renderPhotoGallery() {
+    const gallery = document.getElementById("photoGallery");
+
+    if (!gallery) return;
+
+    if (currentPhotos.length === 0) {
+        gallery.innerHTML = `<p class="empty-message">No photos yet. Add one above.</p>`;
+        return;
+    }
+
+    gallery.innerHTML = currentPhotos.map((photo, index) => {
+        const added = photo.addedAt ? new Date(photo.addedAt).toLocaleDateString() : "Date unknown";
+        const isMain = index === 0;
+
+        return `
+            <div class="photo-gallery-item${isMain ? " main" : ""}">
+                <img src="${photo.url}" alt="Snake photo ${index + 1}" loading="lazy"
+                    onerror="this.onerror=null;this.src='Images/TheSnakeRoom.jpg'">
+                ${isMain ? `<span class="photo-main-badge">Main</span>` : ""}
+                <span class="photo-date">${added}</span>
+                <div class="photo-thumb-actions">
+                    ${isMain ? "" : `<button type="button" class="gene-action-button" onclick="makePhotoMain(${index})">Make Main</button>`}
+                    <button type="button" class="gene-remove-button" onclick="removePhoto(${index})">Remove</button>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
+function syncMainPhotoField() {
+    const imageInput = document.getElementById("imageInput");
+
+    imageInput.value = currentPhotos.length > 0 ? currentPhotos[0].url : "";
     updateImagePreview();
-    setPhotoStatus("Photo saved on this device only. Connect to Cloud Sync and pick it again to store it in the cloud.");
+    renderPhotoGallery();
+}
+
+function seedPhotosFromSnake(snake) {
+    if (Array.isArray(snake.photos)) {
+        currentPhotos = snake.photos
+            .filter(photo => photo && photo.url)
+            .map(photo => ({ url: photo.url, addedAt: photo.addedAt || null }));
+        return;
+    }
+
+    // Older records keep a single image string. Treat it as the main photo.
+    currentPhotos = snake.image ? [{ url: snake.image, addedAt: null }] : [];
+}
+
+function makePhotoMain(index) {
+    if (index <= 0 || index >= currentPhotos.length) return;
+
+    const [photo] = currentPhotos.splice(index, 1);
+    currentPhotos.unshift(photo);
+    syncMainPhotoField();
+}
+
+function removePhoto(index) {
+    const photo = currentPhotos[index];
+
+    if (!photo) return;
+
+    if (!confirm("Remove this photo from the snake?")) return;
+
+    currentPhotos.splice(index, 1);
+
+    // Best effort: delete the file from cloud storage too (skipped when
+    // another snake still points at the same photo).
+    if (window.CloudSync && typeof window.CloudSync.deleteSnakePhoto === "function") {
+        window.CloudSync.deleteSnakePhoto(photo.url);
+    }
+
+    syncMainPhotoField();
 }
 
 function handlePhotoFileChange(event) {
@@ -345,39 +413,47 @@ function handlePhotoFileChange(event) {
 }
 
 async function processPhotoFile(file) {
+    const limit = (window.CloudSync && typeof window.CloudSync.getPhotoLimit === "function")
+        ? window.CloudSync.getPhotoLimit()
+        : Infinity;
+
+    if (currentPhotos.length >= limit) {
+        alert(`Your plan allows ${limit} photo${limit === 1 ? "" : "s"} per snake. Upgrading the plan adds more photo slots.`);
+        return;
+    }
+
     const imageInput = document.getElementById("imageInput");
-    const previousValue = imageInput.value;
     const objectUrl = URL.createObjectURL(file);
 
     imageInput.value = objectUrl;
     updateImagePreview();
 
     if (!window.CloudSync || typeof window.CloudSync.uploadSnakePhotoFile !== "function") {
-        await savePhotoAsDataUrl(file, "The cloud sync helper did not load on this page.", previousValue);
+        await savePhotoAsDataUrl(file, "The cloud sync helper did not load on this page.");
         return;
     }
 
     setPhotoStatus("Shrinking and uploading photo\u2026");
 
     try {
-        const url = await window.CloudSync.uploadSnakePhotoFile(file, previousValue);
+        const url = await window.CloudSync.uploadSnakePhotoFile(file);
 
-        imageInput.value = url;
         URL.revokeObjectURL(objectUrl);
-        updateImagePreview();
-        setPhotoStatus("Photo saved to cloud storage. Press Save Snake to keep it.");
+        currentPhotos.push({ url, addedAt: new Date().toISOString() });
+        syncMainPhotoField();
+        setPhotoStatus("Photo added to the gallery. Press Save Snake to keep it.");
     } catch (error) {
         const message = error && error.message ? error.message : String(error);
 
         if (message === "Not signed in." || message.includes("No Supabase connection")) {
-            await savePhotoAsDataUrl(file, message, previousValue);
+            await savePhotoAsDataUrl(file, message);
             return;
         }
 
-        imageInput.value = previousValue;
-        updateImagePreview();
+        URL.revokeObjectURL(objectUrl);
+        syncMainPhotoField();
         const cleanMessage = message.replace(/\.+$/, "");
-        setPhotoStatus(`Photo upload failed: ${cleanMessage}. The previous image was kept.`, true);
+        setPhotoStatus(`Photo upload failed: ${cleanMessage}. The photo was not added.`, true);
     }
 }
 
@@ -398,9 +474,11 @@ function fillFormForEdit() {
         currentWeightHistory = [];
         currentFeedingHistory = [];
         currentShedHistory = [];
+        currentPhotos = [];
         renderGeneList();
         updateFeederSuggestion();
         updateImagePreview();
+        renderPhotoGallery();
         renderWeightHistory({ weight: "", weightHistory: [] });
         renderFeedingHistory({ feedingHistory: [] });
         renderShedHistory({ shedHistory: [] });
@@ -427,10 +505,12 @@ function fillFormForEdit() {
     currentWeightHistory = Array.isArray(snake.weightHistory) ? [...snake.weightHistory] : [];
     currentFeedingHistory = Array.isArray(snake.feedingHistory) ? [...snake.feedingHistory] : [];
     currentShedHistory = Array.isArray(snake.shedHistory) ? [...snake.shedHistory] : [];
+    seedPhotosFromSnake(snake);
 
     renderGeneList();
     updateFeederSuggestion();
     updateImagePreview();
+    renderPhotoGallery();
     renderFeedingHistory({ feedingHistory: currentFeedingHistory });
     renderWeightHistory({ weight: snake.weight, weightHistory: currentWeightHistory });
     renderShedHistory({ shedHistory: currentShedHistory });
@@ -754,9 +834,21 @@ function saveSnakeFromPage() {
         hatchDate: document.getElementById("hatchDateInput").value,
         acquiredDate: document.getElementById("acquiredDateInput").value,
         status: document.getElementById("statusInput").value,
-        genes: currentGenes,
-        image: imageValue || "Images/TheSnakeRoom.jpg"
+        genes: currentGenes
     };
+
+    // The Main Photo URL field is authoritative for the main photo; the
+    // gallery array rides along so every photo syncs with the snapshot.
+    let savedPhotos = [...currentPhotos];
+
+    if (savedPhotos.length === 0) {
+        savedPhotos = imageValue ? [{ url: imageValue, addedAt: null }] : [];
+    } else if (imageValue && imageValue !== savedPhotos[0].url) {
+        savedPhotos[0] = { url: imageValue, addedAt: savedPhotos[0].addedAt || null };
+    }
+
+    snake.photos = savedPhotos;
+    snake.image = savedPhotos.length > 0 ? savedPhotos[0].url : "Images/TheSnakeRoom.jpg";
 
     if (editingIndex === null || !snakes[editingIndex]) {
         snakes.push(snake);
@@ -781,6 +873,8 @@ window.addShedHistoryEntry = addShedHistoryEntry;
 window.removeWeightHistoryEntry = removeWeightHistoryEntry;
 window.removeFeedingHistoryEntry = removeFeedingHistoryEntry;
 window.removeShedHistoryEntry = removeShedHistoryEntry;
+window.removePhoto = removePhoto;
+window.makePhotoMain = makePhotoMain;
 window.saveSnakeFromPage = saveSnakeFromPage;
 
 setupGeneOptions();

@@ -319,6 +319,9 @@ function renderSnakes() {
             ? snake.genes.map(gene => `<span class="gene-pill">${getGeneDescription(gene)}</span>`).join("")
             : `<span class="gene-pill">No genes entered</span>`;
         const binNumberText = snake.binNumber ? `Bin: ${snake.binNumber}` : "No bin number";
+        const photoCountBadge = Array.isArray(snake.photos) && snake.photos.length > 1
+            ? `<span class="photo-count-badge" title="${snake.photos.length} photos">&#128247; ${snake.photos.length}</span>`
+            : "";
 
         card.innerHTML = `
             <a href="${snake.image}">
@@ -330,6 +333,7 @@ function renderSnakes() {
                 <div class="snake-header">
                     <h3 class="snake-name">${snake.name}</h3>
                     <span class="${sexClass}">${sexIcon}</span>
+                    ${photoCountBadge}
                 </div>
 
                 <p class="snake-morph">${identityText}

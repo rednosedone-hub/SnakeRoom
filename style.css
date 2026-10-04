@@ -1455,3 +1455,66 @@ p {
         grid-template-columns: 1fr;
     }
 }
+
+/* ---- Snake photo gallery (snake form) ---- */
+
+.photo-gallery {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.photo-gallery-item {
+    position: relative;
+    width: 150px;
+    padding: 8px;
+    border: 2px solid #555;
+    border-radius: 8px;
+    background: var(--black-color);
+}
+
+.photo-gallery-item.main {
+    border-color: var(--gold-color);
+}
+
+.photo-gallery-item img {
+    width: 100%;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 4px;
+    display: block;
+    background: var(--background-color);
+}
+
+.photo-main-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: var(--gold-color);
+    color: #222;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.photo-date {
+    display: block;
+    font-size: 11px;
+    color: #cfc4a0;
+    margin: 6px 0 4px;
+}
+
+.photo-thumb-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.photo-count-badge {
+    font-size: 12px;
+    color: var(--gold-color);
+    border: 1px solid var(--gold-color);
+    border-radius: 10px;
+    padding: 1px 8px;
+}

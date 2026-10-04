@@ -695,6 +695,20 @@
         return raw;
     }
 
+    // ---- Plan limits ------------------------------------------------------
+    // When you start selling the app, store a plan per user (for example a
+    // profiles table with a plan column) and pass that plan into
+    // getPhotoLimit. Until then everyone is treated as the owner, with no
+    // photo limit.
+    const PHOTO_LIMITS = {
+        free: 1,
+        owner: Infinity
+    };
+
+    function getPhotoLimit(plan) {
+        return PHOTO_LIMITS[plan] ?? PHOTO_LIMITS.owner;
+    }
+
     async function uploadSnakePhotoFile(file, existingImage = "") {
         const activeClient = getClient();
 
@@ -725,6 +739,48 @@
         }
 
         return bucket.getPublicUrl(path).data.publicUrl;
+    }
+
+    async function deleteSnakePhoto(imageValue) {
+        const path = snakePhotoPathFromImageValue(imageValue);
+
+        if (!path) {
+            return false; // Not a cloud photo (site path or data URL): nothing to delete.
+        }
+
+        const activeClient = getClient();
+
+        if (!activeClient) {
+            return false;
+        }
+
+        const session = await getSession();
+
+        if (!session || !path.startsWith(`${session.user.id}/`)) {
+            return false;
+        }
+
+        // Migration can point several snakes at the same cloud URL. Only
+        // delete the file when no other snake still references it.
+        const snakes = window.SnakeData.readStorageArray("snakes");
+        const referenceCount = snakes.filter(snake =>
+            (snake.image || "") === imageValue ||
+            (Array.isArray(snake.photos) &&
+                snake.photos.some(photo => photo && photo.url === imageValue))
+        ).length;
+
+        if (referenceCount > 1) {
+            return false;
+        }
+
+        const { error } = await activeClient.storage.from(PHOTO_BUCKET).remove([path]);
+
+        if (error) {
+            console.error("Could not delete the cloud photo:", error);
+            return false;
+        }
+
+        return true;
     }
 
     async function migrateImagesFolder(files, onProgress = null) {
@@ -926,9 +982,12 @@
         SNAPSHOT_KEYS,
         PHOTO_BUCKET,
         PHOTO_SETUP_SQL,
+        PHOTO_LIMITS,
         compressImageToJpeg,
         uploadSnakePhotoFile,
+        deleteSnakePhoto,
         migrateImagesFolder,
+        getPhotoLimit,
         _setClientForTesting: value => {
             testClient = value;
         }
