@@ -59,6 +59,40 @@
             </section>
 
             <section class="form-section">
+                <h3>Photo Backup</h3>
+
+                <p class="empty-message">
+                    Snake photos are stored in your Supabase project's file storage, in a
+                    private folder that only your account can write to. Add photos on each
+                    snake's own page &mdash; on your phone the picker opens your camera roll.
+                    One-time setup: run this SQL in the Supabase SQL Editor, the same way you
+                    ran the backup table script.
+                </p>
+
+                <pre class="sql-block" id="photoSqlBlock"></pre>
+
+                <button type="button" class="gene-action-button" id="copyPhotoSqlButton">
+                    Copy Photo SQL
+                </button>
+
+                <div class="form-field" style="margin-top:12px;">
+                    <h4>Back up the photos that ship with the site (optional, one time, on a computer)</h4>
+                    <p class="empty-message">
+                        This uploads every photo your snakes currently point at (the site's
+                        Images folder) into your private cloud folder, then repoints the snake
+                        records at the cloud copies. After it finishes, press Push To Cloud.
+                    </p>
+                    <input type="file" id="photoFolderInput" webkitdirectory multiple>
+                    <div class="form-page-actions">
+                        <button type="button" class="main-button" id="backupPhotosButton">
+                            Back Up Photo Folder
+                        </button>
+                    </div>
+                    <div class="import-report" id="photoReport"></div>
+                </div>
+            </section>
+
+            <section class="form-section">
                 <h3>Connection</h3>
 
                 <p class="empty-message">
@@ -138,7 +172,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="data-helpers.js"></script>
-    <script src="cloud-sync.js"></script>
+    <script src="cloud-sync.js?v=2"></script>
 </body>
 
 </html>

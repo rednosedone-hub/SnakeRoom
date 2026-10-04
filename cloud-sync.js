@@ -32,6 +32,51 @@
         "  with check (auth.uid () = user_id);"
     ].join("\n");
 
+    const PHOTO_BUCKET = "snake-photos";
+
+    const PHOTO_SETUP_SQL = [
+        "-- The Snake Room: one-time photo storage setup",
+        "-- Creates the snake-photos bucket and its security rules.",
+        "-- Safe to run more than once. Run it in the Supabase SQL Editor.",
+        "",
+        "insert into storage.buckets (id, name, public)",
+        "values ('snake-photos', 'snake-photos', true)",
+        "on conflict (id) do update set public = true;",
+        "",
+        "drop policy if exists \"Snake photos are public to read\" on storage.objects;",
+        "create policy \"Snake photos are public to read\"",
+        "  on storage.objects for select",
+        "  using (bucket_id = 'snake-photos');",
+        "",
+        "drop policy if exists \"Users upload photos to their own folder\" on storage.objects;",
+        "create policy \"Users upload photos to their own folder\"",
+        "  on storage.objects for insert to authenticated",
+        "  with check (",
+        "    bucket_id = 'snake-photos'",
+        "    and (storage.foldername (name)) [1] = auth.uid ()::text",
+        "  );",
+        "",
+        "drop policy if exists \"Users update their own photos\" on storage.objects;",
+        "create policy \"Users update their own photos\"",
+        "  on storage.objects for update to authenticated",
+        "  using (",
+        "    bucket_id = 'snake-photos'",
+        "    and (storage.foldername (name)) [1] = auth.uid ()::text",
+        "  )",
+        "  with check (",
+        "    bucket_id = 'snake-photos'",
+        "    and (storage.foldername (name)) [1] = auth.uid ()::text",
+        "  );",
+        "",
+        "drop policy if exists \"Users delete their own photos\" on storage.objects;",
+        "create policy \"Users delete their own photos\"",
+        "  on storage.objects for delete to authenticated",
+        "  using (",
+        "    bucket_id = 'snake-photos'",
+        "    and (storage.foldername (name)) [1] = auth.uid ()::text",
+        "  );"
+    ].join("\n");
+
     function readSettings() {
         try {
             return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
@@ -47,7 +92,14 @@
     let client = null;
     let clientConfig = null;
 
+    // Test hook: lets browser-console tests swap in a mock Supabase client.
+    let testClient = null;
+
     function getClient() {
+        if (testClient) {
+            return testClient;
+        }
+
         const settings = readSettings();
         const url = (settings.supabaseUrl || "").trim();
         const key = (settings.supabaseKey || "").trim();
@@ -573,20 +625,249 @@
         }
     }
 
+    // ---- Photo storage ----------------------------------------------------
+    //
+    // Photos live in a Supabase Storage bucket ("snake-photos": public to
+    // read, writes locked to a private folder per signed-in user). Snake
+    // records only store the photo's public URL, so the snapshot sync keeps
+    // working exactly as before — the pictures themselves just live in the
+    // cloud too and can never be lost with the device.
+
+    async function compressImageToJpeg(file, maxEdge = 1400, quality = 0.82) {
+        let source;
+
+        try {
+            source = await createImageBitmap(file, { imageOrientation: "from-image" });
+        } catch (error) {
+            source = await new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(file);
+                const image = new Image();
+
+                image.onload = () => {
+                    URL.revokeObjectURL(url);
+                    resolve(image);
+                };
+                image.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    reject(new Error("That file could not be read as an image."));
+                };
+                image.src = url;
+            });
+        }
+
+        const scale = Math.min(1, maxEdge / Math.max(source.width, source.height));
+        const width = Math.max(1, Math.round(source.width * scale));
+        const height = Math.max(1, Math.round(source.height * scale));
+        const canvas = document.createElement("canvas");
+
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(source, 0, 0, width, height);
+
+        if (typeof source.close === "function") {
+            source.close();
+        }
+
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", quality));
+        return blob || file;
+    }
+
+    function snakePhotoPathFromImageValue(imageValue) {
+        const match = /storage\/v1\/object\/public\/snake-photos\/(.+)$/i.exec(imageValue || "");
+        return match ? decodeURIComponent(match[1]) : null;
+    }
+
+    function randomPhotoKey() {
+        if (window.crypto && typeof crypto.randomUUID === "function") {
+            return crypto.randomUUID();
+        }
+
+        return `u${Date.now()}${Math.random().toString(16).slice(2)}`;
+    }
+
+    async function uploadSnakePhotoFile(file, existingImage = "") {
+        const activeClient = getClient();
+
+        if (!activeClient) {
+            throw new Error("No Supabase connection is saved.");
+        }
+
+        const session = await getSession();
+
+        if (!session) {
+            throw new Error("Not signed in.");
+        }
+
+        const blob = await compressImageToJpeg(file);
+        const existingPath = snakePhotoPathFromImageValue(existingImage);
+        const path = existingPath && existingPath.startsWith(`${session.user.id}/`)
+            ? existingPath
+            : `${session.user.id}/snake-${randomPhotoKey().slice(0, 18)}.jpg`;
+        const bucket = activeClient.storage.from(PHOTO_BUCKET);
+
+        const { error } = await bucket.upload(path, blob, {
+            contentType: "image/jpeg",
+            upsert: true
+        });
+
+        if (error) {
+            throw error;
+        }
+
+        return bucket.getPublicUrl(path).data.publicUrl;
+    }
+
+    async function migrateImagesFolder(files, onProgress = null) {
+        const session = await getSession();
+
+        if (!session) {
+            throw new Error("Sign in first, then back up the photo folder.");
+        }
+
+        const activeClient = getClient();
+        const bucket = activeClient.storage.from(PHOTO_BUCKET);
+        const snakes = window.SnakeData.readStorageArray("snakes");
+        const wanted = new Map(); // image path -> matching picked file
+
+        snakes.forEach(snake => {
+            const image = (snake.image || "").trim().replace(/^\.\//, "");
+
+            if (image && !/^(https?:|data:|blob:)/i.test(image) && !wanted.has(image)) {
+                wanted.set(image, null);
+            }
+        });
+
+        Array.from(files).forEach(file => {
+            const relative = (file.webkitRelativePath || file.name).replace(/^\.\//, "");
+
+            wanted.forEach((matchedFile, imagePath) => {
+                if (!matchedFile && (relative === imagePath || relative.endsWith(`/${imagePath}`))) {
+                    wanted.set(imagePath, file);
+                }
+            });
+        });
+
+        let uploaded = 0;
+        let failed = 0;
+        const missing = [];
+
+        for (const [imagePath, file] of wanted) {
+            if (!file) {
+                missing.push(imagePath);
+                continue;
+            }
+
+            try {
+                const blob = await compressImageToJpeg(file);
+                const path = `${session.user.id}/${imagePath}`;
+
+                const { error } = await bucket.upload(path, blob, {
+                    contentType: "image/jpeg",
+                    upsert: true
+                });
+
+                if (error) {
+                    throw error;
+                }
+
+                const url = bucket.getPublicUrl(path).data.publicUrl;
+
+                snakes.forEach(snake => {
+                    if ((snake.image || "").trim().replace(/^\.\//, "") === imagePath) {
+                        snake.image = url;
+                    }
+                });
+
+                uploaded += 1;
+            } catch (error) {
+                failed += 1;
+                console.error(`Could not upload ${imagePath}:`, error);
+            }
+
+            if (typeof onProgress === "function") {
+                onProgress(uploaded + failed, wanted.size, imagePath);
+            }
+        }
+
+        if (uploaded > 0) {
+            window.SnakeData.saveStorageArray("snakes", snakes);
+        }
+
+        return { uploaded, failed, missing };
+    }
+
+    async function backupPhotos() {
+        const report = document.getElementById("photoReport");
+        const input = document.getElementById("photoFolderInput");
+
+        const showPhotoReport = message => {
+            if (report) {
+                report.textContent = message;
+            }
+        };
+
+        try {
+            if (!input || !input.files || input.files.length === 0) {
+                showPhotoReport("Use the folder picker above first, then press Back Up Photo Folder again.");
+                return;
+            }
+
+            if (report) {
+                report.textContent = "Uploading photos\u2026";
+                report.classList.remove("import-error");
+            }
+
+            const result = await migrateImagesFolder(input.files, (done, total, current) => {
+                showPhotoReport(`Uploading photos\u2026 ${done} of ${total} (${current})`);
+            });
+
+            let message = `Uploaded ${result.uploaded} photo(s) to cloud storage.`;
+
+            if (result.failed > 0) {
+                message += ` ${result.failed} failed (details in the browser console).`;
+            }
+
+            if (result.missing.length > 0) {
+                message += ` ${result.missing.length} snake photo path(s) were not in the chosen folder.`;
+            }
+
+            message += " Now press Push To Cloud to save the updated snake records.";
+            showPhotoReport(message);
+        } catch (error) {
+            if (report) {
+                report.textContent = `Photo backup failed: ${error.message}`;
+                report.classList.add("import-error");
+            }
+        }
+    }
+
     // ---- Boot -------------------------------------------------------------
 
     function bindEvents() {
-        document.getElementById("pushButton").addEventListener("click", pushSnapshot);
-        document.getElementById("pullButton").addEventListener("click", pullSnapshot);
-        document.getElementById("saveConnectionButton").addEventListener("click", saveConnection);
-        document.getElementById("clearConnectionButton").addEventListener("click", clearConnection);
-        document.getElementById("sendMagicLinkButton").addEventListener("click", sendMagicLink);
-        document.getElementById("signInPasswordButton").addEventListener("click", signInWithPassword);
-        document.getElementById("signOutButton").addEventListener("click", signOut);
-        document.getElementById("copySqlButton").addEventListener("click", async () => {
+        const bind = (id, handler) => {
+            const element = document.getElementById(id);
+
+            if (element) {
+                element.addEventListener("click", handler);
+            }
+        };
+
+        bind("pushButton", pushSnapshot);
+        bind("pullButton", pullSnapshot);
+        bind("saveConnectionButton", saveConnection);
+        bind("clearConnectionButton", clearConnection);
+        bind("sendMagicLinkButton", sendMagicLink);
+        bind("signInPasswordButton", signInWithPassword);
+        bind("signOutButton", signOut);
+        bind("copySqlButton", async () => {
             await navigator.clipboard.writeText(SETUP_SQL);
             setSyncReport("SQL copied to the clipboard.");
         });
+        bind("copyPhotoSqlButton", async () => {
+            await navigator.clipboard.writeText(PHOTO_SETUP_SQL);
+            setSyncReport("Photo SQL copied to the clipboard.");
+        });
+        bind("backupPhotosButton", backupPhotos);
     }
 
     function init() {
@@ -594,6 +875,12 @@
 
         if (sqlBlock) {
             sqlBlock.textContent = SETUP_SQL;
+        }
+
+        const photoSqlBlock = document.getElementById("photoSqlBlock");
+
+        if (photoSqlBlock) {
+            photoSqlBlock.textContent = PHOTO_SETUP_SQL;
         }
 
         bindEvents();
@@ -618,7 +905,15 @@
         buildSnapshot,
         applySnapshot,
         readSettings,
-        SNAPSHOT_KEYS
+        SNAPSHOT_KEYS,
+        PHOTO_BUCKET,
+        PHOTO_SETUP_SQL,
+        compressImageToJpeg,
+        uploadSnakePhotoFile,
+        migrateImagesFolder,
+        _setClientForTesting: value => {
+            testClient = value;
+        }
     };
 
     document.addEventListener("DOMContentLoaded", init);

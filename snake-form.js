@@ -273,7 +273,115 @@ function updateImagePreview() {
     imagePreview.src = imageInput.value || "Images/TheSnakeRoom.jpg";
 }
 
+// ---- Photo picker ----------------------------------------------------------
+
+const DEFAULT_PHOTO_HINT = "Pick a photo from this device. On a phone this opens your camera roll. Photos are shrunk and uploaded to your cloud storage.";
+
+function setPhotoStatus(message, isError = false) {
+    const status = document.getElementById("photoUploadStatus");
+
+    if (!status) return;
+
+    status.textContent = message;
+    status.classList.toggle("import-error", isError);
+}
+
+async function savePhotoAsDataUrl(file, reason, fallbackValue) {
+    const imageInput = document.getElementById("imageInput");
+    const photoFileInput = document.getElementById("photoFileInput");
+    const keepLocal = confirm(
+        reason + "\n\n" +
+        "Keep this photo on this device only? It will not be in your cloud backup " +
+        "until you connect and sign in on the Cloud Sync page."
+    );
+
+    if (!keepLocal) {
+        imageInput.value = fallbackValue || "";
+
+        if (photoFileInput) {
+            photoFileInput.value = "";
+        }
+
+        updateImagePreview();
+        setPhotoStatus("Photo not added.");
+        return;
+    }
+
+    setPhotoStatus("Preparing photo for this device\u2026");
+
+    let blob = file;
+
+    if (window.CloudSync && typeof window.CloudSync.compressImageToJpeg === "function") {
+        try {
+            blob = await window.CloudSync.compressImageToJpeg(file);
+        } catch (error) {
+            blob = file;
+        }
+    }
+
+    const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("Could not read that file."));
+        reader.readAsDataURL(blob);
+    });
+
+    imageInput.value = dataUrl;
+    updateImagePreview();
+    setPhotoStatus("Photo saved on this device only. Connect to Cloud Sync and pick it again to store it in the cloud.");
+}
+
+async function handlePhotoFileChange(event) {
+    const input = event.target;
+    const file = input.files && input.files[0];
+
+    if (!file) return;
+
+    const imageInput = document.getElementById("imageInput");
+    const previousValue = imageInput.value;
+    const objectUrl = URL.createObjectURL(file);
+
+    imageInput.value = objectUrl;
+    updateImagePreview();
+
+    if (!window.CloudSync || typeof window.CloudSync.uploadSnakePhotoFile !== "function") {
+        await savePhotoAsDataUrl(file, "The cloud sync helper did not load on this page.", previousValue);
+        return;
+    }
+
+    setPhotoStatus("Shrinking and uploading photo\u2026");
+
+    try {
+        const url = await window.CloudSync.uploadSnakePhotoFile(file, previousValue);
+
+        imageInput.value = url;
+        URL.revokeObjectURL(objectUrl);
+        updateImagePreview();
+        setPhotoStatus("Photo saved to cloud storage. Press Save Snake to keep it.");
+    } catch (error) {
+        const message = error && error.message ? error.message : String(error);
+
+        if (message === "Not signed in." || message.includes("No Supabase connection")) {
+            await savePhotoAsDataUrl(file, message, previousValue);
+            return;
+        }
+
+        imageInput.value = previousValue;
+        updateImagePreview();
+        setPhotoStatus(`Photo upload failed: ${message}. The previous image was kept.`, true);
+    }
+}
+
 function fillFormForEdit() {
+    const photoFileInput = document.getElementById("photoFileInput");
+
+    if (photoFileInput) {
+        photoFileInput.value = "";
+    }
+
+    setPhotoStatus(DEFAULT_PHOTO_HINT);
+
     if (editingIndex === null || !snakes[editingIndex]) {
         document.getElementById("formPageTitle").textContent = "Add Snake";
         document.getElementById("feedingIntervalInput").value = "14";
@@ -609,6 +717,13 @@ function saveSnakeFromPage() {
         return;
     }
 
+    const imageValue = document.getElementById("imageInput").value.trim();
+
+    if (imageValue.startsWith("blob:")) {
+        alert("The photo is still uploading. Try saving again in a moment.");
+        return;
+    }
+
     const existingSnake = editingIndex !== null && snakes[editingIndex]
         ? snakes[editingIndex]
         : {};
@@ -632,7 +747,7 @@ function saveSnakeFromPage() {
         acquiredDate: document.getElementById("acquiredDateInput").value,
         status: document.getElementById("statusInput").value,
         genes: currentGenes,
-        image: document.getElementById("imageInput").value.trim() || "Images/TheSnakeRoom.jpg"
+        image: imageValue || "Images/TheSnakeRoom.jpg"
     };
 
     if (editingIndex === null || !snakes[editingIndex]) {
@@ -662,3 +777,9 @@ window.saveSnakeFromPage = saveSnakeFromPage;
 
 setupGeneOptions();
 fillFormForEdit();
+
+const photoFileInput = document.getElementById("photoFileInput");
+
+if (photoFileInput) {
+    photoFileInput.addEventListener("change", handlePhotoFileChange);
+}
