@@ -3,6 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room</title>
     <link rel="stylesheet" href="style.css">
@@ -142,5 +144,6 @@
     <script src="morphCalculator.js?v=3"></script>
     <script src="morph-ui.js?v=3"></script>
 
+    <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
 </body>
 </html>

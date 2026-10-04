@@ -2,6 +2,9 @@
 <html>
 
 <head>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
     <title>The Snake Room</title>
 
     <link rel="stylesheet" href="style.css">
@@ -33,5 +36,6 @@
         <p>Holding page for my snakes for sale</p>
     </div>
 
+    <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
 </body>
 </html>
