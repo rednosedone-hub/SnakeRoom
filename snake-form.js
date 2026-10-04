@@ -275,7 +275,7 @@ function updateImagePreview() {
 
 // ---- Photo picker ----------------------------------------------------------
 
-const DEFAULT_PHOTO_HINT = "Pick a photo from this device. On a phone this opens your camera roll. Photos are shrunk and uploaded to your cloud storage.";
+const DEFAULT_PHOTO_HINT = "Pick a photo from this device, or use Take Photo on a phone. On a phone the picker opens your camera roll. Photos are shrunk and uploaded to your cloud storage.";
 
 function setPhotoStatus(message, isError = false) {
     const status = document.getElementById("photoUploadStatus");
@@ -332,12 +332,19 @@ async function savePhotoAsDataUrl(file, reason, fallbackValue) {
     setPhotoStatus("Photo saved on this device only. Connect to Cloud Sync and pick it again to store it in the cloud.");
 }
 
-async function handlePhotoFileChange(event) {
+function handlePhotoFileChange(event) {
     const input = event.target;
     const file = input.files && input.files[0];
 
     if (!file) return;
 
+    // Reset so picking the exact same file again still fires a change event.
+    input.value = "";
+
+    processPhotoFile(file);
+}
+
+async function processPhotoFile(file) {
     const imageInput = document.getElementById("imageInput");
     const previousValue = imageInput.value;
     const objectUrl = URL.createObjectURL(file);
@@ -369,7 +376,8 @@ async function handlePhotoFileChange(event) {
 
         imageInput.value = previousValue;
         updateImagePreview();
-        setPhotoStatus(`Photo upload failed: ${message}. The previous image was kept.`, true);
+        const cleanMessage = message.replace(/\.+$/, "");
+        setPhotoStatus(`Photo upload failed: ${cleanMessage}. The previous image was kept.`, true);
     }
 }
 
@@ -779,7 +787,17 @@ setupGeneOptions();
 fillFormForEdit();
 
 const photoFileInput = document.getElementById("photoFileInput");
+const cameraFileInput = document.getElementById("cameraFileInput");
+const cameraPhotoButton = document.getElementById("cameraPhotoButton");
 
 if (photoFileInput) {
     photoFileInput.addEventListener("change", handlePhotoFileChange);
+}
+
+if (cameraFileInput) {
+    cameraFileInput.addEventListener("change", handlePhotoFileChange);
+}
+
+if (cameraPhotoButton && cameraFileInput) {
+    cameraPhotoButton.addEventListener("click", () => cameraFileInput.click());
 }

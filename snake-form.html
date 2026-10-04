@@ -226,9 +226,14 @@
                     <div class="form-field">
                         <span>Add / Replace Photo</span>
                         <input type="file" id="photoFileInput" accept="image/*">
+                        <button type="button" id="cameraPhotoButton" class="gene-action-button" style="margin-top:8px;">
+                            Take Photo with Camera
+                        </button>
+                        <input type="file" id="cameraFileInput" accept="image/*" capture="environment" style="display:none;">
                         <p class="empty-message" id="photoUploadStatus">
-                            Pick a photo from this device. On a phone this opens your camera
-                            roll. Photos are shrunk and uploaded to your cloud storage.
+                            Pick a photo from this device, or use Take Photo on a phone. On a
+                            phone the picker opens your camera roll. Photos are shrunk and
+                            uploaded to your cloud storage.
                         </p>
                     </div>
 

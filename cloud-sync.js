@@ -685,6 +685,16 @@
         return `u${Date.now()}${Math.random().toString(16).slice(2)}`;
     }
 
+    function describeStorageError(error) {
+        const raw = error && error.message ? error.message : String(error);
+
+        if (/bucket not found/i.test(raw)) {
+            return "Photo storage isn't set up yet. Open the Cloud Sync page, press Copy Photo SQL, and run it once in the Supabase SQL Editor, then try again.";
+        }
+
+        return raw;
+    }
+
     async function uploadSnakePhotoFile(file, existingImage = "") {
         const activeClient = getClient();
 
@@ -711,7 +721,7 @@
         });
 
         if (error) {
-            throw error;
+            throw new Error(describeStorageError(error));
         }
 
         return bucket.getPublicUrl(path).data.publicUrl;
@@ -767,7 +777,7 @@
                 });
 
                 if (error) {
-                    throw error;
+                    throw new Error(describeStorageError(error));
                 }
 
                 const url = bucket.getPublicUrl(path).data.publicUrl;
@@ -780,6 +790,14 @@
 
                 uploaded += 1;
             } catch (error) {
+                const message = error && error.message ? error.message : String(error);
+
+                // A missing bucket fails every file, so abort with the setup
+                // instructions instead of grinding through the whole folder.
+                if (/bucket not found|isn't set up yet/i.test(message)) {
+                    throw error;
+                }
+
                 failed += 1;
                 console.error(`Could not upload ${imagePath}:`, error);
             }
