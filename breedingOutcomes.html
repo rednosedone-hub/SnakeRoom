@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Snake Room - Breeding Outcomes</title>
+    <link rel="stylesheet" href="style.css?v=5">
+</head>
+
+<body>
+    <div class="page-container">
+        <div class="hero-section">
+            <img src="Images/TheSnakeRoom.jpg" class="hero-image" alt="The Snake Room logo">
+
+            <div class="container">
+                <h1>The Snake Room</h1>
+                <h2>Breeding Outcomes</h2>
+            </div>
+        </div>
+
+        <div class="button-row">
+            <a href="index.html" class="main-button">Home</a>
+            <a href="breeding.html" class="main-button">Breeding</a>
+            <a href="snakes.html" class="main-button">Collection</a>
+            <a href="bin-cards.html" class="main-button">Bin Cards</a>
+            <a href="cloud-sync.html" class="main-button">Cloud Sync</a>
+        </div>
+
+        <div class="divider"></div>
+
+        <main class="snake-form-page">
+            <section class="form-section">
+                <h3>Clutches To Hatch</h3>
+
+                <p class="gene-help">
+                    When a clutch hatches, review the hatchlings here and turn them into real
+                    animals in your collection. Each hatchling gets a name, bin number, sex, and
+                    status - genes and photos can be added on their profile pages later.
+                </p>
+
+                <p id="outcomesStatus" class="outcomes-status"></p>
+
+                <div id="outcomesList" class="breeding-list">
+                    <p class="empty-message">No clutches waiting to hatch.</p>
+                </div>
+            </section>
+
+            <section class="form-section">
+                <h3>Hatched Clutches</h3>
+
+                <p class="gene-help">
+                    A record of every clutch you have hatched out. Use Add Hatchling if an egg
+                    pips late or you need to add one you missed.
+                </p>
+
+                <div id="hatchedList" class="breeding-list">
+                    <p class="empty-message">No hatched clutches yet.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="data-helpers.js"></script>
+    <script src="breedingOutcomes.js"></script>
+    <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
+</body>
+
+</html>

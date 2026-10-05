@@ -47,6 +47,21 @@ function migrateBreedingReferences() {
     }
 }
 
+function ensureClutchTokens() {
+    let changed = false;
+
+    clutches.forEach(clutch => {
+        if (!clutch.clutchToken) {
+            clutch.clutchToken = `tc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+            changed = true;
+        }
+    });
+
+    if (changed) {
+        saveStorageArray("clutches", clutches);
+    }
+}
+
 function saveStorageArray(key, items) {
     window.SnakeData.saveStorageArray(key, items);
 }
@@ -261,6 +276,7 @@ function convertPairToClutch(pairId) {
 
     clutches.push({
         id: clutchId,
+        clutchToken: `tc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
         year: pair.eggsLaidDate.slice(0, 4),
         femaleSnakeId: pair.femaleSnakeId || "",
         maleSnakeId: pair.maleSnakeId || "",
@@ -283,65 +299,8 @@ function convertPairToClutch(pairId) {
     renderClutches();
 }
 
-function getNextHatchlingId(clutchId, number) {
-    return `${clutchId}-${String(number).padStart(2, "0")}`;
-}
-
-function convertClutchToSnakes(clutchId) {
-    const clutch = clutches.find(item => item.id === clutchId);
-
-    if (!clutch) {
-        return;
-    }
-
-    if (clutch.convertedToSnakes) {
-        alert("This clutch has already been converted to individual snakes.");
-        return;
-    }
-
-    const hatchDateInput = document.getElementById(`hatchDate-${clutchId}`);
-    const hatchCountInput = document.getElementById(`hatchCount-${clutchId}`);
-    const hatchDate = hatchDateInput.value;
-    const hatchlingCount = Number(hatchCountInput.value) || 0;
-
-    if (!hatchDate || hatchlingCount <= 0) {
-        alert("Enter a hatch date and hatchling count first.");
-        return;
-    }
-
-    for (let index = 1; index <= hatchlingCount; index += 1) {
-        const hatchlingId = getNextHatchlingId(clutch.id, index);
-
-        snakes.push({
-            name: hatchlingId,
-            ID: hatchlingId,
-            morph: hatchlingId,
-            sex: "Unknown",
-            weight: "",
-            hatchDate: hatchDate,
-            acquiredDate: "",
-            lastFed: "",
-            feedingIntervalDays: 7,
-            feederSize: "",
-            status: "Hatchling",
-            genes: [],
-            feedingHistory: [],
-            weightHistory: [],
-            shedHistory: [],
-            image: "Images/TheSnakeRoom.jpg",
-            clutchId: clutch.id,
-            dam: getSnakeLabel(clutch.femaleSnakeId || clutch.femaleIndex),
-            sire: getSnakeLabel(clutch.maleSnakeId || clutch.maleIndex)
-        });
-    }
-
-    clutch.hatchedDate = hatchDate;
-    clutch.hatchlingCount = hatchlingCount;
-    clutch.convertedToSnakes = true;
-
-    saveStorageArray("snakes", snakes);
-    saveStorageArray("clutches", clutches);
-    renderClutches();
+function goToBreedingOutcomes(clutchId) {
+    window.location.href = `breedingOutcomes.html#clutch-${encodeURIComponent(clutchId)}`;
 }
 
 function renderBreedingPairs() {
@@ -446,7 +405,7 @@ function renderClutches() {
                 <p>Pre-lay shed: ${clutch.preLayShedDate || "Not recorded"}</p>
                 <p>Laid: ${clutch.laidDate || "Not recorded"} / Eggs: ${clutch.eggCount || 0}</p>
                 <p>${clutch.convertedToSnakes
-                    ? `Converted to ${clutch.hatchlingCount} hatchlings on ${clutch.hatchedDate}`
+                    ? `Hatched ${clutch.hatchlingCount || 0} hatchlings on ${clutch.hatchedDate || "not recorded"}. Record kept as history.`
                     : clutch.laidDate
                         ? `Waiting to hatch. Expected around ${getExpectedHatchDate(clutch.laidDate)}`
                         : "Waiting to hatch"}</p>
@@ -468,9 +427,8 @@ function renderClutches() {
             </div>
 
             <div class="card-buttons">
-                <button type="button" class="edit-button" onclick="convertClutchToSnakes('${clutch.id}')"
-                    ${clutch.convertedToSnakes ? "disabled" : ""}>
-                    Convert To Snakes
+                <button type="button" class="edit-button" onclick="goToBreedingOutcomes('${clutch.id}')">
+                    ${clutch.convertedToSnakes ? "View Outcomes" : "Record Hatch"}
                 </button>
             </div>
         </div>
@@ -482,9 +440,10 @@ window.updatePairField = updatePairField;
 window.addPairingDate = addPairingDate;
 window.removePairingDate = removePairingDate;
 window.convertPairToClutch = convertPairToClutch;
-window.convertClutchToSnakes = convertClutchToSnakes;
+window.goToBreedingOutcomes = goToBreedingOutcomes;
 
 setupSnakeSelects();
 migrateBreedingReferences();
+ensureClutchTokens();
 renderBreedingPairs();
 renderClutches();

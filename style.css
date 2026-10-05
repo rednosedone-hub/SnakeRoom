@@ -1518,3 +1518,45 @@ p {
     border-radius: 10px;
     padding: 1px 8px;
 }
+
+.outcome-card {
+    gap: 18px;
+}
+
+.hatchling-editor-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+.hatchling-editor-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 10px;
+    align-items: end;
+    border: 1px dashed var(--goldenrod-color);
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.hatchling-editor-heading {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+    color: var(--gold-color);
+}
+
+.hatch-date-field {
+    max-width: 220px;
+}
+
+.hatched-card {
+    border-style: dashed;
+}
+
+@media (max-width: 700px) {
+    .hatchling-editor-row {
+        grid-template-columns: 1fr 1fr;
+    }
+}
