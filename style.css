@@ -1833,3 +1833,35 @@ p {
     margin-left: 5px;
     font-size: 11px;
 }
+
+/* Floating save bar (snake form) */
+
+.floating-save-bar {
+    position: fixed;
+    right: 18px;
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    z-index: 70;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.floating-save-bar.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(12px);
+}
+
+.floating-save-button {
+    padding: 10px 24px;
+    background-color: var(--goldenrod-color);
+    color: var(--black-color);
+    border: 2px solid var(--black-color);
+    border-radius: 24px;
+    font-family: 'CloisterBlack', serif;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 4px 4px 2px 1px var(--black-color);
+}
+
+.floating-save-button:hover {
+    background-color: var(--gold-color);
+}

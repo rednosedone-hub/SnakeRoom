@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Snake Record</title>
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=8">
 </head>
 
 <body>
@@ -303,7 +303,7 @@
                 </div>
             </section>
 
-            <div class="form-page-actions">
+            <div class="form-page-actions" id="saveActionsRow">
                 <button onclick="saveSnakeFromPage()" class="main-button">
                     Save Snake
                 </button>
@@ -315,12 +315,18 @@
         </main>
     </div>
 
+    <div class="floating-save-bar hidden" id="floatingSaveBar">
+        <button type="button" class="floating-save-button" onclick="saveSnakeFromPage()">
+            Save Snake
+        </button>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="data-helpers.js"></script>
     <script src="cloud-sync.js?v=3"></script>
     <script src="geneCatalog.js?v=3"></script>
     <script src="genes.js?v=3"></script>
-    <script src="snake-form.js?v=4"></script>
+    <script src="snake-form.js?v=5"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
 </body>
 

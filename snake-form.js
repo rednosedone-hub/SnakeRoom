@@ -989,3 +989,18 @@ if (cameraFileInput) {
 if (cameraPhotoButton && cameraFileInput) {
     cameraPhotoButton.addEventListener("click", () => cameraFileInput.click());
 }
+
+// The floating Save pill shows whenever the normal save row is scrolled out
+// of view, so long forms can be saved without scrolling to the bottom.
+const saveActionsRow = document.getElementById("saveActionsRow");
+const floatingSaveBar = document.getElementById("floatingSaveBar");
+
+if (saveActionsRow && floatingSaveBar && "IntersectionObserver" in window) {
+    const saveRowObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            floatingSaveBar.classList.toggle("hidden", entry.isIntersecting);
+        });
+    });
+
+    saveRowObserver.observe(saveActionsRow);
+}
