@@ -7,6 +7,73 @@ let selectedSnakeIndexes = new Set();
 const snakeGrid = document.getElementById("snakeGrid");
 const snakeTableWrapper = document.getElementById("snakeTableWrapper");
 
+const SEX_FILTER_OPTIONS = ["All", "Female", "Male", "Unknown"];
+const STATUS_FILTER_OPTIONS = ["Hatchling", "Holdback", "Breeder", "Available", "On Hold", "Sold"];
+let collectionFilters = loadCollectionFilters();
+
+function loadCollectionFilters() {
+    try {
+        const saved = JSON.parse(localStorage.getItem("collectionFilters"));
+
+        if (saved && typeof saved === "object") {
+            return {
+                sex: saved.sex || "All",
+                statuses: Array.isArray(saved.statuses) ? saved.statuses : [],
+                morphText: saved.morphText || "",
+                genes: Array.isArray(saved.genes) ? saved.genes : [],
+                geneMatch: saved.geneMatch === "all" ? "all" : "any"
+            };
+        }
+    } catch (error) {
+        // Corrupted value falls through to the defaults.
+    }
+
+    return { sex: "All", statuses: [], morphText: "", genes: [], geneMatch: "any" };
+}
+
+function saveCollectionFilters() {
+    localStorage.setItem("collectionFilters", JSON.stringify(collectionFilters));
+}
+
+function getActiveFilterCount() {
+    let count = 0;
+
+    if (collectionFilters.sex !== "All") count += 1;
+    if (collectionFilters.statuses.length > 0) count += 1;
+    if (collectionFilters.morphText.trim() !== "") count += 1;
+    if (collectionFilters.genes.length > 0) count += 1;
+
+    return count;
+}
+
+function snakeMatchesGene(snake, geneName) {
+    const searchName = String(geneName).toLowerCase();
+    const hasGene = Array.isArray(snake.genes) && snake.genes.some(gene =>
+        String(gene.name || "").toLowerCase() === searchName
+    );
+
+    if (hasGene) {
+        return true;
+    }
+
+    // Older records keep genes in the morph text instead of the genes array.
+    return ["morph", "name", "ID"].some(field =>
+        String(snake[field] || "").toLowerCase().includes(searchName)
+    );
+}
+
+function snakeMatchesGeneFilters(snake) {
+    if (collectionFilters.genes.length === 0) {
+        return true;
+    }
+
+    const matches = collectionFilters.genes.map(geneName => snakeMatchesGene(snake, geneName));
+
+    return collectionFilters.geneMatch === "all"
+        ? matches.every(Boolean)
+        : matches.some(Boolean);
+}
+
 function loadSnakes() {
     return window.SnakeData.loadSnakesWithIds(window.SnakeData.defaultSnakes);
 }
@@ -163,8 +230,6 @@ function getSelectValue(id, fallbackValue) {
 }
 
 function getFilteredAndSortedSnakes() {
-    const selectedFilter = getSelectValue("filterSelect", "All");
-    const selectedStatus = getSelectValue("statusSelect", "All");
     const selectedSort = getSelectValue("sortSelect", "None");
 
     let snakeList = snakes.map((snake, index) => {
@@ -174,13 +239,25 @@ function getFilteredAndSortedSnakes() {
         };
     });
 
-    if (selectedFilter !== "All") {
-        snakeList = snakeList.filter(snake => snake.sex === selectedFilter);
+    if (collectionFilters.sex !== "All") {
+        snakeList = snakeList.filter(snake => snake.sex === collectionFilters.sex);
     }
 
-    if (selectedStatus !== "All") {
-        snakeList = snakeList.filter(snake => snake.status === selectedStatus);
+    if (collectionFilters.statuses.length > 0) {
+        snakeList = snakeList.filter(snake => collectionFilters.statuses.includes(snake.status));
     }
+
+    const morphSearchText = collectionFilters.morphText.trim().toLowerCase();
+
+    if (morphSearchText !== "") {
+        snakeList = snakeList.filter(snake =>
+            ["name", "morph", "ID"].some(field =>
+                String(snake[field] || "").toLowerCase().includes(morphSearchText)
+            )
+        );
+    }
+
+    snakeList = snakeList.filter(snake => snakeMatchesGeneFilters(snake));
 
     if (selectedSort === "nameAsc") {
         snakeList.sort((a, b) => a.name.localeCompare(b.name));
@@ -280,10 +357,16 @@ function renderSnakes() {
     updateBulkActionBar();
 
     if (snakeList.length === 0) {
+        const clearFiltersButton = getActiveFilterCount() > 0
+            ? `<button type="button" class="main-button" onclick="clearAllFilters()">Clear Filters</button>`
+            : "";
         const emptyMessage = `
-            <p class="empty-message">
-                No snakes match the current filter.
-            </p>
+            <div class="empty-filter-state">
+                <p class="empty-message">
+                    No snakes match the current filter.
+                </p>
+                ${clearFiltersButton}
+            </div>
         `;
 
         if (collectionView === "cards") {
@@ -697,6 +780,143 @@ function renderGeneList() {
     `).join("");
 }
 
+function updateFilterBadge() {
+    const badge = document.getElementById("filterCountBadge");
+    const count = getActiveFilterCount();
+
+    badge.textContent = count;
+    badge.classList.toggle("visible", count > 0);
+}
+
+function toggleFilterPanel() {
+    document.getElementById("filterPanel").classList.toggle("open");
+}
+
+function closeFilterPanel() {
+    document.getElementById("filterPanel").classList.remove("open");
+}
+
+function renderSexSegmented() {
+    document.getElementById("sexSegmented").innerHTML = SEX_FILTER_OPTIONS.map(sex => `
+        <button type="button" class="${collectionFilters.sex === sex ? "active" : ""}"
+            onclick="setSexFilter('${sex}')">
+            ${sex === "All" ? "All" : `${sex}s`}
+        </button>
+    `).join("");
+}
+
+function setSexFilter(sex) {
+    collectionFilters.sex = sex;
+    saveCollectionFilters();
+    renderSexSegmented();
+    updateFilterBadge();
+    renderSnakes();
+}
+
+function renderStatusChips() {
+    document.getElementById("statusChipRow").innerHTML = STATUS_FILTER_OPTIONS.map(status => `
+        <button type="button" class="filter-chip ${collectionFilters.statuses.includes(status) ? "active" : ""}"
+            onclick="toggleStatusFilter('${status}')">
+            ${status}
+        </button>
+    `).join("");
+}
+
+function toggleStatusFilter(status) {
+    const position = collectionFilters.statuses.indexOf(status);
+
+    if (position >= 0) {
+        collectionFilters.statuses.splice(position, 1);
+    } else {
+        collectionFilters.statuses.push(status);
+    }
+
+    saveCollectionFilters();
+    renderStatusChips();
+    updateFilterBadge();
+    renderSnakes();
+}
+
+function renderGeneChips() {
+    const chipRow = document.getElementById("geneChipRow");
+
+    if (!window.GeneTools || !Array.isArray(window.GeneTools.catalog)) {
+        chipRow.innerHTML = `<span class="filter-hint">Gene catalog not loaded.</span>`;
+        return;
+    }
+
+    chipRow.innerHTML = window.GeneTools.catalog.map(gene => {
+        const encodedName = encodeURIComponent(gene.name);
+
+        return `
+            <button type="button" class="filter-chip ${collectionFilters.genes.includes(gene.name) ? "active" : ""}"
+                onclick="toggleGeneFilter(decodeURIComponent('${encodedName}'))">
+                ${gene.name}
+            </button>
+        `;
+    }).join("");
+}
+
+function toggleGeneFilter(geneName) {
+    const position = collectionFilters.genes.indexOf(geneName);
+
+    if (position >= 0) {
+        collectionFilters.genes.splice(position, 1);
+    } else {
+        collectionFilters.genes.push(geneName);
+    }
+
+    saveCollectionFilters();
+    renderGeneChips();
+    updateFilterBadge();
+    renderSnakes();
+}
+
+function renderGeneMatchSegmented() {
+    document.getElementById("geneMatchSegmented").innerHTML = ["any", "all"].map(mode => `
+        <button type="button" class="${collectionFilters.geneMatch === mode ? "active" : ""}"
+            onclick="setGeneMatchMode('${mode}')">
+            ${mode === "any" ? "Any" : "All"}
+        </button>
+    `).join("");
+}
+
+function setGeneMatchMode(mode) {
+    collectionFilters.geneMatch = mode;
+    saveCollectionFilters();
+    renderGeneMatchSegmented();
+    renderSnakes();
+}
+
+function updateMorphFilter(value) {
+    collectionFilters.morphText = value;
+    saveCollectionFilters();
+    updateFilterBadge();
+    renderSnakes();
+}
+
+function clearAllFilters() {
+    collectionFilters = { sex: "All", statuses: [], morphText: "", genes: [], geneMatch: "any" };
+    document.getElementById("morphFilterInput").value = "";
+
+    saveCollectionFilters();
+    renderSexSegmented();
+    renderStatusChips();
+    renderGeneChips();
+    renderGeneMatchSegmented();
+    updateFilterBadge();
+    renderSnakes();
+}
+
+function renderFilterControls() {
+    document.getElementById("morphFilterInput").value = collectionFilters.morphText;
+    renderSexSegmented();
+    renderStatusChips();
+    renderGeneChips();
+    renderGeneMatchSegmented();
+    updateFilterBadge();
+}
+
 window.deleteSnake = deleteSnake;
 window.renderSnakes = renderSnakes;
 window.goToSnakeForm = goToSnakeForm;
@@ -712,6 +932,15 @@ window.updateGeneButtons = updateGeneButtons;
 window.addGene = addGene;
 window.addCustomGene = addCustomGene;
 window.removeGene = removeGene;
+window.toggleFilterPanel = toggleFilterPanel;
+window.closeFilterPanel = closeFilterPanel;
+window.setSexFilter = setSexFilter;
+window.toggleStatusFilter = toggleStatusFilter;
+window.toggleGeneFilter = toggleGeneFilter;
+window.setGeneMatchMode = setGeneMatchMode;
+window.updateMorphFilter = updateMorphFilter;
+window.clearAllFilters = clearAllFilters;
 
 setupGeneOptions();
+renderFilterControls();
 renderSnakes();

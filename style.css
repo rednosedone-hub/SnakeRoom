@@ -1560,3 +1560,191 @@ p {
         grid-template-columns: 1fr 1fr;
     }
 }
+
+/* Collection filter panel */
+
+.toolbar-spacer {
+    flex: 1;
+}
+
+.view-toggle {
+    display: inline-flex;
+    border: 2px solid var(--black-color);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 5px 5px 2px 1px var(--goldenrod-color);
+}
+
+.view-toggle button {
+    padding: 9px 18px;
+    background-color: #222;
+    color: var(--gold-color);
+    border: none;
+    border-right: 2px solid var(--black-color);
+    font-family: 'CloisterBlack', serif;
+    font-size: 22px;
+    cursor: pointer;
+}
+
+.view-toggle button:last-child {
+    border-right: none;
+}
+
+.view-toggle button.active-view-button {
+    background-color: var(--goldenrod-color);
+    color: var(--black-color);
+}
+
+.filter-count-badge {
+    display: none;
+    margin-left: 6px;
+    padding: 0 8px;
+    border-radius: 10px;
+    background-color: var(--black-color);
+    color: var(--gold-color);
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 14px;
+    vertical-align: middle;
+}
+
+.filter-count-badge.visible {
+    display: inline-block;
+}
+
+.filter-panel {
+    display: none;
+    flex-direction: column;
+    gap: 16px;
+    margin: -20px 0 30px;
+    padding: 18px;
+    border: 2px solid var(--gold-color);
+    border-radius: 8px;
+    background-color: rgba(0, 0, 0, 0.35);
+    box-shadow: 5px 5px 2px 1px var(--black-color);
+}
+
+.filter-panel.open {
+    display: flex;
+}
+
+.filter-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.filter-label {
+    min-width: 70px;
+    color: var(--gold-color);
+    font-family: 'CloisterBlack', serif;
+    font-size: 20px;
+}
+
+.filter-hint {
+    color: var(--silver-color);
+    font-size: 13px;
+    font-style: italic;
+}
+
+.filter-input {
+    flex: 1;
+    min-width: 220px;
+    padding: 9px 12px;
+    border: 2px solid var(--gold-color);
+    border-radius: 8px;
+    background-color: var(--black-color);
+    color: var(--gold-color);
+    font-size: 16px;
+}
+
+.segmented {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.segmented button {
+    padding: 7px 14px;
+    background-color: #222;
+    color: var(--gold-color);
+    border: 1px solid var(--goldenrod-color);
+    border-radius: 6px;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+.segmented button.active {
+    background-color: var(--goldenrod-color);
+    color: var(--black-color);
+    font-weight: bold;
+}
+
+.chip-row {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.gene-chip-scroll {
+    max-height: 150px;
+    overflow-y: auto;
+    padding: 8px;
+    width: 100%;
+    border: 1px dashed var(--goldenrod-color);
+    border-radius: 6px;
+}
+
+.filter-chip {
+    padding: 5px 12px;
+    background-color: #222;
+    color: var(--gold-color);
+    border: 1px solid var(--goldenrod-color);
+    border-radius: 14px;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.filter-chip.active {
+    background-color: var(--goldenrod-color);
+    color: var(--black-color);
+    font-weight: bold;
+}
+
+.gene-match-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.filter-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.small-action-button {
+    font-size: 20px;
+    padding: 8px 18px;
+}
+
+.empty-filter-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+@media (max-width: 700px) {
+    .filter-label {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .toolbar-spacer {
+        flex-basis: 100%;
+    }
+}
