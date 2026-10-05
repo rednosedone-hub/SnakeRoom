@@ -59,14 +59,6 @@ function slugify(value) {
         .replace(/^-+|-+$/g, "");
 }
 
-function titleCase(value) {
-    return String(value)
-        .split(/[\s_-]+/)
-        .filter(Boolean)
-        .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-        .join(" ");
-}
-
 function formatCount(clutch) {
     return `Eggs: ${clutch.eggCount || 0}`;
 }
@@ -159,15 +151,14 @@ function createHatchlingRecord(clutch, row, hatchDate) {
     const stamp = Date.now().toString(36);
     const random = Math.random().toString(36).slice(2, 8);
     const hatchlingId = `snake-hatch-${stamp}-${random}`;
-    const parentMorphs = [getSnakeByRefMorph(clutch.femaleSnakeId), getSnakeByRefMorph(clutch.maleSnakeId)]
-        .filter(Boolean)
-        .join(" ");
 
     return {
         id: hatchlingId,
         name: row.name,
-        ID: hatchlingId,
-        morph: titleCase(parentMorphs),
+        // The morph field doubles as the owner-assigned snake ID, so hatchlings
+        // start with their clutch number there instead of pairing text.
+        ID: row.name,
+        morph: row.name,
         sex: row.sex,
         weight: "",
         binNumber: row.binNumber,
@@ -191,12 +182,6 @@ function createHatchlingRecord(clutch, row, hatchDate) {
         laidDate: clutch.laidDate || "",
         hatchedDate: hatchDate || ""
     };
-}
-
-function getSnakeByRefMorph(reference) {
-    const snake = window.SnakeData.getSnakeByReference(snakes, reference);
-
-    return snake ? (snake.name || snake.morph || "") : "";
 }
 
 function extractExistingHatchlingIds(clutch) {

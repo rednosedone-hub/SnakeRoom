@@ -1748,3 +1748,88 @@ p {
         flex-basis: 100%;
     }
 }
+
+/* Sort popover + sortable table headers */
+
+.sort-button-wrapper {
+    position: relative;
+}
+
+.sort-current-label {
+    display: none;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+    margin-left: 8px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background-color: var(--black-color);
+    color: var(--gold-color);
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 13px;
+}
+
+.sort-current-label.visible {
+    display: inline-block;
+}
+
+.sort-popover {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    z-index: 60;
+    width: 280px;
+    max-width: 90vw;
+    max-height: 380px;
+    overflow-y: auto;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px;
+    border: 2px solid var(--gold-color);
+    border-radius: 8px;
+    background-color: var(--background-color);
+    box-shadow: 5px 5px 2px 1px var(--black-color);
+}
+
+.sort-popover.open {
+    display: flex;
+}
+
+.sort-option {
+    text-align: left;
+    padding: 8px 10px;
+    background: none;
+    border: none;
+    border-radius: 6px;
+    color: var(--gold-color);
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+.sort-option:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.sort-option.active {
+    background-color: var(--goldenrod-color);
+    color: var(--black-color);
+    font-weight: bold;
+}
+
+.snake-table th.sortable-header {
+    cursor: pointer;
+    user-select: none;
+}
+
+.snake-table th.sortable-header:hover {
+    color: var(--gold-color);
+}
+
+.sort-arrow {
+    margin-left: 5px;
+    font-size: 11px;
+}

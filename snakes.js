@@ -219,19 +219,166 @@ function showCustomGenePanel() {
     document.getElementById("customGenePanel").style.display = "grid";
 }
 
-function getSelectValue(id, fallbackValue) {
-    const select = document.getElementById(id);
+const SORT_OPTIONS = [
+    { key: "none", label: "Default Order" },
+    { key: "nameAsc", label: "Name (A-Z)" },
+    { key: "nameDesc", label: "Name (Z-A)" },
+    { key: "morphAsc", label: "ID (A-Z)" },
+    { key: "morphDesc", label: "ID (Z-A)" },
+    { key: "binNumberAsc", label: "Bin Number (Low-High)" },
+    { key: "binNumberDesc", label: "Bin Number (High-Low)" },
+    { key: "sexAsc", label: "Sex (Females First)" },
+    { key: "sexDesc", label: "Sex (Males First)" },
+    { key: "weightDesc", label: "Weight (High-Low)" },
+    { key: "weightAsc", label: "Weight (Low-High)" },
+    { key: "fedAsc", label: "Last Fed (Oldest First)" },
+    { key: "fedDesc", label: "Last Fed (Newest First)" },
+    { key: "intervalAsc", label: "Feeding Interval (Shortest)" },
+    { key: "intervalDesc", label: "Feeding Interval (Longest)" },
+    { key: "feederAsc", label: "Feeder (A-Z)" },
+    { key: "feederDesc", label: "Feeder (Z-A)" },
+    { key: "statusAsc", label: "Status (A-Z)" },
+    { key: "statusDesc", label: "Status (Z-A)" }
+];
+let currentSortKey = loadSortKey();
 
-    if (select) {
-        return select.value;
+function loadSortKey() {
+    const saved = localStorage.getItem("collectionSort");
+
+    return SORT_OPTIONS.some(option => option.key === saved) ? saved : "none";
+}
+
+function compareByField(field, direction) {
+    return (a, b) => {
+        const valueA = a[field];
+        const valueB = b[field];
+        const aEmpty = valueA === undefined || valueA === null || String(valueA).trim() === "";
+        const bEmpty = valueB === undefined || valueB === null || String(valueB).trim() === "";
+
+        if (aEmpty && bEmpty) return 0;
+        if (aEmpty) return 1;
+        if (bEmpty) return -1;
+
+        return String(valueA).localeCompare(String(valueB)) * direction;
+    };
+}
+
+function compareByNumber(field, direction) {
+    return (a, b) => {
+        const valueA = a[field];
+        const valueB = b[field];
+        const aEmpty = valueA === undefined || valueA === null || String(valueA).trim() === "";
+        const bEmpty = valueB === undefined || valueB === null || String(valueB).trim() === "";
+
+        if (aEmpty && bEmpty) return 0;
+        if (aEmpty) return 1;
+        if (bEmpty) return -1;
+
+        return (Number(valueA) - Number(valueB)) * direction;
+    };
+}
+
+function compareByIdentity(direction) {
+    return (a, b) => getSnakeIdentityText(a).localeCompare(getSnakeIdentityText(b)) * direction;
+}
+
+function compareByBin(direction) {
+    return (a, b) => {
+        // Put snakes with no bin at the end.
+        if (!a.binNumber && !b.binNumber) return 0;
+        if (!a.binNumber) return 1;
+        if (!b.binNumber) return -1;
+
+        const binA = String(a.binNumber).split("-");
+        const binB = String(b.binNumber).split("-");
+        const rowA = Number(binA[0]);
+        const positionA = Number(binA[1]);
+        const rowB = Number(binB[0]);
+        const positionB = Number(binB[1]);
+
+        if (rowA !== rowB) {
+            return (rowA - rowB) * direction;
+        }
+
+        return (positionA - positionB) * direction;
+    };
+}
+
+const SORT_COMPARATORS = {
+    nameAsc: compareByField("name", 1),
+    nameDesc: compareByField("name", -1),
+    morphAsc: compareByIdentity(1),
+    morphDesc: compareByIdentity(-1),
+    binNumberAsc: compareByBin(1),
+    binNumberDesc: compareByBin(-1),
+    sexAsc: compareByField("sex", 1),
+    sexDesc: compareByField("sex", -1),
+    weightAsc: compareByNumber("weight", 1),
+    weightDesc: compareByNumber("weight", -1),
+    fedAsc: compareByField("lastFed", 1),
+    fedDesc: compareByField("lastFed", -1),
+    intervalAsc: compareByNumber("feedingIntervalDays", 1),
+    intervalDesc: compareByNumber("feedingIntervalDays", -1),
+    feederAsc: compareByField("feederSize", 1),
+    feederDesc: compareByField("feederSize", -1),
+    statusAsc: compareByField("status", 1),
+    statusDesc: compareByField("status", -1)
+};
+
+function toggleSortPopover(event) {
+    event.stopPropagation();
+    document.getElementById("sortPopover").classList.toggle("open");
+}
+
+function closeSortPopover() {
+    document.getElementById("sortPopover").classList.remove("open");
+}
+
+function renderSortPopover() {
+    document.getElementById("sortPopover").innerHTML = SORT_OPTIONS.map(option => `
+        <button type="button" class="sort-option ${currentSortKey === option.key ? "active" : ""}"
+            onclick="applySortKey('${option.key}')">
+            ${option.label}
+        </button>
+    `).join("");
+    updateSortButtonLabel();
+}
+
+function updateSortButtonLabel() {
+    const current = SORT_OPTIONS.find(option => option.key === currentSortKey);
+    const labelSpan = document.getElementById("sortCurrentLabel");
+
+    labelSpan.textContent = current && current.key !== "none" ? current.label : "";
+    labelSpan.classList.toggle("visible", Boolean(current) && current.key !== "none");
+}
+
+function applySortKey(key) {
+    currentSortKey = SORT_OPTIONS.some(option => option.key === key) ? key : "none";
+    localStorage.setItem("collectionSort", currentSortKey);
+    renderSortPopover();
+    closeSortPopover();
+    renderSnakes();
+}
+
+function toggleTableSort(columnKey) {
+    const ascKey = `${columnKey}Asc`;
+
+    applySortKey(currentSortKey === ascKey ? `${columnKey}Desc` : ascKey);
+}
+
+function getSortArrowFor(columnKey) {
+    if (currentSortKey === `${columnKey}Asc`) {
+        return "&#9650;";
     }
 
-    return fallbackValue;
+    if (currentSortKey === `${columnKey}Desc`) {
+        return "&#9660;";
+    }
+
+    return "";
 }
 
 function getFilteredAndSortedSnakes() {
-    const selectedSort = getSelectValue("sortSelect", "None");
-
     let snakeList = snakes.map((snake, index) => {
         return {
             ...snake,
@@ -259,85 +406,11 @@ function getFilteredAndSortedSnakes() {
 
     snakeList = snakeList.filter(snake => snakeMatchesGeneFilters(snake));
 
-    if (selectedSort === "nameAsc") {
-        snakeList.sort((a, b) => a.name.localeCompare(b.name));
+    const comparator = SORT_COMPARATORS[currentSortKey];
+
+    if (comparator) {
+        snakeList.sort(comparator);
     }
-
-    if (selectedSort === "nameDesc") {
-        snakeList.sort((a, b) => b.name.localeCompare(a.name));
-    }
-
-    if (selectedSort === "morphAsc") {
-        snakeList.sort((a, b) => getSnakeIdentityText(a).localeCompare(getSnakeIdentityText(b)));
-    }
-
-    if (selectedSort === "morphDesc") {
-        snakeList.sort((a, b) => getSnakeIdentityText(b).localeCompare(getSnakeIdentityText(a)));
-    }
-
-    if (selectedSort === "sexAsc") {
-        snakeList.sort((a, b) => a.sex.localeCompare(b.sex));
-    }
-
-    if (selectedSort === "sexDesc") {
-        snakeList.sort((a, b) => b.sex.localeCompare(a.sex));
-    }
-
-    if (selectedSort === "weightAsc") {
-        snakeList.sort((a, b) => Number(a.weight || 0) - Number(b.weight || 0));
-    }
-
-    if (selectedSort === "weightDesc") {
-        snakeList.sort((a, b) => Number(b.weight || 0) - Number(a.weight || 0));
-    }
-
-    if (selectedSort === "binNumberAsc") {
-    snakeList.sort((a, b) => {
-        const binA = String(a.binNumber || "").split("-");
-        const binB = String(b.binNumber || "").split("-");
-
-        // Put snakes with no bin at the end
-        if (!a.binNumber && !b.binNumber) return 0;
-        if (!a.binNumber) return 1;
-        if (!b.binNumber) return -1;
-
-        const rowA = Number(binA[0]);
-        const positionA = Number(binA[1]);
-
-        const rowB = Number(binB[0]);
-        const positionB = Number(binB[1]);
-
-        if (rowA !== rowB) {
-            return rowA - rowB;
-        }
-
-        return positionA - positionB;
-    });
-}
-
-    if (selectedSort === "binNumberDesc") {
-        snakeList.sort((a, b) => {
-            const binA = String(a.binNumber || "").split("-");
-            const binB = String(b.binNumber || "").split("-");
-
-            // Put snakes with no bin at the end
-            if (!a.binNumber && !b.binNumber) return 0;
-            if (!a.binNumber) return 1;
-            if (!b.binNumber) return -1;
-
-            const rowA = Number(binA[0]);
-            const positionA = Number(binA[1]);
-
-            const rowB = Number(binB[0]);
-            const positionB = Number(binB[1]);
-
-            if (rowA !== rowB) {
-                return rowB - rowA;
-            }
-
-        return positionB - positionA;
-    });
-}
 
     return snakeList;
 }
@@ -459,6 +532,34 @@ function renderSnakes() {
     });
 }
 
+function renderSnakeTableHeader() {
+    const tableColumns = [
+        { label: `<input type="checkbox" onchange="toggleAllVisibleSnakes(this.checked)">` },
+        { label: "Name", sortKey: "name" },
+        { label: "ID", sortKey: "morph" },
+        { label: "Sex", sortKey: "sex" },
+        { label: "Weight", sortKey: "weight" },
+        { label: "Last Fed", sortKey: "fed" },
+        { label: "Every", sortKey: "interval" },
+        { label: "Feeder", sortKey: "feeder" },
+        { label: "Status", sortKey: "status" },
+        { label: "QR" },
+        { label: "" }
+    ];
+
+    return tableColumns.map(column => {
+        if (!column.sortKey) {
+            return `<th>${column.label}</th>`;
+        }
+
+        return `
+            <th class="sortable-header" onclick="toggleTableSort('${column.sortKey}')">
+                ${column.label}<span class="sort-arrow">${getSortArrowFor(column.sortKey)}</span>
+            </th>
+        `;
+    }).join("");
+}
+
 function renderSnakeTable(snakeList) {
     const rows = snakeList.map(snake => {
         const isChecked = selectedSnakeIndexes.has(snake.originalIndex) ? "checked" : "";
@@ -500,19 +601,7 @@ function renderSnakeTable(snakeList) {
         <table class="snake-table">
             <thead>
                 <tr>
-                    <th>
-                        <input type="checkbox" onchange="toggleAllVisibleSnakes(this.checked)">
-                    </th>
-                    <th>Name</th>
-                    <th>ID</th>
-                    <th>Sex</th>
-                    <th>Weight</th>
-                    <th>Last Fed</th>
-                    <th>Every</th>
-                    <th>Feeder</th>
-                    <th>Status</th>
-                    <th>QR</th>
-                    <th></th>
+                    ${renderSnakeTableHeader()}
                 </tr>
             </thead>
             <tbody>
@@ -932,6 +1021,10 @@ window.updateGeneButtons = updateGeneButtons;
 window.addGene = addGene;
 window.addCustomGene = addCustomGene;
 window.removeGene = removeGene;
+window.toggleSortPopover = toggleSortPopover;
+window.closeSortPopover = closeSortPopover;
+window.applySortKey = applySortKey;
+window.toggleTableSort = toggleTableSort;
 window.toggleFilterPanel = toggleFilterPanel;
 window.closeFilterPanel = closeFilterPanel;
 window.setSexFilter = setSexFilter;
@@ -943,4 +1036,19 @@ window.clearAllFilters = clearAllFilters;
 
 setupGeneOptions();
 renderFilterControls();
+renderSortPopover();
 renderSnakes();
+
+document.addEventListener("click", event => {
+    const popover = document.getElementById("sortPopover");
+
+    if (!popover || !popover.classList.contains("open")) {
+        return;
+    }
+
+    const sortButton = document.getElementById("sortToggleButton");
+
+    if (!popover.contains(event.target) && !sortButton.contains(event.target)) {
+        closeSortPopover();
+    }
+});

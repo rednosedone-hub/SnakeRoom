@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Collection</title>
-    <link rel="stylesheet" href="style.css?v=6">
+    <link rel="stylesheet" href="style.css?v=7">
 </head>
 
 <body>
@@ -39,19 +39,13 @@
                 Filters <span class="filter-count-badge" id="filterCountBadge"></span>
             </button>
 
-            <select id="sortSelect" onchange="renderSnakes()">
-                <option value="None">Sort By</option>
-                <option value="nameAsc">Name (A-Z)</option>
-                <option value="nameDesc">Name (Z-A)</option>
-                <option value="morphAsc">ID (A-Z)</option>
-                <option value="morphDesc">ID (Z-A)</option>
-                <option value="binNumberAsc">Bin Number (Low-High)</option>
-                <option value="binNumberDesc">Bin Number (High-Low)</option>
-                <option value="sexAsc">Sex (Female/Male)</option>
-                <option value="sexDesc">Sex (Male/Female)</option>
-                <option value="weightDesc">Weight (High-Low)</option>
-                <option value="weightAsc">Weight (Low-High)</option>
-            </select>
+            <span class="sort-button-wrapper">
+                <button type="button" class="main-button" id="sortToggleButton" onclick="toggleSortPopover(event)">
+                    Sort <span class="sort-current-label" id="sortCurrentLabel"></span>
+                </button>
+
+                <span class="sort-popover" id="sortPopover"></span>
+            </span>
 
             <span class="toolbar-spacer"></span>
 
@@ -87,7 +81,7 @@
             </div>
 
             <div class="filter-group">
-                <span class="filter-label">Morph</span>
+                <span class="filter-label">ID / Morph</span>
                 <input type="text" id="morphFilterInput" class="filter-input"
                     placeholder="Search name, ID, or morph text..."
                     oninput="updateMorphFilter(this.value)">
@@ -136,7 +130,7 @@
     <script src="data-helpers.js"></script>
     <script src="geneCatalog.js?v=3"></script>
     <script src="genes.js?v=3"></script>
-    <script src="snakes.js?v=4"></script>
+    <script src="snakes.js?v=5"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
 </body>
 
