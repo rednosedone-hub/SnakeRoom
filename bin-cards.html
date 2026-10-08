@@ -26,7 +26,6 @@
             <a href="snakes.html" class="main-button">Collection</a>
             <a href="breeding.html" class="main-button">Breeding</a>
             <a href="morphCalculator.html" class="main-button">Morph Calculator</a>
-            <a href="cloud-sync.html" class="main-button">Cloud Sync</a>
         </div>
 
         <div class="divider print-hidden"></div>
@@ -37,6 +36,19 @@
             <div class="bin-card-controls">
                 <label class="form-field">
                     <span>Print</span>
+                    <select id="printScopeSelect">
+                        <option value="All">All Snakes</option>
+                        <option value="Single">Single Snake</option>
+                    </select>
+                </label>
+
+                <label class="form-field" id="singleSnakeField" style="display: none;">
+                    <span>Snake</span>
+                    <select id="singleSnakeSelect"></select>
+                </label>
+
+                <label class="form-field">
+                    <span>Sex</span>
                     <select id="sexFilter">
                         <option value="All">All Snakes</option>
                         <option value="Female">Females</option>
@@ -79,11 +91,14 @@
 
         <main class="bin-card-sheet" id="binCardSheet"></main>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="data-helpers.js"></script>
+    <script src="cloud-sync.js?v=5"></script>
+    <script src="auto-sync.js?v=1"></script>
     <script src="geneCatalog.js?v=3"></script>
     <script src="genes.js?v=3"></script>
-    <script src="bin-cards.js"></script>
+    <script src="bin-cards.js?v=2"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
 </body>
 

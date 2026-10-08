@@ -294,7 +294,7 @@ async function savePhotoAsDataUrl(file, reason) {
     const keepLocal = confirm(
         reason + "\n\n" +
         "Keep this photo on this device only? It will not be in your cloud backup " +
-        "until you connect and sign in on the Cloud Sync page."
+        "until you're signed in and online \u2014 the app syncs automatically."
     );
 
     if (!keepLocal) {
@@ -324,7 +324,7 @@ async function savePhotoAsDataUrl(file, reason) {
 
     currentPhotos.push({ url: dataUrl, addedAt: new Date().toISOString() });
     syncMainPhotoField();
-    setPhotoStatus("Photo saved on this device only. Connect to Cloud Sync and re-add it to store it in the cloud.");
+    setPhotoStatus("Photo saved on this device only. Photos added while signed in and online are uploaded to the cloud automatically.");
 }
 
 function renderPhotoGallery() {
@@ -481,6 +481,19 @@ function bindQrPullButton() {
     }
 }
 
+// Kept for the QR deep-link flow: recovery now just needs the auto-sync pull.
+async function pullFreshDataAndReload() {
+    const result = await window.CloudSync.pullCore({ silent: true });
+
+    if (result === "pulled" && requestedUid &&
+        window.SnakeData.findSnakeIndexById(window.SnakeData.loadSnakesWithIds([]), requestedUid) >= 0) {
+        window.location.reload();
+        return true;
+    }
+
+    return false;
+}
+
 async function pullAndOpenRequestedSnake() {
     showQrSnakeReport("Pulling your collection from the cloud\u2026");
 
@@ -495,15 +508,13 @@ async function pullAndOpenRequestedSnake() {
         }
 
         showQrSnakeReport(
-            "Pull finished, but that snake is still not on this device. Either the pull " +
-            "failed (try Pull From Cloud on the <a href=\"cloud-sync.html\">Cloud Sync</a> page), " +
+            "Pull finished, but that snake is still not on this device. Either you were offline, " +
             "or the card is old and the snake was re-created. " +
             "<a href=\"snakes.html\">Open the Collection</a> to find the right snake, then print fresh cards."
         );
     } catch (error) {
         showQrSnakeReport(
-            `Pull failed: ${error.message}. Try Pull From Cloud on the ` +
-            "<a href=\"cloud-sync.html\">Cloud Sync</a> page, then scan the card again."
+            `Pull failed: ${error.message}. Reconnect to the internet, then scan the card again.`
         );
     }
 }
@@ -515,34 +526,35 @@ async function recoverMissingUidSnake() {
         title.textContent = "Snake Not On This Device";
     }
 
-    const syncLink = `<a href="cloud-sync.html">Open Cloud Sync</a>`;
-    const pullButton = `<button type="button" class="gene-action-button" id="qrPullButton" style="margin-left:8px;">Pull From Cloud &amp; Open Snake</button>`;
-
     try {
         if (!window.CloudSync || typeof window.CloudSync.getSession !== "function") {
-            showQrSnakeReport(`This snake is not in this device's data yet, and the cloud sync helper did not load. ${syncLink}, then pull your collection and scan the card again.`);
+            showQrSnakeReport(`This snake is not in this device's data yet, and the cloud sync helper did not load. Reload the page once you're online, then scan the card again.`);
             return;
         }
 
         const settings = window.CloudSync.readSettings();
 
         if (!settings.supabaseUrl || !settings.supabaseKey) {
-            showQrSnakeReport(`This snake is not in this device's data yet. ${syncLink}, save your connection and sign in, pull your collection, then scan the card again.`);
+            showQrSnakeReport(`This snake is not in this device's data yet, and no cloud connection is saved. Connect to the internet to sync automatically. If it still does not appear, open the login page and sign in once.`);
             return;
         }
 
         const session = await window.CloudSync.getSession();
 
         if (!session) {
-            showQrSnakeReport(`This snake is not in this device's data yet. ${syncLink} and sign in, then scan the card again and press the pull button. ${pullButton}`);
-            bindQrPullButton();
+            showQrSnakeReport(`This snake is not in this device's data yet. Sign in once on the login page (reached from Home), then scan the card again \u2014 recovery will pull it automatically.`);
             return;
         }
 
-        showQrSnakeReport(`This snake lives in your cloud backup but is not on this device yet. Pull your collection here to open it. ${pullButton}`);
-        bindQrPullButton();
+        showQrSnakeReport(`This snake lives in your cloud backup but is not on this device yet. Pulling your collection now\u2026`);
+
+        const recovered = await pullFreshDataAndReload();
+
+        if (!recovered) {
+            showQrSnakeReport(`Pull finished, but that snake is still not on this device. The card may be old, or the snake was re-created. <a href="snakes.html">Open the Collection</a> to find the right snake.`);
+        }
     } catch (error) {
-        showQrSnakeReport(`Could not reach the cloud to look for this snake: ${error.message}. ${syncLink} to check your connection, then scan again.`);
+        showQrSnakeReport(`Could not reach the cloud to look for this snake: ${error.message}. Reconnect to the internet, then scan again.`);
     }
 }
 

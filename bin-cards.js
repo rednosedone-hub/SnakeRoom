@@ -1,6 +1,9 @@
 const snakes = window.SnakeData.loadSnakesWithIds([]);
 
 const elements = {
+    printScopeSelect: document.getElementById("printScopeSelect"),
+    singleSnakeField: document.getElementById("singleSnakeField"),
+    singleSnakeSelect: document.getElementById("singleSnakeSelect"),
     sexFilter: document.getElementById("sexFilter"),
     statusFilter: document.getElementById("statusFilter"),
     includePhotoInput: document.getElementById("includePhotoInput"),
@@ -10,6 +13,13 @@ const elements = {
 };
 
 function getSelectedSnakes() {
+    if (elements.printScopeSelect.value === "Single") {
+        const snakeId = elements.singleSnakeSelect.value;
+        const snake = snakes.find(item => item.id === snakeId);
+
+        return snake ? [snake] : [];
+    }
+
     const selectedSex = elements.sexFilter.value;
     const selectedStatus = elements.statusFilter.value;
 
@@ -17,6 +27,34 @@ function getSelectedSnakes() {
         .filter(snake => selectedSex === "All" || snake.sex === selectedSex)
         .filter(snake => selectedStatus === "All" || snake.status === selectedStatus)
         .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+}
+
+function getSnakePickerText(snake) {
+    return `${snake.name || "Unnamed"} - ${window.SnakeData.getSnakeIdentityText(snake)}`;
+}
+
+function populateSingleSnakeSelect(selectedId) {
+    const sorted = snakes
+        .slice()
+        .sort((a, b) => getSnakePickerText(a).localeCompare(getSnakePickerText(b)));
+
+    elements.singleSnakeSelect.innerHTML = sorted.map(snake => `
+        <option value="${snake.id}"${snake.id === selectedId ? " selected" : ""}>
+            ${window.SnakeData.getSnakeLabelByReference(snakes, snake.id)}
+        </option>
+    `).join("");
+}
+
+function handlePrintScopeChange() {
+    const isSingle = elements.printScopeSelect.value === "Single";
+
+    elements.singleSnakeField.style.display = isSingle ? "block" : "none";
+
+    if (isSingle) {
+        populateSingleSnakeSelect(snakes[0]?.id || "");
+    }
+
+    renderBinCards();
 }
 
 function getSexClass(snake) {
@@ -113,6 +151,8 @@ function printCards() {
     window.print();
 }
 
+elements.printScopeSelect.addEventListener("change", handlePrintScopeChange);
+elements.singleSnakeSelect.addEventListener("change", renderBinCards);
 elements.sexFilter.addEventListener("change", renderBinCards);
 elements.statusFilter.addEventListener("change", renderBinCards);
 elements.includePhotoInput.addEventListener("change", renderBinCards);

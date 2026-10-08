@@ -10,7 +10,7 @@
 // (Gene catalog is starter + custom; only custom genes need backup.)
 
 (function () {
-    const SNAPSHOT_KEYS = ["snakes", "breedingPairs", "clutches", "customGeneCatalog"];
+    const SNAPSHOT_KEYS = ["snakes", "breedingPairs", "clutches", "breedingGoals", "customGeneCatalog"];
 
     const SETTINGS_KEY = "cloudSyncSettings";
 
@@ -473,13 +473,23 @@
         }
     }
 
-    async function pushSnapshot() {
+    // Core sync used both by the buttons on the login page and by the
+    // automatic background sync (auto-sync.js).
+    //
+    // pushCore({ interactive }):
+    //   interactive = true  -> keeps the old confirm() dialogs and status text.
+    //   interactive = false -> never blocks on a dialog; returns a status so
+    //                          the caller can show its own banner instead.
+    // Status: "pushed" | "conflict" | "shrink-guard" | "no-session" | "error".
+    async function pushCore({ interactive = true } = {}) {
         try {
             const session = await getSession();
 
             if (!session) {
-                setSyncReport("Sign in first, then push.", true);
-                return;
+                if (interactive) {
+                    setSyncReport("Sign in first, then push.", true);
+                }
+                return "no-session";
             }
 
             const activeClient = getClient();
@@ -488,6 +498,10 @@
             const staleCheck = await checkCloudIsStale(activeClient, session.user.id, pushSettings);
 
             if (staleCheck.cloudUpdatedAt && !staleCheck.safe) {
+                if (!interactive) {
+                    return "conflict";
+                }
+
                 const overwrite = confirm(
                     "The cloud backup is newer than this device's last pull.\n\n" +
                     `Cloud updated: ${staleCheck.cloudUpdatedAt}\n` +
@@ -498,8 +512,8 @@
                 );
 
                 if (!overwrite) {
-                    setSyncReport("Push cancelled. Pull from the cloud first to bring the other device's changes onto this device.", true);
-                    return;
+                    setSyncReport("Push cancelled. Use the Pull button to bring the other device's changes onto this device.", true);
+                    return "conflict";
                 }
             }
 
@@ -516,6 +530,10 @@
                 const localSnakeCount = getCollectionCounts().snakes;
 
                 if (cloudSnakeCount >= 5 && localSnakeCount < cloudSnakeCount / 2) {
+                    if (!interactive) {
+                        return "shrink-guard";
+                    }
+
                     const shrink = confirm(
                         "This device has far fewer snakes than the cloud backup.\n\n" +
                         `This device: ${localSnakeCount} snake(s)\n` +
@@ -526,13 +544,15 @@
                     );
 
                     if (!shrink) {
-                        setSyncReport("Push cancelled. Use Pull From Cloud to load this device with the full collection.", true);
-                        return;
+                        setSyncReport("Push cancelled. Use the Pull button to load this device with the full collection.", true);
+                        return "shrink-guard";
                     }
                 }
             }
 
-            setSyncReport("Pushing\u2026");
+            if (interactive) {
+                setSyncReport("Pushing\u2026");
+            }
 
             const snapshot = buildSnapshot();
             const row = {
@@ -550,25 +570,46 @@
                 throw error;
             }
 
-            saveSettings({ ...readSettings(), lastPushedAt: row.updated_at, lastDevice: row.device });
-            setSyncReport(`Pushed ${describeCounts(getCollectionCounts())}.`);
+            saveSettings({
+                ...readSettings(),
+                lastPushedAt: row.updated_at,
+                lastDevice: row.device,
+                cloudUpdatedAt: row.updated_at
+            });
+
+            if (interactive) {
+                setSyncReport(`Pushed ${describeCounts(getCollectionCounts())}.`);
+            }
+
+            return "pushed";
         } catch (error) {
-            setSyncReport(`Push failed: ${error.message}`, true);
+            if (interactive) {
+                setSyncReport(`Push failed: ${error.message}`, true);
+            }
             console.error(error);
+            return "error";
         }
     }
 
-    async function pullSnapshot() {
+    // Core pull. Returns "pulled" | "empty" | "no-session" | "error".
+    // silent keeps the status text off (the auto-sync engine reloads the page
+    // right after a pull, so mid-pull text would never be read anyway).
+    async function pullCore({ silent = false } = {}) {
         try {
             const session = await getSession();
 
             if (!session) {
-                setSyncReport("Sign in first, then pull.", true);
-                return;
+                if (!silent) {
+                    setSyncReport("Sign in first, then pull.", true);
+                }
+                return "no-session";
             }
 
             const activeClient = getClient();
-            setSyncReport("Pulling\u2026");
+
+            if (!silent) {
+                setSyncReport("Pulling\u2026");
+            }
 
             const { data, error } = await activeClient
                 .from("snake_room_backups")
@@ -581,8 +622,10 @@
             }
 
             if (!data || !data.snapshot) {
-                setSyncReport("No cloud backup found yet. Push first from any device.", true);
-                return;
+                if (!silent) {
+                    setSyncReport("No cloud backup found yet. Changes are saved on this device; the backup appears after the first push (automatic once signed in).", true);
+                }
+                return "empty";
             }
 
             applySnapshot(data.snapshot);
@@ -592,11 +635,27 @@
                 cloudUpdatedAt: data.updated_at,
                 cloudDevice: data.device
             });
-            setSyncReport(`Pulled backup from ${data.updated_at || "unknown time"}. Reload the other pages to see the restored data.`);
+
+            if (!silent) {
+                setSyncReport(`Pulled backup from ${data.updated_at || "unknown time"}. Reload the other pages to see the restored data.`);
+            }
+
+            return "pulled";
         } catch (error) {
-            setSyncReport(`Pull failed: ${error.message}`, true);
+            if (!silent) {
+                setSyncReport(`Pull failed: ${error.message}`, true);
+            }
             console.error(error);
+            return "error";
         }
+    }
+
+    async function pushSnapshot() {
+        await pushCore({ interactive: true });
+    }
+
+    async function pullSnapshot() {
+        await pullCore({ silent: false });
     }
 
     async function signInWithPassword() {
@@ -1025,16 +1084,21 @@
         refreshStatus();
 
         // Supabase magic-link sign-ins land back on this page with tokens in
-        // the URL fragment. Parse them, then clean the address bar.
-        const activeClient = getClient();
+        // the URL fragment. Parse them, then clean the address bar. Only run
+        // when the Supabase library actually loaded: cloud-sync.js now ships
+        // on every page for background sync, but the library is only included
+        // where sign-in UI lives.
+        if (window.supabase && typeof window.supabase.createClient === "function") {
+            const activeClient = getClient();
 
-        if (activeClient && window.location.hash.includes("access_token")) {
-            activeClient.auth.onAuthStateChange((event) => {
-                if (event === "SIGNED_IN") {
-                    history.replaceState(null, "", window.location.pathname);
-                    refreshStatus();
-                }
-            });
+            if (activeClient && window.location.hash.includes("access_token")) {
+                activeClient.auth.onAuthStateChange((event) => {
+                    if (event === "SIGNED_IN") {
+                        history.replaceState(null, "", window.location.pathname);
+                        refreshStatus();
+                    }
+                });
+            }
         }
     }
 
@@ -1052,6 +1116,9 @@
         migrateImagesFolder,
         getPhotoLimit,
         getSession,
+        pushCore,
+        pullCore,
+        _getClient: getClient,
         pullSnapshot,
         _setClientForTesting: value => {
             testClient = value;

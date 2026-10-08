@@ -32,13 +32,13 @@
         <div class="button-row">
             <a href="snakes.html" class="main-button">Collection</a>
             <a href="breeding.html" class="main-button">Breeding</a>
+            <a href="goalPlanner.html" class="main-button">Goal Planner</a>
             <a href="breedingOutcomes.html" class="main-button">Outcomes</a>
             <a href="available.html" class="main-button">Available</a>
             <a href="morphCalculator.html" class="main-button">Morph Calculator</a>
             <a href="bin-cards.html" class="main-button">Bin Cards</a>
             <a href="data-tools.html" class="main-button">Data Tools</a>
             <a href="weight-sheet.html" class="main-button">Weight Sheet</a>
-            <a href="cloud-sync.html" class="main-button">Cloud Sync</a>
         </div>
 
         <div class="divider"></div>
@@ -88,8 +88,11 @@
             </section>
         </main>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="data-helpers.js"></script>
+    <script src="cloud-sync.js?v=5"></script>
+    <script src="auto-sync.js?v=1"></script>
     <script src="dashboard.js"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
 </body>

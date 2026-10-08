@@ -6,8 +6,8 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Snake Room</title>
-    <link rel="stylesheet" href="style.css">
+    <title>The Snake Room - Goal Planner</title>
+    <link rel="stylesheet" href="style.css?v=15">
 </head>
 
 <body>
@@ -17,54 +17,50 @@
 
             <div class="container">
                 <h1>The Snake Room</h1>
-                <h2><strong>Snakes that need feeding</strong></h2>
+                <h2>Goal Planner</h2>
             </div>
-        </div>
-
-        <div class="paragraph-container">
-            <p>
-                
-            </p>
         </div>
 
         <div class="button-row">
             <a href="index.html" class="main-button">Home</a>
             <a href="snakes.html" class="main-button">Collection</a>
             <a href="breeding.html" class="main-button">Breeding</a>
-            <a href="available.html" class="main-button">Available</a>
             <a href="morphCalculator.html" class="main-button">Morph Calculator</a>
         </div>
 
         <div class="divider"></div>
 
-        <div class="bulk-action-bar" id="bulkActionBar" style="display: flex;">
-            <span id="selectedCount">0 selected</span>
-            <input id="bulkFedDateInput" type="date">
+        <main class="snake-form-page">
 
-            <button onclick="markSelectedFed()" class="secondary-button">
-                Mark Fed
-            </button>
+            <section class="form-section">
+                <h3>Your Goals</h3>
 
-            <button onclick="updateSelectedFeederSizes()" class="secondary-button">
-                Update Feeders
-            </button>
+                <div class="goal-create-row">
+                    <input type="text" id="goalInput" class="goal-input"
+                        placeholder="Enter a goal morph, e.g. Batman">
+                    <button class="main-button" onclick="createGoal()">Plan This Goal</button>
+                </div>
 
-            <button onclick="clearSelectedSnakes()" class="secondary-button">
-                Clear
-            </button>
+                <div id="goalCreationPanel" class="goal-creation-panel" style="display: none;"></div>
 
-        </div>
+                <div id="goalList" class="goal-list"></div>
+            </section>
 
-        <h3>Snakes Due to Feed</h3>
-        <div class="snake-table-wrapper" id="snakeTableWrapper"></div>
+            <section class="form-section" id="goalDetailSection" style="display: none;">
+                <div id="goalDetail"></div>
+            </section>
+
+        </main>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="data-helpers.js"></script>
     <script src="cloud-sync.js?v=5"></script>
     <script src="auto-sync.js?v=1"></script>
-    <script src="feed-helpers.js"></script>
-    <script src="feeding-session.js"></script>
+    <script src="geneCatalog.js?v=3"></script>
+    <script src="genes.js?v=3"></script>
+    <script src="morphCalculator.js?v=3"></script>
+    <script src="goalPlanner.js?v=3"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
 </body>
 

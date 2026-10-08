@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Collection</title>
-    <link rel="stylesheet" href="style.css?v=7">
+    <link rel="stylesheet" href="style.css?v=15">
 </head>
 
 <body>
@@ -29,7 +29,6 @@
             <a href="morphCalculator.html" class="main-button">Morph Calculator</a>
             <a href="data-tools.html" class="main-button">Data Tools</a>
             <a href="weight-sheet.html" class="main-button">Weight Sheet</a>
-            <a href="cloud-sync.html" class="main-button">Cloud Sync</a>
         </div>
 
         <div class="divider"></div>
@@ -126,8 +125,11 @@
 
         <div class="snake-table-wrapper" id="snakeTableWrapper"></div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="data-helpers.js"></script>
+    <script src="cloud-sync.js?v=5"></script>
+    <script src="auto-sync.js?v=1"></script>
     <script src="geneCatalog.js?v=3"></script>
     <script src="genes.js?v=3"></script>
     <script src="snakes.js?v=5"></script>
