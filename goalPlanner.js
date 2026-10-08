@@ -138,6 +138,30 @@ function getGoal(goalId) {
     return goals.find(goal => goal.id === goalId);
 }
 
+function getStoneLabel() {
+    const stone = window.SnakeData.getSnakeByReference(snakes, "stone");
+    return stone ? window.SnakeData.getSnakeIdentityText(stone) : null;
+}
+
+function getStones() {
+    const labels = new Set();
+    snakes.forEach(snake => {
+        const gene = window.SnakeData.getSnakeByReference(snakes, snake);
+        labels.add(Object.keys(gene));
+    });
+    return labels;
+}
+
+function getStonesLabel() {
+    const stones = getStones();
+    let label = "";
+    stones.forEach(c => {
+        const other = "";
+        return label + " " + (label ? " " : "") + c;
+    });
+    return label;
+}
+
 // ---- Goal decoding
 
 function decodeGoalPieces(goalText) {
@@ -269,7 +293,7 @@ function slotLabel(slot) {
             return slot.label || "Missing snake";
         }
 
-        return `${snake.name || "Unnamed"} + ${window.SnakeData.getSnakeIdentityText(snake)}`;
+        return getSnakeLine(snake);
     }
 
     return `Needed: ${slot.label}`;
@@ -575,7 +599,7 @@ function buildSlotOptions(pieces, kind) {
         .forEach(snake => {
             options.push(`
                 <option value="snake:${snake.id}">
-                    ${escapeHtml(`${snake.name || "Unnamed"} + ${window.SnakeData.getSnakeIdentityText(snake)}`)}
+                    ${escapeHtml(getSnakeLine(snake))}
                 </option>
             `);
         });
@@ -786,7 +810,7 @@ function generatePathIdeas(goalId) {
     ideasContainer.innerHTML = top.map(idea => `
         <div class="goal-idea-card">
             <div class="goal-step-header">
-                <span class="goal-step-title">${escapeHtml(window.SnakeData.getSnakeIdentityText(idea.female))} &times; ${escapeHtml(window.SnakeData.getSnakeIdentityText(idea.male))}</span>
+                <span class="goal-step-title">${escapeHtml(getSnakeLine(idea.female))} &times; ${escapeHtml(getSnakeLine(idea.male))}</span>
                 <button class="goal-add-step" onclick="addStepFromIdea('${goalId}', '${idea.female.id}', '${idea.male.id}')">Use this pairing</button>
             </div>
             <p class="goal-hint">
@@ -806,6 +830,16 @@ function addStepFromIdea(goalId, femaleId, maleId) {
 }
 
 // ---- Utilities
+
+function getSnakeLine(snake) {
+    const geneNames = (snake.genes || [])
+        .map(g => g.name)
+        .filter(Boolean);
+
+    const geneLine = geneSet.map(g => typeof g === "string" ? g : g.name || g.gene).join(", ").trim();
+
+    return `${snake.name || snake.ID || "Unknown snake"} — ${geneLine || "no genes"}`;
+}
 
 function escapeHtml(value) {
     return String(value)
