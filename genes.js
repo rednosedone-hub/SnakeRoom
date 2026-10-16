@@ -100,14 +100,50 @@ function addCustomGeneToCatalog(newGene) {
     return newGene;
 }
 
+// A possible het has an unknown genotype: "66% Het Clown" means a 0.66 chance
+// the animal really carries one copy. It is stored on the record as hetOdds so
+// the calculator can weigh it instead of guessing. Proven animals carry no
+// hetOdds, so old records behave exactly as before.
+function getPossibleHetOdds(geneRecord) {
+    const odds = Number(geneRecord && geneRecord.hetOdds);
+
+    if (!Number.isFinite(odds) || odds <= 0 || odds >= 1) {
+        return null;
+    }
+
+    return odds;
+}
+
+// Rounds to the nearest percent so ordinary odds read naturally (49.6% -> 50%)
+// and snaps the 2/3 case to the hobby's familiar "66% Het".
+function getPossibleHetLabel(geneRecord) {
+    const odds = getPossibleHetOdds(geneRecord);
+
+    if (odds === null) {
+        return "";
+    }
+
+    const percent = Math.round(odds * 100);
+
+    return `${percent === 67 ? 66 : percent}% Het ${geneRecord.name}`;
+}
+
+function getStoredGenePillClass(geneRecord) {
+    return getPossibleHetOdds(geneRecord) === null ? "" : "probhet";
+}
+
 function describeGene(geneRecord) {
     const gene = findGene(geneRecord.name);
     const type = gene ? gene.type : geneRecord.type;
 
     if (type === "recessive") {
-        return geneRecord.copies === 2
-            ? `${geneRecord.name} Visual`
-            : `${geneRecord.name} Het`;
+        if (geneRecord.copies === 2) {
+            return `${geneRecord.name} Visual`;
+        }
+
+        const possibleHetLabel = getPossibleHetLabel(geneRecord);
+
+        return possibleHetLabel || `${geneRecord.name} Het`;
     }
 
     if (geneRecord.copies === 2) {
@@ -122,5 +158,8 @@ window.GeneTools = {
     comboNames: sharedComboNames,
     findGene: findGene,
     addCustomGeneToCatalog: addCustomGeneToCatalog,
-    describeGene: describeGene
+    describeGene: describeGene,
+    getPossibleHetOdds: getPossibleHetOdds,
+    getPossibleHetLabel: getPossibleHetLabel,
+    getStoredGenePillClass: getStoredGenePillClass
 };

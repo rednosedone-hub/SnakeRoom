@@ -42,31 +42,44 @@
         return window.GeneTools.findGene(input.value.trim());
     }
 
+    // Each option carries the genotype it saves, so a possible het keeps the
+    // odds that say it is only a maybe.
     function getStateOptions(gene) {
         if (!gene) {
-            return [{ value: "1", label: "Select a gene first" }];
+            return [{ value: "none", label: "Select a gene first" }];
         }
 
         if (gene.type === "recessive") {
             return [
-                { value: "1", label: "Het" },
-                { value: "2", label: "Visual" }
+                { value: "het", label: "Het", copies: 1 },
+                { value: "possible66", label: "66% Het", copies: 1, hetOdds: 0.66 },
+                { value: "possible50", label: "50% Het", copies: 1, hetOdds: 0.5 },
+                { value: "visual", label: "Visual", copies: 2 }
             ];
         }
 
         if (gene.superType === "none" || gene.superType === "lethal") {
             return [
-                { value: "1", label: "Visual" }
+                { value: "visual", label: "Visual", copies: 1 }
             ];
         }
 
         return [
-            { value: "1", label: "Visual" },
-            { value: "2", label: gene.superName || `Super ${gene.name}` }
+            { value: "visual", label: "Visual", copies: 1 },
+            { value: "super", label: gene.superName || `Super ${gene.name}`, copies: 2 }
         ];
     }
 
     function getGenePillClass(gene) {
+        // Stored snake genes carry their tag; outcome rows carry their own type.
+        const storedTagClass = window.GeneTools.getStoredGenePillClass
+            ? window.GeneTools.getStoredGenePillClass(gene)
+            : "";
+
+        if (storedTagClass) {
+            return storedTagClass;
+        }
+
         const catalogGene = window.GeneTools.findGene(gene.name);
 
         if (gene.type === "probhet") {
@@ -198,11 +211,15 @@
             return;
         }
 
+        const options = getStateOptions(gene);
+        const option = options.find(item => item.value === select.value) || options[0];
+
         parentGenes[parent] = parentGenes[parent].filter(record => record.name !== gene.name);
         parentGenes[parent].push({
             name: gene.name,
             type: gene.type,
-            copies: Number(select.value)
+            copies: option.copies,
+            ...(option.hetOdds ? { hetOdds: option.hetOdds } : {})
         });
 
         input.value = "";
@@ -215,11 +232,16 @@
         const snake = snakes[Number(snakeIndex)];
 
         parentGenes[parent] = Array.isArray(snake?.genes)
-            ? snake.genes.map(gene => ({
-                name: gene.name,
-                type: gene.type,
-                copies: Number(gene.copies) || 1
-            }))
+            ? snake.genes.map(gene => {
+                const hetOdds = window.GeneTools.getPossibleHetOdds(gene);
+
+                return {
+                    name: gene.name,
+                    type: gene.type,
+                    copies: Number(gene.copies) || 1,
+                    ...(hetOdds === null ? {} : { hetOdds: hetOdds })
+                };
+            })
             : [];
 
         renderParentGenes(parent);

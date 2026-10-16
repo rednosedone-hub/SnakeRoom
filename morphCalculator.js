@@ -7,11 +7,13 @@
     function normalizeRecord(record) {
         const gene = getGene(record.name);
         const copies = Number(record.copies);
+        const hetOdds = Number(record.hetOdds);
 
         return {
             name: record.name,
             type: gene ? gene.type : record.type || "codom",
-            copies: Number.isInteger(copies) ? Math.max(0, Math.min(2, copies)) : 1
+            copies: Number.isInteger(copies) ? Math.max(0, Math.min(2, copies)) : 1,
+            hetOdds: Number.isFinite(hetOdds) && hetOdds > 0 && hetOdds < 1 ? hetOdds : null
         };
     }
 
@@ -37,23 +39,62 @@
         return [0, 0];
     }
 
-    function getCopyDistribution(femaleCopies, maleCopies, gene) {
-        if (gene?.type === "recessive" && femaleCopies === 1 && maleCopies === 1) {
-            return [
-                { copies: 2, probability: 0.25 },
-                { copies: -1, probability: 0.75 }
-            ];
+    // Chance this parent passes one recessive allele to an egg. A possible het
+    // only counts for its odds: 66% Het passes the allele 0.66 x 0.5 of the
+    // time, which is what makes those clutches read "33% Het" instead of a
+    // certain "50% Het".
+    function getAlleleChance(record) {
+        if (!record) {
+            return 0;
         }
 
-        if (gene?.type === "recessive" && femaleCopies + maleCopies === 1) {
-            return [
-                { copies: -2, probability: 1 }
-            ];
+        if (record.copies >= 2) {
+            return 1;
+        }
+
+        if (record.copies === 1) {
+            const certainty = record.hetOdds === null || record.hetOdds === undefined ? 1 : record.hetOdds;
+
+            return certainty * 0.5;
+        }
+
+        return 0;
+    }
+
+    function getRecessiveDistribution(femaleRecord, maleRecord) {
+        const femaleChance = getAlleleChance(femaleRecord);
+        const maleChance = getAlleleChance(maleRecord);
+        const visualChance = femaleChance * maleChance;
+        const otherChance = 1 - visualChance;
+        const options = [];
+
+        if (visualChance > 0) {
+            options.push({ copies: 2, hetOdds: null, probability: visualChance });
+        }
+
+        if (otherChance > 0) {
+            const oneCopyChance = femaleChance * (1 - maleChance) + maleChance * (1 - femaleChance);
+
+            // The row is labelled by the chance a hatchling really carries one
+            // copy, the same convention that named 66% / 50% het before.
+            options.push({
+                copies: 1,
+                hetOdds: oneCopyChance / otherChance,
+                probability: otherChance
+            });
+        }
+
+        return options;
+    }
+
+    function getCopyDistribution(femaleRecord, maleRecord, gene) {
+        if (gene?.type === "recessive") {
+            return getRecessiveDistribution(femaleRecord, maleRecord);
         }
 
         const totals = new Map();
-        const femaleAlleles = getAlleleOptions(femaleCopies);
-        const maleAlleles = getAlleleOptions(maleCopies);
+        const femaleAlleles = getAlleleOptions(femaleRecord?.copies || 0);
+        const maleAlleles = getAlleleOptions(maleRecord?.copies || 0);
 
         femaleAlleles.forEach(femaleAllele => {
             maleAlleles.forEach(maleAllele => {
@@ -64,6 +105,7 @@
 
         return Array.from(totals.entries()).map(([copies, count]) => ({
             copies,
+            hetOdds: null,
             probability: count / 4
         }));
     }
@@ -77,7 +119,7 @@
                     nextOutcomes.push({
                         genes: {
                             ...outcome.genes,
-                            [distribution.name]: option.copies
+                            [distribution.name]: { copies: option.copies, hetOdds: option.hetOdds ?? null }
                         },
                         probability: outcome.probability * option.probability
                     });
@@ -94,33 +136,32 @@
 
     function getOutcomeGeneDetails(geneCopies) {
         return Object.entries(geneCopies)
-            .filter(([, copies]) => copies !== 0)
-            .map(([name, copies]) => {
-                if (copies === -1) {
+            .map(([name, record]) => ({
+                name,
+                copies: record.copies,
+                hetOdds: record.hetOdds === undefined ? null : record.hetOdds
+            }))
+            // A row with no copies, or a het with zero chance, is simply absent.
+            .filter(record => record.copies > 0
+                && !(record.copies === 1 && record.hetOdds !== null && record.hetOdds <= 0))
+            .map(record => {
+                if (record.hetOdds !== null && record.hetOdds < 1) {
                     return {
-                        label: `66% Het ${name}`,
-                        name,
-                        copies,
+                        label: window.GeneTools.getPossibleHetLabel(record),
+                        name: record.name,
+                        copies: record.copies,
+                        hetOdds: record.hetOdds,
                         type: "probhet"
                     };
                 }
 
-                if (copies === -2) {
-                    return {
-                        label: `50% Het ${name}`,
-                        name,
-                        copies,
-                        type: "probhet"
-                    };
-                }
-
-                const gene = getGene(name);
+                const gene = getGene(record.name);
 
                 return {
-                    label: window.GeneTools.describeGene({ name, copies }),
-                    name,
-                    copies,
-                    type: getGeneDisplayType(gene, copies)
+                    label: window.GeneTools.describeGene({ name: record.name, copies: record.copies }),
+                    name: record.name,
+                    copies: record.copies,
+                    type: getGeneDisplayType(gene, record.copies)
                 };
             })
             .sort((a, b) => a.label.localeCompare(b.label));
@@ -175,9 +216,12 @@
 
     function getWarnings(geneCopies) {
         return Object.entries(geneCopies)
-            .flatMap(([name, copies]) => {
+            .flatMap(([name, record]) => {
                 const gene = getGene(name);
-                if (!gene || copies <= 0) {
+                const copies = record.copies;
+
+                // Possible hets are not proven carriers, so health notes stay quiet.
+                if (!gene || copies <= 0 || record.hetOdds !== null) {
                     return [];
                 }
 
@@ -241,8 +285,8 @@
         const distributions = geneNames.map(name => ({
             name,
             options: getCopyDistribution(
-                femaleMap.get(name)?.copies || 0,
-                maleMap.get(name)?.copies || 0,
+                femaleMap.get(name) || { copies: 0, hetOdds: null },
+                maleMap.get(name) || { copies: 0, hetOdds: null },
                 getGene(name)
             )
         }));

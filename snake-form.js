@@ -154,10 +154,16 @@ function updateGeneButtons() {
     }
 
     if (gene.type === "recessive") {
-        geneHelp.textContent = `${gene.name} is recessive. Add Het for one copy, or Visual for two copies.`;
+        geneHelp.textContent = `${gene.name} is recessive. Add Het for a proven carrier, 66% Het or 50% Het while it is still unproven, or Visual for two copies.`;
         geneButtonRow.innerHTML = `
             <button type="button" class="gene-action-button" onclick="addGene('het')">
                 Add Het
+            </button>
+            <button type="button" class="gene-action-button" onclick="addGene('possible66')">
+                Add 66% Het
+            </button>
+            <button type="button" class="gene-action-button" onclick="addGene('possible50')">
+                Add 50% Het
             </button>
             <button type="button" class="gene-action-button" onclick="addGene('visual')">
                 Add Visual
@@ -196,17 +202,33 @@ function addGene(mode) {
     }
 
     const copies = mode === "visual" || mode === "super" ? 2 : 1;
+    const hetOdds = getPossibleHetOddsForMode(mode);
 
     currentGenes = currentGenes.filter(currentGene => currentGene.name !== gene.name);
     currentGenes.push({
         name: gene.name,
         type: gene.type,
-        copies: copies
+        copies: copies,
+        ...(hetOdds ? { hetOdds: hetOdds } : {})
     });
 
     geneInput.value = "";
     renderGeneList();
     updateGeneButtons();
+}
+
+// Possible hets are unproven carriers: the odds are stored on the record so the
+// calculator and the goal planner can weigh them instead of guessing.
+function getPossibleHetOddsForMode(mode) {
+    if (mode === "possible66") {
+        return 0.66;
+    }
+
+    if (mode === "possible50") {
+        return 0.5;
+    }
+
+    return null;
 }
 
 function addCustomGene() {
@@ -249,6 +271,20 @@ function removeGene(index) {
     renderGeneList();
 }
 
+// Once a possible het proves out it becomes an ordinary het: the odds tag goes
+// away but the gene stays, so no retyping is needed.
+function proveGene(index) {
+    const gene = currentGenes[index];
+
+    if (!gene) {
+        return;
+    }
+
+    const { hetOdds, ...provenGene } = gene;
+    currentGenes[index] = provenGene;
+    renderGeneList();
+}
+
 function renderGeneList() {
     const geneList = document.getElementById("geneList");
 
@@ -259,14 +295,23 @@ function renderGeneList() {
         return;
     }
 
-    geneList.innerHTML = currentGenes.map((gene, index) => `
-        <span class="gene-pill">
+    geneList.innerHTML = currentGenes.map((gene, index) => {
+        const possibleHet = Boolean(window.GeneTools.getPossibleHetOdds(gene));
+
+        return `
+        <span class="gene-pill ${window.GeneTools.getStoredGenePillClass(gene)}">
             ${getGeneDescription(gene)}
+            ${possibleHet
+                ? `<button type="button" class="gene-remove-button" onclick="proveGene(${index})" title="Mark as a proven het">
+                Proven
+            </button>`
+                : ""}
             <button type="button" class="gene-remove-button" onclick="removeGene(${index})">
                 x
             </button>
         </span>
-    `).join("");
+    `;
+    }).join("");
 }
 
 function updateImagePreview() {

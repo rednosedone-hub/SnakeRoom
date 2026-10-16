@@ -195,6 +195,16 @@ function getGeneDescription(geneRecord) {
     return geneRecord.name;
 }
 
+// Possible hets get the "probhet" pill colour; every other gene keeps the
+// plain pill it has always had.
+function getStoredGenePillClass(geneRecord) {
+    if (window.GeneTools && window.GeneTools.getStoredGenePillClass) {
+        return window.GeneTools.getStoredGenePillClass(geneRecord);
+    }
+
+    return "";
+}
+
 function getSnakeIdentityText(snake) {
     return window.SnakeData.getSnakeIdentityText(snake);
 }
@@ -472,7 +482,7 @@ function renderSnakes() {
             ? `Last fed: ${snake.lastFed} / every ${snake.feedingIntervalDays || 7} days`
             : "No feeding date";
         const genePills = Array.isArray(snake.genes) && snake.genes.length > 0
-            ? snake.genes.map(gene => `<span class="gene-pill">${getGeneDescription(gene)}</span>`).join("")
+            ? snake.genes.map(gene => `<span class="gene-pill ${getStoredGenePillClass(gene)}">${getGeneDescription(gene)}</span>`).join("")
             : `<span class="gene-pill">No genes entered</span>`;
         const binNumberText = snake.binNumber ? `Bin: ${snake.binNumber}` : "No bin number";
         const photoCountBadge = Array.isArray(snake.photos) && snake.photos.length > 1

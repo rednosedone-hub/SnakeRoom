@@ -54,11 +54,23 @@ function serializeGenes(genes) {
 
     return genes
         .filter(gene => gene && gene.name)
-        .map(gene => [
-            gene.name,
-            gene.type || "codom",
-            gene.copies || 1
-        ].join(":"))
+        .map(gene => {
+            const parts = [
+                gene.name,
+                gene.type || "codom",
+                gene.copies || 1
+            ];
+
+            // This page does not load genes.js, so the possible-het check is
+            // done here rather than leaning on GeneTools.
+            const odds = Number(gene.hetOdds);
+
+            if (Number.isFinite(odds) && odds > 0 && odds < 1) {
+                parts.push(odds);
+            }
+
+            return parts.join(":");
+        })
         .join(";");
 }
 
@@ -72,13 +84,19 @@ function parseGenes(text) {
         .map(part => part.trim())
         .filter(Boolean)
         .map(part => {
-            const [name, type = "codom", copies = "1"] = part.split(":").map(value => value.trim());
-
-            return {
+            const [name, type = "codom", copies = "1", hetOdds = ""] = part.split(":").map(value => value.trim());
+            const odds = Number(hetOdds);
+            const gene = {
                 name,
                 type,
                 copies: Number(copies) || 1
             };
+
+            if (hetOdds && Number.isFinite(odds) && odds > 0 && odds < 1) {
+                gene.hetOdds = odds;
+            }
+
+            return gene;
         })
         .filter(gene => gene.name);
 }

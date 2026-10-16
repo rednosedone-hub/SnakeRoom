@@ -2145,6 +2145,58 @@ p {
     min-width: 52px;
 }
 
+.goal-prediction-hit .goal-chip {
+    border-color: var(--gold-color);
+    color: var(--gold-color);
+    font-weight: bold;
+}
+
+.goal-prediction-badge {
+    color: var(--black-color);
+    background-color: var(--gold-color);
+    border-radius: 999px;
+    padding: 1px 8px;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.goal-keep-button {
+    background: none;
+    border: 1px solid var(--goldenrod-color);
+    border-radius: 999px;
+    color: var(--goldenrod-color);
+    cursor: pointer;
+    font-size: 0.72rem;
+    padding: 1px 8px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.goal-keep-button:hover {
+    background-color: var(--gold-color);
+    border-color: var(--gold-color);
+    color: var(--black-color);
+}
+
+.goal-holdback-line strong {
+    color: var(--gold-color);
+}
+
+.goal-predictions-more {
+    margin-top: 8px;
+}
+
+.goal-predictions-more summary {
+    color: var(--goldenrod-color);
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.goal-predictions-more .goal-predictions {
+    margin-top: 8px;
+}
+
 .goal-chip {
     max-width: 100%;
     overflow-wrap: anywhere;

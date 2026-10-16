@@ -13,7 +13,7 @@
 // Pairing math reuses the morph calculator engine, so chance percentages are
 // the same ones the Morph Calculator page reports.
 
-const snakes = window.SnakeData.loadSnakesWithIds([]);
+function getLiveSnakes() { return window.SnakeData.loadSnakesWithIds([]); }
 
 let goals = window.SnakeData.readStorageArray("breedingGoals", []);
 
@@ -139,14 +139,16 @@ function getGoal(goalId) {
 }
 
 function getStoneLabel() {
-    const stone = window.SnakeData.getSnakeByReference(snakes, "stone");
+    const liveSnakes = getLiveSnakes();
+    const stone = window.SnakeData.getSnakeByReference(liveSnakes, "stone");
     return stone ? window.SnakeData.getSnakeIdentityText(stone) : null;
 }
 
 function getStones() {
     const labels = new Set();
-    snakes.forEach(snake => {
-        const gene = window.SnakeData.getSnakeByReference(snakes, snake);
+    const liveSnakes = getLiveSnakes();
+    liveSnakes.forEach(snake => {
+        const gene = window.SnakeData.getSnakeByReference(liveSnakes, snake);
         labels.add(Object.keys(gene));
     });
     return labels;
@@ -278,16 +280,141 @@ function getSnakeGeneCount(snake, piece) {
 }
 
 function buildSnakeMatches(pieces) {
-    return snakes.map(snake =>
+    const liveSnakes = getLiveSnakes();
+    return liveSnakes.map(snake =>
         ({ snake, matches: pieces.map(piece => getSnakeGeneCount(snake, piece)) })
     );
+}
+
+// ---- Next-step hint: simplest owned cross (or buy) that creates progress on a piece.
+
+function getVisualCount(piece, snakeMatches) {
+    return snakeMatches.filter(entry => entry.matches[piece._idx] === "Visual").length;
+}
+
+function getHetCount(piece, snakeMatches) {
+    return snakeMatches.filter(entry => entry.matches[piece._idx] === "Het").length;
+}
+
+function getVisualSnakes(piece, snakeMatches) {
+    return snakeMatches.filter(entry => entry.matches[piece._idx] === "Visual").map(entry => entry.snake);
+}
+
+function getHetSnakes(piece, snakeMatches) {
+    return snakeMatches.filter(entry => entry.matches[piece._idx] === "Het").map(entry => entry.snake);
+}
+
+// Carriers that are only possible hets water down the per-egg odds, so the
+// hint has to say which ones still have something to prove.
+function getUnprovenHetNames(piece, snakeMatches) {
+    return getHetSnakes(piece, snakeMatches)
+        .filter(snake => {
+            const record = (snake.genes || []).find(gene =>
+                gene.name.toLowerCase() === piece.gene.toLowerCase()
+            );
+
+            return window.GeneTools.getPossibleHetOdds(record || {}) !== null;
+        })
+        .map(snake => snake.name);
+}
+
+function formatUnprovenCaveat(piece, snakeMatches) {
+    const unproven = getUnprovenHetNames(piece, snakeMatches);
+
+    if (unproven.length === 0) {
+        return "";
+    }
+
+    const names = unproven.join(" and ");
+
+    return ` ${names} ${unproven.length === 1 ? "is" : "are"} still an unproven het, so the real odds sit lower until that proves out.`;
+}
+
+function nextStepHint(piece, snakeMatches) {
+    const recessive = window.GeneTools.findGene(piece.gene)?.type === "recessive";
+    const visuals = getVisualSnakes(piece, snakeMatches);
+    const hets = getHetSnakes(piece, snakeMatches);
+
+    // For co-doms, any animal that carries the gene already shows it visually
+    // (1 copy = visual, 2 copies = super). There is no hidden "carrier" state.
+    const codomAnimals = recessive
+        ? []
+        : visuals.concat(hets);
+
+    if (recessive) {
+        // visual x het throws visuals (50% per egg for a simple recessive).
+        if (visuals.length > 0 && hets.length > 0) {
+            const hetNames = hets.map(s => s.name).join(" and ");
+            return `You have ${visuals.length} ${piece.gene} visual${visuals.length === 1 ? "" : "s"} on hand. Visual x ${hetNames} (a ${piece.gene} het) can make more visuals (50% per egg).${formatUnprovenCaveat(piece, snakeMatches)}`;
+        }
+
+        if (visuals.length > 0) {
+            return `You have ${visuals.length} ${piece.gene} visual${visuals.length === 1 ? "" : "s"} on hand.`;
+        }
+
+        if (hets.length === 0) {
+            return `No ${piece.gene} carriers yet. Need to buy or breed a ${piece.gene} het first.`;
+        }
+
+        if (hets.length >= 2) {
+            const names = hets.map(s => s.name).join(" and ");
+            return `Breed 2 ${piece.gene} hets to get a visual (25% per egg). Your hets: ${names}.${formatUnprovenCaveat(piece, snakeMatches)}`;
+        }
+
+        return `Only 1 ${piece.gene} het on hand. Need 1 more ${piece.gene} carrier before a het cross can make a visual.`;
+    }
+
+    // Co-dom: 1 copy = visual, 2 copies = super.
+    if (codomAnimals.length > 0) {
+        return `You have ${codomAnimals.length} ${piece.gene} animal${codomAnimals.length === 1 ? "" : "s"} on hand (visual or super).`;
+    }
+
+    return `No ${piece.gene} animals yet. Need to buy or breed a ${piece.gene} visual (1 copy) first.`;
+}
+
+// ---- Holdbacks: the hatchling a step tells you to keep
+//
+// A step can name one of its own outcomes as the animal to hold back ("keep a
+// Clown Visual Leopard"). That planned animal is stored on the step and can be
+// picked as a parent in later steps, which is how a real multi-generation path
+// gets mapped. Nothing is created in the collection until it actually hatches.
+
+function getGoalHoldbacks(goal) {
+    return (goal.steps || [])
+        .map((step, index) => ({ step, index, holdback: step.holdback }))
+        .filter(entry => Boolean(entry.holdback));
+}
+
+function findHoldback(holdbackId) {
+    for (const goal of goals) {
+        const found = getGoalHoldbacks(goal).find(entry => entry.holdback.id === holdbackId);
+
+        if (found) {
+            return { goal, ...found };
+        }
+    }
+
+    return null;
+}
+
+function getHoldbackGenes(holdback) {
+    if (holdback.promotedSnakeId) {
+        const snake = window.SnakeData.getSnakeByReference(getLiveSnakes(), holdback.promotedSnakeId);
+
+        if (snake) {
+            return snake.genes || [];
+        }
+    }
+
+    return holdback.genes || [];
 }
 
 // ---- Slot helper: owned animals vs animals you still need
 
 function slotLabel(slot) {
     if (slot.type === "snake") {
-        const snake = window.SnakeData.getSnakeByReference(snakes, slot.snakeId);
+        const liveSnakes = getLiveSnakes();
+        const snake = window.SnakeData.getSnakeByReference(liveSnakes, slot.snakeId);
 
         if (!snake) {
             return slot.label || "Missing snake";
@@ -296,14 +423,39 @@ function slotLabel(slot) {
         return getSnakeLine(snake);
     }
 
+    if (slot.type === "holdback") {
+        const found = findHoldback(slot.holdbackId);
+
+        if (!found) {
+            return `${slot.label || "Planned holdback"} (holdback removed)`;
+        }
+
+        if (found.holdback.promotedSnakeId) {
+            const snake = window.SnakeData.getSnakeByReference(getLiveSnakes(), found.holdback.promotedSnakeId);
+
+            if (snake) {
+                return getSnakeLine(snake);
+            }
+        }
+
+        return `Planned: ${found.holdback.label} (from Step ${found.index + 1})`;
+    }
+
     return `Needed: ${slot.label}`;
 }
 
 function slotGenes(slot) {
     if (slot.type === "snake") {
-        const snake = window.SnakeData.getSnakeByReference(snakes, slot.snakeId);
+        const snakesLive = window.SnakeData.loadSnakesWithIds([]);
+        const snake = window.SnakeData.getSnakeByReference(snakesLive, slot.snakeId);
 
         return snake ? (snake.genes || []) : [];
+    }
+
+    if (slot.type === "holdback") {
+        const found = findHoldback(slot.holdbackId);
+
+        return found ? getHoldbackGenes(found.holdback) : [];
     }
 
     return inferSlotGenes(slot.label);
@@ -376,6 +528,10 @@ function slotValueToSlot(selectValue) {
 
     if (selectValue.startsWith("snake:")) {
         return { type: "snake", snakeId: selectValue.slice(6), label: "" };
+    }
+
+    if (selectValue.startsWith("holdback:")) {
+        return { type: "holdback", holdbackId: selectValue.slice(9), label: "" };
     }
 
     if (selectValue.startsWith("need:")) {
@@ -464,8 +620,9 @@ function outcomePieceHits(outcome, pieces) {
         const record = outcome.geneDetails.find(gene =>
             gene.name.toLowerCase() === piece.gene.toLowerCase()
         );
+        const recessive = window.GeneTools.findGene(piece.gene)?.type === "recessive";
         const present = Boolean(record) && record.copies !== 0;
-        const full = Boolean(record) && (piece.recessive ? record.copies === 2 : record.copies >= 1);
+        const full = Boolean(record) && (recessive ? record.copies === 2 : record.copies >= 1);
 
         return { present, full };
     });
@@ -483,7 +640,12 @@ function evaluatePairing(femaleSlot, maleSlot, pieces) {
         outcomes = [];
     }
 
-    const hits = outcomes.map(outcome => outcomePieceHits(outcome, pieces));
+    const normalizedPieces = (pieces || []).map(piece => ({
+        ...piece,
+        recessive: window.GeneTools.findGene(piece.gene)?.type === "recessive"
+    }));
+
+    const hits = outcomes.map(outcome => outcomePieceHits(outcome, normalizedPieces));
 
     const goalProbability = outcomes.reduce((sum, outcome, index) =>
         hits[index].every(hit => hit.full) ? sum + outcome.probability : sum, 0);
@@ -520,30 +682,131 @@ function evaluatePairing(femaleSlot, maleSlot, pieces) {
     };
 }
 
-function formatMismatch(evaluation, pieces) {
-    if (!evaluation.bestOutcome) {
-        return "";
+// Orders every outcome of a pairing by how close it lands to the goal, so a
+// step card shows the outcome that produces the goal (or the nearest miss)
+// first instead of burying it under multi-gene combos.
+function rankOutcomesForGoal(outcomes, pieces) {
+    return (outcomes || [])
+        .map(outcome => {
+            const hits = outcomePieceHits(outcome, pieces || []);
+
+            return {
+                outcome,
+                hits,
+                fullCount: hits.filter(hit => hit.full).length,
+                presentCount: hits.filter(hit => hit.present).length,
+                isGoal: hits.length > 0 && hits.every(hit => hit.full)
+            };
+        })
+        .sort((a, b) =>
+            Number(b.isGoal) - Number(a.isGoal)
+            || b.fullCount - a.fullCount
+            || b.presentCount - a.presentCount
+            || b.outcome.probability - a.outcome.probability
+            || a.outcome.morphCount - b.outcome.morphCount
+            || a.outcome.morphName.localeCompare(b.outcome.morphName)
+        );
+}
+
+// Outcomes that land on the same goal pieces are one animal to a breeder, not
+// several rolls: "Clown + Leopard" split across Enchi/Lesser variations is
+// still a 25% chance of holding one back, so each group adds its outcomes up.
+// Only the groups that reach the most pieces are returned.
+function getClosestTiers(ranked, pieces) {
+    const nonGoal = ranked.filter(item => !item.isGoal);
+
+    if (nonGoal.length === 0) {
+        return null;
     }
 
-    const missing = evaluation.bestOutcome.geneDetails
-        .filter(gene => {
-            const piece = pieces.find(item =>
-                item.gene.toLowerCase() === gene.name.toLowerCase()
-            );
+    const bestFullCount = Math.max(...nonGoal.map(item => item.fullCount));
+    const groups = new Map();
 
-            if (!piece) {
-                return false;
+    // With no piece at full strength yet, carriers are the closest thing this
+    // pairing makes, so those group by which goal genes they at least carry.
+    const keyFor = item => item.hits
+        .map((hit, index) => ((bestFullCount > 0 ? hit.full : hit.present) ? pieces[index].gene : ""))
+        .filter(Boolean)
+        .join(" + ") || "none";
+
+    nonGoal
+        .filter(item => item.fullCount === bestFullCount)
+        .forEach(item => {
+            const key = keyFor(item);
+
+            if (!groups.has(key)) {
+                groups.set(key, {
+                    key,
+                    entry: item,
+                    outcomes: [],
+                    chance: 0,
+                    fullCount: bestFullCount,
+                    presentCount: item.presentCount
+                });
             }
 
-            return gene.copies === 0 || (piece.recessive && gene.copies !== 2);
-        })
-        .map(gene => gene.label);
+            const group = groups.get(key);
+            group.outcomes.push(item);
+            group.chance += item.outcome.probability;
+        });
 
-    if (missing.length === 0) {
+    return Array.from(groups.values())
+        .sort((a, b) =>
+            b.chance - a.chance
+            || b.outcomes.length - a.outcomes.length
+            || a.key.localeCompare(b.key)
+        );
+}
+
+// "Reached" pieces are named the way the calculator does ("Clown Visual"),
+// and a piece that is there but short of the goal says how short it is.
+function describeMissing(entry, pieces) {
+    return pieces
+        .map((piece, index) => {
+            const hit = entry.hits[index];
+
+            if (hit.full) {
+                return "";
+            }
+
+            return hit.present
+                ? `${piece.gene} (het only)`
+                : `${piece.gene} (absent)`;
+        })
+        .filter(Boolean)
+        .join(", ");
+}
+
+function formatClosest(tiers, pieces) {
+    if (!tiers || tiers.length === 0) {
         return "";
     }
 
-    return `Best pairing still missing: ${missing.join(", ")}`;
+    if (tiers[0].fullCount === 0) {
+        if (tiers[0].presentCount === 0) {
+            return `This pairing passes none of the goal genes: ${pieces.map(piece => piece.gene).join(", ")}.`;
+        }
+
+        return `Closest this pairing gets: ${formatClosestGroups(tiers, pieces, "as carriers only")} — no goal visuals in this clutch yet.`;
+    }
+
+    return `Closest this pairing gets: ${formatClosestGroups(tiers, pieces)}.`;
+}
+
+function formatClosestGroups(tiers, pieces, prefix = "") {
+    const groups = tiers.slice(0, 2).map(group => {
+        const chance = (group.chance * 100).toFixed(1);
+        const spread = group.outcomes.length > 1
+            ? ` across ${group.outcomes.length} outcome variations`
+            : "";
+        // The carriers-only wording already says the pieces fall short.
+        const missing = prefix ? "" : ` (missing ${describeMissing(group.entry, pieces)})`;
+        const reached = prefix ? `${group.key} ${prefix}` : group.key;
+
+        return `${reached} at ${chance}% per egg${spread}${missing}`;
+    });
+
+    return groups.join("; or ");
 }
 
 function formatWarnings(outcome) {
@@ -590,12 +853,30 @@ function goalIdAchieved(goal) {
 
 // ---- Rendering: goal detail
 
-function buildSlotOptions(pieces, kind) {
+function snakeMovesGoalForward(snake, pieces) {
+    return pieces.some(piece => {
+        const count = getSnakeGeneCount(snake, piece);
+        if (count === "None") {
+            return false;
+        }
+
+        const recessive = window.GeneTools.findGene(piece.gene)?.type === "recessive";
+        if (recessive) {
+            return count === "Het" || count === "Visual";
+        }
+
+        return count === "Visual";
+    });
+}
+
+function buildSlotOptions(goal, kind) {
+    const pieces = goal.pieces;
     const sex = kind === "female" ? "Female" : "Male";
     const options = [];
+    const liveSnakes = getLiveSnakes();
 
-    snakes
-        .filter(snake => snake.sex === sex || snake.sex === "Unknown")
+    liveSnakes
+        .filter(snake => (snake.sex === sex || snake.sex === "Unknown") && snakeMovesGoalForward(snake, pieces))
         .forEach(snake => {
             options.push(`
                 <option value="snake:${snake.id}">
@@ -604,35 +885,130 @@ function buildSlotOptions(pieces, kind) {
             `);
         });
 
+    // Holdbacks from earlier steps: sex is still yours to pick when the clutch
+    // hatches, so they can fill either slot at roughly half the listed odds.
+    getGoalHoldbacks(goal).forEach(entry => {
+        const holdback = entry.holdback;
+
+        options.push(`
+                <option value="holdback:${holdback.id}">
+                    Hold back from Step ${entry.index + 1}: ${escapeHtml(holdback.label)} — ${(holdback.chance * 100).toFixed(1)}% per egg (${(getHoldbackVariationChance(holdback) * 100).toFixed(1)}% any variation), about half that as a ${sex.toLowerCase()}
+                </option>
+            `);
+    });
+
     options.push(`<option value="need:NI animal">NI animal</option>`);
     options.push(`<option value="need:Buy new animal">Need to buy</option>`);
     pieces.forEach(piece => {
-        options.push(`<option value="need:Het ${piece.gene} NI">${escapeHtml(`Need to buy Het ${piece.gene} NI animal`)}</option>`);
-        options.push(`<option value="need:Visual ${piece.gene} NI">${escapeHtml(`Need to buy Visual ${piece.gene} NI animal`)}</option>`);
+        options.push(`<option value="need:Het ${piece.gene} NI">Need to buy Het ${piece.gene} (any sex)</option>`);
+        options.push(`<option value="need:Visual ${piece.gene} NI">Need to buy Visual ${piece.gene} (any sex)</option>`);
     });
 
     return options.join("");
 }
 
-function buildStepCard(goal, step, index) {
-    const evaluation = evaluatePairing(step.female, step.male, goal.pieces);
-    const best = evaluation.bestOutcome;
-    const mismatch = formatMismatch(evaluation, goal.pieces);
-    const warning = formatWarnings(best);
-    const predictions = (evaluation.outcomes || [])
-        .slice(0, 8)
-        .map(outcome => {
-            // Skip gene breakdowns that just repeat the morph name.
-            const breakdown = outcome.genes.filter(gene => gene !== outcome.morphName);
+const PREDICTION_LIMIT = 8;
 
-            return `
-            <div class="goal-prediction-row">
-                <span class="goal-chip">${escapeHtml(outcome.morphName)}</span>
-                <span class="goal-prediction-chance">${(outcome.probability * 100).toFixed(1)}%</span>
+// The genotype of one outcome, ready to store as a snake's genes or as a
+// planned holdback's genes.
+function getOutcomeGenotype(outcome) {
+    return (outcome.geneDetails || []).map(gene => {
+        const catalogGene = window.GeneTools.findGene(gene.name);
+        const genotype = {
+            name: gene.name,
+            copies: gene.copies,
+            type: catalogGene ? catalogGene.type : gene.type
+        };
+
+        // A possible het stays a possible het down the chain.
+        if (gene.hetOdds !== undefined && gene.hetOdds !== null && gene.hetOdds < 1) {
+            genotype.hetOdds = gene.hetOdds;
+        }
+
+        return genotype;
+    });
+}
+
+// Same goal pieces reached, different extras: an Enchi Leopard Clown is still
+// the animal you meant to hold back, so both numbers get reported.
+function getVariationChance(ranked, entry, pieces) {
+    const keyFor = item => item.hits
+        .map((hit, index) => (hit.full ? pieces[index].gene : ""))
+        .filter(Boolean)
+        .join(" + ");
+    const key = keyFor(entry);
+
+    return ranked
+        .filter(item => keyFor(item) === key)
+        .reduce((sum, item) => sum + item.outcome.probability, 0);
+}
+
+function getHoldbackVariationChance(holdback) {
+    return Number(holdback.variationChance) || holdback.chance;
+}
+
+function genotypeSignature(genes) {
+    return (genes || [])
+        .map(gene => `${gene.name}:${gene.copies}:${gene.hetOdds === undefined ? "" : gene.hetOdds}`)
+        .sort()
+        .join("|");
+}
+
+function buildPredictionRow(entry, rankedIndex, goal, step) {
+    // Skip gene breakdowns that just repeat the morph name.
+    const breakdown = entry.outcome.genes.filter(gene => gene !== entry.outcome.morphName);
+    const kept = Boolean(step.holdback)
+        && genotypeSignature(getOutcomeGenotype(entry.outcome)) === genotypeSignature(step.holdback.genes);
+
+    return `
+            <div class="goal-prediction-row ${entry.isGoal ? "goal-prediction-hit" : ""}">
+                <span class="goal-chip">${escapeHtml(entry.outcome.morphName)}</span>
+                <span class="goal-prediction-chance">${(entry.outcome.probability * 100).toFixed(1)}%</span>
+                ${entry.isGoal ? `<span class="goal-prediction-badge">goal</span>` : ""}
+                ${kept ? `<span class="goal-prediction-badge">holding back</span>` : ""}
+                <button class="goal-keep-button" onclick="keepHoldback('${goal.id}', '${step.id}', ${rankedIndex})">Keep one</button>
             </div>
             ${breakdown.length > 0 ? `<div class="goal-hint">${escapeHtml(breakdown.join(" · "))}</div>` : ""}
         `;
-        }).join("");
+}
+
+function buildStepCard(goal, step, index) {
+    const evaluation = evaluatePairing(step.female, step.male, goal.pieces);
+    const ranked = rankOutcomesForGoal(evaluation.outcomes, goal.pieces);
+    const goalEntryCount = ranked.filter(entry => entry.isGoal).length;
+    // When the step can already hit the goal the goal rows say it, so the
+    // closest-miss line is only worth showing when it cannot.
+    const closestTiers = getClosestTiers(ranked, goal.pieces);
+    const mismatch = evaluation.goalProbability > 0 ? "" : formatClosest(closestTiers, goal.pieces);
+    const warning = formatWarnings(evaluation.bestOutcome);
+    const visiblePredictions = ranked.slice(0, PREDICTION_LIMIT);
+    const hiddenPredictions = ranked.slice(PREDICTION_LIMIT);
+    const predictions = visiblePredictions
+        .map((entry, offset) => buildPredictionRow(entry, offset, goal, step))
+        .join("");
+    const morePredictions = hiddenPredictions.length > 0
+        ? `
+            <details class="goal-predictions-more">
+                <summary>Show all ${ranked.length} possible outcomes</summary>
+                <div class="goal-predictions">${hiddenPredictions
+                    .map((entry, offset) => buildPredictionRow(entry, offset + PREDICTION_LIMIT, goal, step))
+                    .join("")}</div>
+            </details>
+        `
+        : "";
+    const holdbackLine = step.holdback
+        ? `
+            <p class="goal-hint goal-holdback-line">
+                Holding back: <strong>${escapeHtml(step.holdback.label)}</strong> — ${(step.holdback.chance * 100).toFixed(1)}% per egg, or
+                ${(getHoldbackVariationChance(step.holdback) * 100).toFixed(1)}% if any variation of the same genes will do.
+                Pick the sex you need when it hatches, then breed it in a later step.
+                ${step.holdback.promotedSnakeId
+            ? ` <span class="goal-prediction-badge">in collection</span>`
+            : `<button class="goal-add-step" onclick="promoteHoldback('${goal.id}', '${step.id}')">Add as a real snake</button>`}
+                <button class="goal-add-step" onclick="clearHoldback('${goal.id}', '${step.id}')">Clear</button>
+            </p>
+        `
+        : "";
 
     return `
         <div class="goal-step-card ${step.done ? "goal-step-done" : ""}">
@@ -645,12 +1021,14 @@ function buildStepCard(goal, step, index) {
                 </span>
             </div>
             ${evaluation.goalProbability > 0
-            ? `<p class="goal-go"><strong>This step can produce the goal!</strong> Chance: ${(evaluation.goalProbability * 100).toFixed(1)}% of the clutch.</p>`
+            ? `<p class="goal-go"><strong>This step can produce the goal!</strong> Chance: ${(evaluation.goalProbability * 100).toFixed(1)}% of the clutch${goalEntryCount > 1 ? ` across ${goalEntryCount} outcomes` : ""}.</p>`
             : ""}
             ${mismatch ? `<p class="goal-warn">${escapeHtml(mismatch)}</p>` : ""}
             ${warning ? `<p class="goal-warn">${escapeHtml(warning)}</p>` : ""}
             ${step.notes ? `<p class="goal-hint">Notes: ${escapeHtml(step.notes)}</p>` : ""}
+            ${holdbackLine}
             <div class="goal-predictions">${predictions}</div>
+            ${morePredictions}
         </div>
     `;
 }
@@ -668,27 +1046,33 @@ function renderGoalDetail(goalId) {
     const pieces = goal.pieces;
     const snakeMatches = buildSnakeMatches(pieces);
 
-    // Collection scan table: piece -> Visual / Het counts + labels.
-    const scanRows = pieces.map((piece, index) => {
-        const gene = window.GeneTools.findGene(piece.gene);
-        const visualEntries = snakeMatches.filter(entry => entry.matches[index] === "Visual");
-        const hetEntries = snakeMatches.filter(entry => entry.matches[index] === "Het");
+    // Collection scan table: piece -> Visual / Het counts + labels. The next-step
+    // hint reads pieces by _idx, so every piece has to carry one.
+    pieces.forEach((piece, index) => { piece._idx = index; });
 
-        const visuals = visualEntries.map(entry =>
-            window.SnakeData.getSnakeIdentityText(entry.snake)
-        );
-        const hets = hetEntries.map(entry =>
-            window.SnakeData.getSnakeIdentityText(entry.snake)
-        );
+        const scanRows = pieces.map((piece, index) => {
+            const gene = window.GeneTools.findGene(piece.gene);
+            const visualEntries = snakeMatches.filter(entry => entry.matches[index] === "Visual");
+            const hetEntries = snakeMatches.filter(entry => entry.matches[index] === "Het");
 
-        return `
+            const visuals = visualEntries.map(entry =>
+                getSnakeLine(entry.snake)
+            );
+            const hets = hetEntries.map(entry =>
+                getSnakeLine(entry.snake)
+            );
+
+            const hint = nextStepHint(piece, snakeMatches);
+
+            return `
             <tr>
                 <td>${escapeHtml(getPieceLabel(piece, gene))}</td>
                 <td>${visuals.length > 0 ? escapeHtml(visuals.join(", ")) : "None"}</td>
                 <td>${hets.length > 0 ? escapeHtml(hets.join(", ")) : (gene?.type === "recessive" ? "None" : "n/a")}</td>
+                <td>${escapeHtml(hint)}</td>
             </tr>
-        `;
-    }).join("");
+            `;
+        }).join("");
 
     // Path mapped so far.
     const stepsHtml = goal.steps.length > 0
@@ -702,14 +1086,14 @@ function renderGoalDetail(goalId) {
                 <span class="goal-label-small">Female</span>
                 <select id="goalFemaleSelect-${goal.id}">
                     <option value="">-- Choose female --</option>
-                    ${buildSlotOptions(pieces, "female")}
+                    ${buildSlotOptions(goal, "female")}
                 </select>
             </label>
             <label class="form-field">
                 <span class="goal-label-small">Male</span>
                 <select id="goalMaleSelect-${goal.id}">
                     <option value="">-- Choose male --</option>
-                    ${buildSlotOptions(pieces, "male")}
+                    ${buildSlotOptions(goal, "male")}
                 </select>
             </label>
             <button class="goal-add-step" onclick="addStepFromSelects('${goal.id}')">Add pairing step</button>
@@ -726,7 +1110,7 @@ function renderGoalDetail(goalId) {
 
         <table class="data-table goal-scan-table">
             <thead>
-                <tr><th>Gene piece needed</th><th>Visual animals you have</th><th>Het animals you have</th></tr>
+                <tr><th>Gene piece needed</th><th>Visual animals you have</th><th>Het animals you have</th><th>Next step</th></tr>
             </thead>
             <tbody>${scanRows}</tbody>
         </table>
@@ -763,8 +1147,9 @@ function generatePathIdeas(goalId) {
         return;
     }
 
-    const females = snakes.filter(snake => snake.sex === "Female" || snake.sex === "Unknown");
-    const males = snakes.filter(snake => snake.sex === "Male" || snake.sex === "Unknown");
+    const liveSnakes = getLiveSnakes();
+    const females = liveSnakes.filter(snake => snake.sex === "Female" || snake.sex === "Unknown");
+    const males = liveSnakes.filter(snake => snake.sex === "Male" || snake.sex === "Unknown");
     const ideas = [];
 
     females.forEach(female => {
@@ -776,6 +1161,8 @@ function generatePathIdeas(goalId) {
             const femaleSlot = { type: "snake", snakeId: female.id, label: "" };
             const maleSlot = { type: "snake", snakeId: male.id, label: "" };
             const evaluation = evaluatePairing(femaleSlot, maleSlot, goal.pieces);
+            const ranked = rankOutcomesForGoal(evaluation.outcomes, goal.pieces);
+            const goalEntries = ranked.filter(entry => entry.isGoal);
 
             ideas.push({
                 female,
@@ -786,7 +1173,12 @@ function generatePathIdeas(goalId) {
                 partial: evaluation.partialProbability,
                 best: evaluation.bestOutcome,
                 bestFullCount: evaluation.bestFullCount,
-                pieceCount: goal.pieces.length
+                pieceCount: goal.pieces.length,
+                bestPresentCount: evaluation.bestPresentCount,
+                goalCount: goalEntries.length,
+                closest: evaluation.goalProbability > 0
+                    ? ""
+                    : formatClosest(getClosestTiers(ranked, goal.pieces), goal.pieces)
             });
         });
     });
@@ -796,11 +1188,12 @@ function generatePathIdeas(goalId) {
         return;
     }
 
-    ideas.sort((a, b) => b.chance - a.chance || b.partial - a.partial);
+    ideas.sort((a, b) => b.chance - a.chance || b.partial - a.partial || b.bestFullCount - a.bestFullCount || b.bestPresentCount - a.bestPresentCount);
 
     const top = ideas
-        .filter(idea => idea.chance > 0 || idea.partial > 0 || idea.bestFullCount >= 0)
-        .slice(0, 6);
+        .filter(idea => idea.chance > 0 || idea.partial > 0 || idea.bestFullCount > 0)
+        .slice(0, 8);
+
 
     if (top.length === 0) {
         ideasContainer.innerHTML = `<p class="empty-message">No pairing in your collection moves toward this goal (or none has expected genes). Try adding a needed animal to the path above.</p>`;
@@ -816,17 +1209,123 @@ function generatePathIdeas(goalId) {
             <p class="goal-hint">
                 ${idea.chance > 0
             ? `Direct chance of the goal: <strong>${(idea.chance * 100).toFixed(1)}%</strong> per egg.`
-            : idea.partial > 0
-                ? `${(idea.partial * 100).toFixed(1)}% of the clutch makes partial progress (carriers/supers).`
+            : idea.closest
+                ? escapeHtml(idea.closest)
                 : `Moves ${idea.bestFullCount} of ${idea.pieceCount} pieces into the clutch.`}
-                ${idea.best && idea.best.genes.length ? ` Top outcome: ${escapeHtml(idea.best.morphName)} (${(idea.best.probability * 100).toFixed(1)}%).` : ""}
             </p>
+            ${idea.closest ? "" : `
+            <p class="goal-hint">
+                Piece check: ${idea.bestFullCount > 0
+            ? `${idea.bestFullCount} of ${idea.pieceCount} required pieces are fully present in the top outcome.`
+            : idea.bestPresentCount > 0
+                ? `${idea.bestPresentCount} of ${idea.pieceCount} required pieces show up as partials (hets/supers); none reach a full presence yet.`
+                : `None of your ${idea.pieceCount} required pieces are present in the top outcome.`}
+            </p>`}
         </div>
     `).join("");
+        
+    if (top.length > 1 && top[0].chance === 0 && top[0].partial === 0) {
+        ideasContainer.insertAdjacentHTML("beforeend", `<p class="goal-hint">
+            None of these pairings can reach the goal in one step. The best options move the most pieces toward being carriers first.
+        </p>`);
+    }
 }
 
 function addStepFromIdea(goalId, femaleId, maleId) {
     addStep(goalId, `snake:${femaleId}`, `snake:${maleId}`);
+}
+
+// ---- Holdback actions
+
+function keepHoldback(goalId, stepId, rankedIndex) {
+    const goal = getGoal(goalId);
+    const step = goal?.steps.find(item => item.id === stepId);
+
+    if (!goal || !step) {
+        return;
+    }
+
+    // Same pairing, same pieces, same order: the row the button pointed at is
+    // the row this index still holds.
+    const ranked = rankOutcomesForGoal(
+        evaluatePairing(step.female, step.male, goal.pieces).outcomes,
+        goal.pieces
+    );
+    const entry = ranked[rankedIndex];
+
+    if (!entry) {
+        return;
+    }
+
+    step.holdback = {
+        id: step.holdback?.id || `hold-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+        label: entry.outcome.morphName,
+        chance: entry.outcome.probability,
+        variationChance: getVariationChance(ranked, entry, goal.pieces),
+        genes: getOutcomeGenotype(entry.outcome),
+        sourceStepId: step.id,
+        createdAt: new Date().toISOString()
+    };
+
+    saveGoals();
+    renderGoalDetail(goalId);
+}
+
+function clearHoldback(goalId, stepId) {
+    const goal = getGoal(goalId);
+    const step = goal?.steps.find(item => item.id === stepId);
+
+    if (!goal || !step) {
+        return;
+    }
+
+    delete step.holdback;
+    saveGoals();
+    renderGoalDetail(goalId);
+}
+
+// The planned animal only becomes a real record once it hatches, and steps that
+// already breed with it follow the real record from then on.
+function promoteHoldback(goalId, stepId) {
+    const goal = getGoal(goalId);
+    const step = goal?.steps.find(item => item.id === stepId);
+    const holdback = step?.holdback;
+
+    if (!goal || !step || !holdback) {
+        return;
+    }
+
+    const answer = prompt(`Name this animal. It is added to your collection as a ${holdback.label}.`, holdback.label);
+
+    if (answer === null) {
+        return;
+    }
+
+    const name = answer.trim() || holdback.label;
+    const snakes = window.SnakeData.loadSnakesWithIds([]);
+    const snake = {
+        id: window.SnakeData.createSnakeId({ name, ID: "", morph: holdback.label }, snakes.length),
+        name,
+        ID: "",
+        morph: holdback.label,
+        binNumber: "",
+        sex: "Unknown",
+        status: "Holdback",
+        weight: "",
+        lastFed: "",
+        feedingIntervalDays: 7,
+        feederSize: "",
+        image: "Images/TheSnakeRoom.jpg",
+        genes: holdback.genes.map(gene => ({ ...gene }))
+    };
+
+    snakes.push(snake);
+    window.SnakeData.saveStorageArray("snakes", snakes);
+
+    holdback.promotedSnakeId = snake.id;
+    saveGoals();
+    renderGoalDetail(goalId);
+    alert(`${name} is in your collection as a Holdback. Set its sex, photo and bin on the Collection page.`);
 }
 
 // ---- Utilities
@@ -836,7 +1335,7 @@ function getSnakeLine(snake) {
         .map(g => g.name)
         .filter(Boolean);
 
-    const geneLine = geneSet.map(g => typeof g === "string" ? g : g.name || g.gene).join(", ").trim();
+    const geneLine = geneNames.join(", ");
 
     return `${snake.name || snake.ID || "Unknown snake"} — ${geneLine || "no genes"}`;
 }
@@ -878,5 +1377,8 @@ window.GoalPlanner = {
     toggleStepDone,
     removeStep,
     editStepNotes,
-    generatePathIdeas
+    generatePathIdeas,
+    keepHoldback,
+    clearHoldback,
+    promoteHoldback
 };
