@@ -301,6 +301,15 @@ p {
     color: var(--silver-color);
 }
 
+/* Shown under "Last Fed" when the most recent attempt was refused: the snake
+   stays on the list, so the row has to explain why it is still there. */
+.feeding-refused {
+    display: block;
+    margin-top: 2px;
+    color: #ffb3b3;
+    font-size: 15px;
+}
+
 /* Feeding day happens standing in front of a rack with a phone in one hand, so
    below 700px the wide table becomes one card per snake: the result dropdown
    is reachable without scrolling sideways. */

@@ -64,6 +64,30 @@ function formatDayText(daysFromToday) {
     return target.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
 }
 
+// A refusal is a real event but not a meal: the snake stays due, and the row
+// says when it last turned food down so it is obvious it was tried.
+function getLastRefusalDate(snake) {
+    if (!Array.isArray(snake.feedingHistory)) {
+        return "";
+    }
+
+    let latest = "";
+
+    snake.feedingHistory.forEach(entry => {
+        if (!entry || entry.result !== "Refused") {
+            return;
+        }
+
+        const date = entry.date || "";
+
+        if (date && date > latest) {
+            latest = date;
+        }
+    });
+
+    return latest;
+}
+
 function describeNextDue(snakes) {
     const waits = [];
     let neverFed = 0;
@@ -157,6 +181,10 @@ function renderFeedingTable(dueItems) {
         const morphLabel = window.SnakeData.getSnakeIdentityText(snake);
         const lastFedText = snake.lastFed ? snake.lastFed : "No feeding record";
         const pendingResult = pendingFeedingResults.get(index) || "";
+        const refusalDate = getLastRefusalDate(snake);
+        const refusalNote = refusalDate && refusalDate > (snake.lastFed || "")
+            ? `<span class="feeding-refused">Refused ${refusalDate}</span>`
+            : "";
 
         // The data-label attributes become the visible field names when the
         // table turns into cards on a phone (style.css, max-width: 700px).
@@ -172,7 +200,7 @@ function renderFeedingTable(dueItems) {
                 <td data-label="Name">${snake.name}</td>
                 <td data-label="ID">${morphLabel}</td>
                 <td data-label="Feeder">${feederSize}</td>
-                <td data-label="Last Fed">${lastFedText}</td>
+                <td data-label="Last Fed">${lastFedText}${refusalNote}</td>
                 <td data-label="Result" class="feeding-result-cell">
                     <select aria-label="Feeding result for ${snake.name || "snake"}" onchange="updateFeedingResult(${index}, this.value)">
                         <option value="" ${pendingResult === "" ? "selected" : ""}>Select</option>
@@ -226,7 +254,13 @@ function markSelectedFed() {
 
     selectedSnakeIndexes.forEach(index => {
         if (snakes[index]) {
-            snakes[index].lastFed = fedDate;
+            const result = pendingFeedingResults.get(index) || "";
+
+            // A refusal is logged, but it is not a meal: lastFed keeps the date
+            // of the last food actually eaten, so the snake stays due.
+            if (result !== "Refused") {
+                snakes[index].lastFed = fedDate;
+            }
 
             if (!Array.isArray(snakes[index].feedingHistory)) {
                 snakes[index].feedingHistory = [];
@@ -237,7 +271,7 @@ function markSelectedFed() {
             snakes[index].feedingHistory.push({
                 date: fedDate,
                 feederSize: snakes[index].feederSize || "",
-                result: pendingFeedingResults.get(index) || ""
+                result
             });
         }
     });
@@ -248,12 +282,23 @@ function markSelectedFed() {
     const resultDetail = Object.keys(resultCounts)
         .map(label => `${resultCounts[label]} ${label}`)
         .join(", ");
+    const refusedCount = resultCounts.refused || 0;
+    const acceptedCount = fedCount - refusedCount;
+    const outcomeParts = [];
+
+    if (acceptedCount > 0) {
+        outcomeParts.push(`${acceptedCount} drop${acceptedCount === 1 ? "s" : ""} off until the next interval`);
+    }
+
+    if (refusedCount > 0) {
+        outcomeParts.push(`${refusedCount} stay${refusedCount === 1 ? "s" : ""} on the list with ${refusedCount === 1 ? "its" : "their"} refusal date`);
+    }
 
     renderFeedingTable(getSnakesDueToFeed(snakes));
     showFeedingReport(
         `Logged ${fedCount} snake${fedCount === 1 ? "" : "s"} for ${fedDate}` +
         `${resultDetail ? ` (${resultDetail})` : ""}. ` +
-        (fedCount === 1 ? "It drops" : "They drop") + " off this list until the next interval."
+        `${outcomeParts.join("; ")}.`
     );
 }
 
