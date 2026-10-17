@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room</title>
-    <link rel="stylesheet" href="style.css?v=18">
+    <link rel="stylesheet" href="style.css?v=19">
 </head>
 
 <body>
@@ -39,9 +39,14 @@
             <a href="bin-cards.html" class="main-button">Bin Cards</a>
             <a href="data-tools.html" class="main-button">Data Tools</a>
             <a href="weight-sheet.html" class="main-button">Weight Sheet</a>
+            <a href="cloud-sync.html" class="main-button">Cloud Sync</a>
         </div>
 
         <div class="divider"></div>
+
+        <p class="cloud-status-line">
+            <a href="cloud-sync.html" data-cloud-status>Cloud backup</a>
+        </p>
 
          <main class="dashboard">
             <section class="summary-grid">
@@ -91,7 +96,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="data-helpers.js"></script>
-    <script src="cloud-sync.js?v=6"></script>
+    <script src="cloud-sync.js?v=7"></script>
     <script src="auto-sync.js?v=2"></script>
     <script src="dashboard.js"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>

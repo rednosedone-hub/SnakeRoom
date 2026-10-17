@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Cloud Sync</title>
-    <link rel="stylesheet" href="style.css?v=18">
+    <link rel="stylesheet" href="style.css?v=19">
 </head>
 
 <body>
@@ -142,49 +142,86 @@
                 <h3>Account</h3>
 
                 <p class="empty-message">
-                    Preferred: sign in with email and password. Create yourself as a user in the
-                    Supabase dashboard under Authentication &rarr; Users &rarr; Add user, set a
-                    password there, and tick "Auto Confirm User". This needs no email at all.
-                </p>
-
-                <p class="empty-message">
-                    Staying signed in: your session renews itself automatically, so a normal
-                    sign-in lasts indefinitely. The usual way to get logged out is the browser
-                    wiping site data &mdash; iPhone Safari does this after a week of not
-                    visiting a site. On a phone, use <strong>Share &rarr; Add to Home Screen</strong>
-                    and open The Snake Room from there: installed apps keep their data for
-                    good. And if a browser ever wipes it, recovering only needs your password
-                    &mdash; the connection is built in and your collection pulls automatically.
+                    Sign in once on each device. Password sign-in sends no email, so it is the
+                    reliable option on a phone. No account yet? Press Create Account.
                 </p>
 
                 <div class="form-grid">
                     <label class="form-field">
                         <span>Email</span>
-                        <input type="email" id="emailInput" placeholder="you@example.com">
+                        <input type="email" id="emailInput" placeholder="you@example.com"
+                            autocomplete="username" inputmode="email" spellcheck="false"
+                            autocapitalize="none" autocorrect="off">
                     </label>
 
                     <label class="form-field">
                         <span>Password</span>
-                        <input type="password" id="passwordInput" placeholder="Your Supabase password">
+                        <input type="password" id="passwordInput" placeholder="Your password"
+                            autocomplete="current-password" autocapitalize="none" autocorrect="off">
                     </label>
                 </div>
 
                 <div class="form-page-actions">
                     <button type="button" class="main-button" id="signInPasswordButton">
-                        Sign In With Password
+                        Sign In
                     </button>
 
-                    <button type="button" class="secondary-button" id="sendMagicLinkButton">
-                        Send Magic Link
+                    <button type="button" class="secondary-button" id="createAccountButton">
+                        Create Account
+                    </button>
+
+                    <button type="button" class="secondary-button" id="resetPasswordButton">
+                        Forgot Password
+                    </button>
+
+                    <button type="button" class="secondary-button" id="resendConfirmButton"
+                        style="display: none;">
+                        Resend Confirmation Email
                     </button>
                 </div>
+
+                <div class="import-report" id="authReport"></div>
+
+                <p class="empty-message">
+                    Your session renews itself, so the only thing that signs you out is the
+                    browser clearing site data &mdash; add the app to your Home Screen and that
+                    stops happening. Prefer an emailed link? Type your email above, then
+                    <button type="button" class="small-link-button" id="sendMagicLinkButton">
+                        Send Magic Link
+                    </button>
+                </p>
+            </section>
+
+            <section class="form-section" id="recoveryPanel" style="display: none;">
+                <h3>Set A New Password</h3>
+
+                <p class="empty-message">
+                    You followed a password reset link, so you are signed in to the account for
+                    this one change. Choose a new password below.
+                </p>
+
+                <div class="form-grid">
+                    <label class="form-field">
+                        <span>New Password</span>
+                        <input type="password" id="newPasswordInput"
+                            autocomplete="new-password" autocapitalize="none" autocorrect="off">
+                    </label>
+                </div>
+
+                <div class="form-page-actions">
+                    <button type="button" class="main-button" id="saveNewPasswordButton">
+                        Save New Password
+                    </button>
+                </div>
+
+                <div class="import-report" id="recoveryReport"></div>
             </section>
         </main>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="data-helpers.js"></script>
-    <script src="cloud-sync.js?v=6"></script>
+    <script src="cloud-sync.js?v=7"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
 </body>
 

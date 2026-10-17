@@ -776,11 +776,46 @@ p {
     padding: 8px 14px;
     background-color: var(--gold-color);
     color: black;
+    border: none;
     border-radius: 8px;
     text-decoration: none;
     font-family: 'CloisterBlack', fantasy, cursive, sans-serif, serif;
     font-size: 22px;
+    cursor: pointer;
     box-shadow: 3px 3px 2px 1px var(--goldenrod-color);
+}
+
+/* Cloud sign-in link on the home screen. An installed app has no address bar,
+   so on a phone this link is the only route to the sign-in page. */
+/* Sits below the divider so the divider's skull ornament (80px tall, centred
+   on the line) cannot sit on top of the tap target. */
+.cloud-status-line {
+    display: flex;
+    justify-content: center;
+    margin: 46px 0 0;
+}
+
+.cloud-status-line a {
+    display: inline-block;
+    max-width: 100%;
+    padding: 7px 16px;
+    border: 1px solid var(--goldenrod-color);
+    border-radius: 999px;
+    background-color: #14110a;
+    color: var(--text-color);
+    font-size: 17px;
+    text-align: center;
+    text-decoration: none;
+}
+
+.cloud-status-line a[data-cloud-state="signed-in"] {
+    border-color: #6fbf73;
+    color: #b6e6b8;
+}
+
+.cloud-status-line a[data-cloud-state="off"] {
+    border-color: #8a3b3b;
+    color: #ffb3b3;
 }
 
 .dashboard-list {

@@ -326,6 +326,44 @@
         }
     }
 
+    // The link back to this page, shown on the home screen. Without it an
+    // installed app on a phone has no way to reach sign-in at all: standalone
+    // mode has no address bar.
+    async function refreshStatusChip() {
+        const chips = document.querySelectorAll("[data-cloud-status]");
+
+        if (!chips.length) {
+            return;
+        }
+
+        let label = "Cloud backup \u2014 tap to sign in";
+        let chipState = "signed-out";
+
+        try {
+            const settings = readSettings();
+
+            if (!settings.supabaseUrl || !settings.supabaseKey) {
+                label = "Cloud backup \u2014 not set up";
+                chipState = "off";
+            } else {
+                const session = await getSession();
+
+                if (session) {
+                    label = `Cloud backup \u2014 ${session.user.email || "signed in"}`;
+                    chipState = "signed-in";
+                }
+            }
+        } catch (error) {
+            label = "Cloud backup \u2014 check connection";
+            chipState = "off";
+        }
+
+        chips.forEach(chip => {
+            chip.textContent = label;
+            chip.dataset.cloudState = chipState;
+        });
+    }
+
     // ---- Actions ----------------------------------------------------------
 
     function normalizeSupabaseUrl(url) {
@@ -666,20 +704,96 @@
         await pullCore({ silent: false });
     }
 
+    // ---- Account ----------------------------------------------------------
+    //
+    // Signing in has to work on a phone that has never seen this app, with no
+    // address bar to type a URL into and no email client set up. So the page
+    // offers the three actions that cover every case: sign in (password only,
+    // no email delivery involved), create an account, and reset a forgotten
+    // password.
+
+    function setAuthReport(message, isError = false) {
+        if (document.getElementById("authReport")) {
+            showReport("authReport", message, isError);
+            return;
+        }
+
+        setSyncReport(message, isError);
+    }
+
+    function readCredentials() {
+        const emailInput = document.getElementById("emailInput");
+        const passwordInput = document.getElementById("passwordInput");
+
+        return {
+            email: emailInput ? emailInput.value.trim() : "",
+            password: passwordInput ? passwordInput.value || "" : ""
+        };
+    }
+
+    function currentPageRedirect() {
+        // Tokens arrive in the hash; sending that back as a redirect is noise.
+        return window.location.href.split("#")[0];
+    }
+
+    function revealResendButton() {
+        const button = document.getElementById("resendConfirmButton");
+
+        if (button) {
+            button.style.display = "inline-block";
+        }
+    }
+
+    // Supabase's raw errors ("Invalid login credentials") do not tell a phone
+    // user what to do next, and on iOS the most common cause is a capital
+    // letter the keyboard added to the email address.
+    function describeAuthError(error) {
+        const code = (error && (error.code || error.error_code)) || "";
+        const message = (error && error.message) || String(error);
+
+        if (/invalid login credentials/i.test(message) || code === "invalid_credentials") {
+            return "That email and password were not recognised. Check the email address has no capital letter at the start (phone keyboards add one). If you have never made an account here, press Create Account. If the password is wrong, press Forgot Password.";
+        }
+
+        if (/email not confirmed/i.test(message) || code === "email_not_confirmed") {
+            revealResendButton();
+            return "This account exists, but its email address is not confirmed yet. Open the confirmation email from Supabase (check the spam folder), or press Resend Confirmation Email below.";
+        }
+
+        if (/user already registered/i.test(message) || code === "user_already_exists") {
+            return "An account with that email already exists. Press Sign In instead \u2014 or Forgot Password if the password is lost.";
+        }
+
+        if (/password should be at least/i.test(message)) {
+            return "Supabase needs a password of at least 6 characters.";
+        }
+
+        if (/rate limit|too many requests|email_send_rate_limit/i.test(message) || /rate_limit/i.test(code)) {
+            return "Supabase is throttling emails from this project (its built-in mail service allows only a few an hour). Wait an hour and try again \u2014 or sign in with a password, which sends no email at all.";
+        }
+
+        if (/failed to fetch|networkerror|load failed/i.test(message)) {
+            return "This device could not reach Supabase. Check the connection and try again.";
+        }
+
+        if (/supabase library not loaded/i.test(message)) {
+            return "The Supabase library did not load (it comes from a CDN). Check the connection and reload the page.";
+        }
+
+        return message;
+    }
+
     async function signInWithPassword() {
         try {
-            const emailInput = document.getElementById("emailInput");
-            const passwordInput = document.getElementById("passwordInput");
-            const email = emailInput.value.trim();
-            const password = passwordInput.value || "";
+            const { email, password } = readCredentials();
 
             if (!email || !password) {
-                setSyncReport("Enter both your email and your password.", true);
+                setAuthReport("Enter both your email and your password.", true);
                 return;
             }
 
             const activeClient = getClient();
-            setSyncReport("Signing in\u2026");
+            setAuthReport("Signing in\u2026");
 
             const { error } = await activeClient.auth.signInWithPassword({
                 email,
@@ -690,21 +804,184 @@
                 throw error;
             }
 
-            passwordInput.value = "";
+            const passwordInput = document.getElementById("passwordInput");
+
+            if (passwordInput) {
+                passwordInput.value = "";
+            }
+
             saveSettings({ ...readSettings(), lastEmail: email });
             await refreshStatus();
+            await refreshStatusChip();
 
             // A wiped phone (or a brand-new device) has no local snakes. Pull
             // immediately so the user does not have to think about it.
             if (getCollectionCounts().snakes === 0) {
-                setSyncReport(`Signed in as ${email}. This device has no snakes yet, so your collection is being pulled from the cloud\u2026`);
+                setAuthReport(`Signed in as ${email}. This device has no snakes yet, so your collection is being pulled from the cloud\u2026`);
                 await pullSnapshot();
                 return;
             }
 
-            setSyncReport(`Signed in as ${email}.`);
+            setAuthReport(`Signed in as ${email}.`);
         } catch (error) {
-            setSyncReport(`Sign in failed: ${error.message}`, true);
+            setAuthReport(`Sign in failed: ${describeAuthError(error)}`, true);
+            console.error(error);
+        }
+    }
+
+    async function createAccount() {
+        try {
+            const { email, password } = readCredentials();
+
+            if (!email || !password) {
+                setAuthReport("Enter the email and password you want to use, then press Create Account.", true);
+                return;
+            }
+
+            if (password.length < 6) {
+                setAuthReport("Choose a password with at least 6 characters.", true);
+                return;
+            }
+
+            const activeClient = getClient();
+            setAuthReport("Creating your account\u2026");
+
+            const { data, error } = await activeClient.auth.signUp({
+                email,
+                password,
+                options: { emailRedirectTo: currentPageRedirect() }
+            });
+
+            if (error) {
+                throw error;
+            }
+
+            saveSettings({ ...readSettings(), lastEmail: email });
+
+            if (data && data.session) {
+                // Email confirmation is switched off in this project, so the
+                // account is usable straight away.
+                const passwordInput = document.getElementById("passwordInput");
+
+                if (passwordInput) {
+                    passwordInput.value = "";
+                }
+
+                await refreshStatus();
+                await refreshStatusChip();
+                setAuthReport(`Account created and signed in as ${email}.`);
+
+                if (getCollectionCounts().snakes === 0) {
+                    await pullSnapshot();
+                } else {
+                    setSyncReport("Account ready. Press Push To Cloud to save this device's collection under it.");
+                }
+
+                return;
+            }
+
+            revealResendButton();
+            setAuthReport(`Account created for ${email}. Supabase has emailed a confirmation link \u2014 open it on this device, then press Sign In. Nothing can sync until the address is confirmed.`);
+        } catch (error) {
+            setAuthReport(`Could not create the account: ${describeAuthError(error)}`, true);
+            console.error(error);
+        }
+    }
+
+    async function resendConfirmationEmail() {
+        try {
+            const { email } = readCredentials();
+
+            if (!email) {
+                setAuthReport("Enter your email first, then press Resend Confirmation Email.", true);
+                return;
+            }
+
+            const activeClient = getClient();
+            const { error } = await activeClient.auth.resend({
+                type: "signup",
+                email,
+                options: { emailRedirectTo: currentPageRedirect() }
+            });
+
+            if (error) {
+                throw error;
+            }
+
+            setAuthReport(`Confirmation email sent again to ${email}. If it does not arrive, check the spam folder.`);
+        } catch (error) {
+            setAuthReport(`Could not resend the confirmation email: ${describeAuthError(error)}`, true);
+            console.error(error);
+        }
+    }
+
+    async function sendPasswordReset() {
+        try {
+            const { email } = readCredentials();
+
+            if (!email) {
+                setAuthReport("Enter your email first, then press Forgot Password.", true);
+                return;
+            }
+
+            const activeClient = getClient();
+            setAuthReport("Asking Supabase for a reset link\u2026");
+
+            const { error } = await activeClient.auth.resetPasswordForEmail(email, {
+                redirectTo: currentPageRedirect()
+            });
+
+            if (error) {
+                throw error;
+            }
+
+            setAuthReport(`If ${email} has an account, Supabase has emailed a reset link. Open it on this device and this page will ask for a new password.`);
+        } catch (error) {
+            setAuthReport(`Could not send the reset link: ${describeAuthError(error)}`, true);
+            console.error(error);
+        }
+    }
+
+    function showRecoveryPanel() {
+        const panel = document.getElementById("recoveryPanel");
+
+        if (!panel) {
+            return;
+        }
+
+        panel.style.display = "";
+
+        if (typeof panel.scrollIntoView === "function") {
+            panel.scrollIntoView({ block: "start" });
+        }
+    }
+
+    async function saveNewPassword() {
+        try {
+            const input = document.getElementById("newPasswordInput");
+            const password = input ? input.value : "";
+
+            if (password.length < 6) {
+                showReport("recoveryReport", "Choose a password with at least 6 characters.", true);
+                return;
+            }
+
+            const activeClient = getClient();
+            const { error } = await activeClient.auth.updateUser({ password });
+
+            if (error) {
+                throw error;
+            }
+
+            if (input) {
+                input.value = "";
+            }
+
+            showReport("recoveryReport", "New password saved. Use it to sign in from now on.");
+            await refreshStatus();
+            await refreshStatusChip();
+        } catch (error) {
+            showReport("recoveryReport", `Could not save the new password: ${describeAuthError(error)}`, true);
             console.error(error);
         }
     }
@@ -1062,6 +1339,10 @@
         bind("clearConnectionButton", clearConnection);
         bind("sendMagicLinkButton", sendMagicLink);
         bind("signInPasswordButton", signInWithPassword);
+        bind("createAccountButton", createAccount);
+        bind("resendConfirmButton", resendConfirmationEmail);
+        bind("resetPasswordButton", sendPasswordReset);
+        bind("saveNewPasswordButton", saveNewPassword);
         bind("signOutButton", signOut);
         bind("copySqlButton", async () => {
             await navigator.clipboard.writeText(SETUP_SQL);
@@ -1090,20 +1371,39 @@
         bindEvents();
         updateConnectionInputs();
         refreshStatus();
+        refreshStatusChip();
 
-        // Supabase magic-link sign-ins land back on this page with tokens in
-        // the URL fragment. Parse them, then clean the address bar. Only run
-        // when the Supabase library actually loaded: cloud-sync.js now ships
-        // on every page for background sync, but the library is only included
-        // where sign-in UI lives.
+        // Emailed links (magic link, confirmation, password reset) land back on
+        // this page with tokens in the URL fragment. Parse them, clean the
+        // address bar, and switch on the new-password panel for a reset. Only
+        // the Cloud Sync page has the account UI, so nothing to do elsewhere.
+        if (!document.getElementById("recoveryPanel")) {
+            return;
+        }
+
+        const hash = window.location.hash;
+
+        if (hash.includes("type=recovery")) {
+            showRecoveryPanel();
+        }
+
         if (window.supabase && typeof window.supabase.createClient === "function") {
             const activeClient = getClient();
 
-            if (activeClient && window.location.hash.includes("access_token")) {
+            if (activeClient) {
                 activeClient.auth.onAuthStateChange((event) => {
+                    if (event === "PASSWORD_RECOVERY") {
+                        showRecoveryPanel();
+                        return;
+                    }
+
                     if (event === "SIGNED_IN") {
-                        history.replaceState(null, "", window.location.pathname);
+                        if (window.location.hash.includes("access_token")) {
+                            history.replaceState(null, "", window.location.pathname);
+                        }
+
                         refreshStatus();
+                        refreshStatusChip();
                     }
                 });
             }
@@ -1124,6 +1424,8 @@
         migrateImagesFolder,
         getPhotoLimit,
         getSession,
+        describeAuthError,
+        refreshStatusChip,
         pushCore,
         pullCore,
         _getClient: getClient,
