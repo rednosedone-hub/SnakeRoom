@@ -1,6 +1,10 @@
 # Never upload the full-resolution originals archive
 ImagesOriginals/
 
+# Collection exports contain animal names, bins and feeding history; keep them
+# out of the repo (the app can re-export at any time).
+snake-room-collection-*.csv
+
 # OS junk
 desktop.ini
 Thumbs.db

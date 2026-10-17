@@ -104,6 +104,20 @@ function addCustomGeneToCatalog(newGene) {
 // the animal really carries one copy. It is stored on the record as hetOdds so
 // the calculator can weigh it instead of guessing. Proven animals carry no
 // hetOdds, so old records behave exactly as before.
+// "Normal" is the absence of a gene, but it can end up saved as one (typed as
+// a custom gene, or imported from a spreadsheet). Treated as a real allele it
+// doubles every outcome and invents morphs like "Super normal", so it is
+// dropped before any prediction is calculated.
+const NON_GENE_NAMES = new Set(["normal", "wild type", "wildtype", "wt", "none", "no genes"]);
+
+function isNonGeneName(geneName) {
+    return NON_GENE_NAMES.has(String(geneName || "").trim().toLowerCase());
+}
+
+function stripNonGenes(genes) {
+    return (genes || []).filter(gene => gene && !isNonGeneName(gene.name));
+}
+
 function getPossibleHetOdds(geneRecord) {
     const odds = Number(geneRecord && geneRecord.hetOdds);
 
@@ -159,6 +173,8 @@ window.GeneTools = {
     findGene: findGene,
     addCustomGeneToCatalog: addCustomGeneToCatalog,
     describeGene: describeGene,
+    isNonGeneName: isNonGeneName,
+    stripNonGenes: stripNonGenes,
     getPossibleHetOdds: getPossibleHetOdds,
     getPossibleHetLabel: getPossibleHetLabel,
     getStoredGenePillClass: getStoredGenePillClass

@@ -270,9 +270,11 @@
         `;
     }
 
-    function renderResults(outcomes) {
+    function renderResults(outcomes, hasGenesEntered) {
         if (outcomes.length === 0) {
-            elements.results.innerHTML = `<p>Select the Morphs for each parent to begin.</p>`;
+            elements.results.innerHTML = hasGenesEntered
+                ? `<p>Every egg is normal — neither parent has a gene entered.</p>`
+                : `<p>Select the Morphs for each parent to begin.</p>`;
             return;
         }
 
@@ -312,7 +314,7 @@
             parentGenes.male
         );
 
-        renderResults(outcomes);
+        renderResults(outcomes, parentGenes.female.length + parentGenes.male.length > 0);
     }
 
     function bindEvents() {

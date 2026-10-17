@@ -1098,6 +1098,11 @@ function buildStepCard(goal, step, index) {
             </details>
         `
         : "";
+    // Two normals (or a slot that lost its animal) have nothing to predict;
+    // saying so beats an empty step card.
+    const emptyHint = ranked.length === 0
+        ? `<p class="goal-hint">No genes in this pairing, so every egg would be normal.</p>`
+        : "";
     const holdbacks = getStepHoldbacks(step);
     const holdbackSummary = holdbacks.length > 1
         ? `<p class="goal-hint">Keeping ${holdbacks.length} from this clutch. When one hatches as a female and one as a male, breed those two together in a later step.</p>`
@@ -1132,6 +1137,7 @@ function buildStepCard(goal, step, index) {
             ${mismatch ? `<p class="goal-warn">${escapeHtml(mismatch)}</p>` : ""}
             ${warning ? `<p class="goal-warn">${escapeHtml(warning)}</p>` : ""}
             ${step.notes ? `<p class="goal-hint">Notes: ${escapeHtml(step.notes)}</p>` : ""}
+            ${emptyHint}
             ${holdbackSummary}
             ${holdbackLine}
             <div class="goal-predictions">${predictions}</div>

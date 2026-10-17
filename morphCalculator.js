@@ -19,8 +19,11 @@
 
     function getParentGeneMap(parentGenes) {
         const map = new Map();
+        const genes = window.GeneTools && window.GeneTools.stripNonGenes
+            ? window.GeneTools.stripNonGenes(parentGenes)
+            : parentGenes || [];
 
-        parentGenes.map(normalizeRecord).forEach(record => {
+        genes.map(normalizeRecord).forEach(record => {
             map.set(record.name, record);
         });
 
