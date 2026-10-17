@@ -284,6 +284,117 @@ p {
     border: 1px solid var(--black-color);
 }
 
+/* Feeding session: the feeding-result dropdown inside the table. 16px text
+   keeps iOS from zooming the whole page when it gains focus. */
+.feeding-table select {
+    width: 100%;
+    min-width: 130px;
+    padding: 8px 10px;
+    font-size: 16px;
+    color: var(--gold-color);
+    background-color: #0d0b07;
+    border: 2px solid var(--goldenrod-color);
+    border-radius: 8px;
+}
+
+.feeding-next-due {
+    color: var(--silver-color);
+}
+
+/* Feeding day happens standing in front of a rack with a phone in one hand, so
+   below 700px the wide table becomes one card per snake: the result dropdown
+   is reachable without scrolling sideways. */
+@media (max-width: 700px) {
+    .feeding-table {
+        display: block;
+        min-width: 0;
+        background: none;
+        border: none;
+        box-shadow: none;
+    }
+
+    .feeding-table thead {
+        display: none;
+    }
+
+    .feeding-table tbody,
+    .feeding-table tr,
+    .feeding-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .feeding-table tr {
+        position: relative;
+        margin: 0 0 14px;
+        padding: 14px 14px 14px 52px;
+        background-color: var(--background-color);
+        border: 2px solid var(--gold-color);
+        border-radius: 8px;
+        box-shadow: 4px 4px 2px 1px var(--goldenrod-color);
+    }
+
+    .feeding-table td {
+        padding: 3px 0;
+        border: none;
+        text-align: left;
+    }
+
+    .feeding-table td[data-label]::before {
+        content: attr(data-label) ": ";
+        color: var(--gold-color);
+        font-weight: bold;
+    }
+
+    .feeding-table td.feeding-check {
+        position: absolute;
+        top: 14px;
+        left: 14px;
+        width: auto;
+        padding: 0;
+    }
+
+    .feeding-table td.feeding-check input[type="checkbox"] {
+        width: 26px;
+        height: 26px;
+    }
+
+    .feeding-table td.feeding-result-cell {
+        margin-top: 8px;
+    }
+
+    .feeding-table td.feeding-result-cell::before {
+        display: block;
+        margin-bottom: 4px;
+    }
+
+    /* The list runs to dozens of cards on feeding day. Keep the date and
+       Mark Fed reachable instead of making the keeper scroll back up
+       between every no-feed response. */
+    #bulkActionBar {
+        position: sticky;
+        top: 0;
+        z-index: 500;
+        gap: 10px;
+        margin: 0 0 16px;
+        padding: 10px;
+        background-color: rgba(9, 9, 70, 0.97);
+        border: 2px solid var(--goldenrod-color);
+        border-radius: 10px;
+    }
+
+    #bulkActionBar .secondary-button {
+        flex: 1 1 auto;
+        padding: 7px 12px;
+        font-size: 19px;
+    }
+
+    #bulkActionBar input {
+        flex: 1 1 140px;
+        min-width: 0;
+    }
+}
+
 .table-action-button {
     width: 100%;
     min-width: 70px;

@@ -43,6 +43,62 @@ function getSuggestedFeederSize(weight, sex) {
     return matchedRule ? matchedRule.feederSize : "";
 }
 
+function showFeedingReport(message, isError = false) {
+    const report = document.getElementById("feedingReport");
+
+    if (!report) {
+        return;
+    }
+
+    report.textContent = message;
+    report.classList.toggle("import-error", isError);
+}
+
+// What the page says when nothing is due. A bare "nothing due" on feeding day
+// looks like the app has lost the collection, so say when the next ones land.
+function formatDayText(daysFromToday) {
+    const target = new Date();
+
+    target.setDate(target.getDate() + daysFromToday);
+
+    return target.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+}
+
+function describeNextDue(snakes) {
+    const waits = [];
+    let neverFed = 0;
+
+    snakes.forEach(snake => {
+        const daysSinceFed = getDaysSince(snake.lastFed);
+
+        if (daysSinceFed === null) {
+            neverFed += 1;
+            return;
+        }
+
+        const daysUntil = getFeedingInterval(snake) - daysSinceFed;
+
+        if (daysUntil > 0) {
+            waits.push(daysUntil);
+        }
+    });
+
+    if (waits.length === 0) {
+        return neverFed > 0
+            ? `${neverFed} snake${neverFed === 1 ? " has" : "s have"} no feeding record yet, so ${neverFed === 1 ? "it never shows" : "they never show"} as due. Set a last fed date on those to schedule them.`
+            : "";
+    }
+
+    const soonest = Math.min(...waits);
+    const count = waits.filter(days => days === soonest).length;
+    const when = soonest === 1 ? "tomorrow" : `in ${soonest} days`;
+    const neverFedNote = neverFed > 0
+        ? ` ${neverFed} snake${neverFed === 1 ? " has" : "s have"} no feeding record, so ${neverFed === 1 ? "it is" : "they are"} not scheduled.`
+        : "";
+
+    return `Next due ${formatDayText(soonest)} (${when}): ${count} snake${count === 1 ? "" : "s"}.${neverFedNote}`;
+}
+
 function updateBulkActionBar() {
     const selectedCount = document.getElementById("selectedCount");
     const bulkFedDateInput = document.getElementById("bulkFedDateInput");
@@ -82,10 +138,13 @@ function renderFeedingTable(dueItems) {
     snakeTableWrapper.innerHTML = "";
 
     if (!Array.isArray(dueItems) || dueItems.length === 0) {
+        const nextDueText = describeNextDue(snakes);
+
         snakeTableWrapper.innerHTML = `
             <p class="empty-message">
                 No snakes are due to be fed today.
             </p>
+            ${nextDueText ? `<p class="empty-message feeding-next-due">${nextDueText}</p>` : ""}
         `;
         updateBulkActionBar();
         return;
@@ -99,20 +158,23 @@ function renderFeedingTable(dueItems) {
         const lastFedText = snake.lastFed ? snake.lastFed : "No feeding record";
         const pendingResult = pendingFeedingResults.get(index) || "";
 
+        // The data-label attributes become the visible field names when the
+        // table turns into cards on a phone (style.css, max-width: 700px).
         return `
             <tr>
-                <td>
+                <td class="feeding-check">
                     <input
                         type="checkbox"
+                        aria-label="Select ${snake.name || "snake"}"
                         onchange="toggleSnakeSelection(${index}, this.checked)"
                     >
                 </td>
-                <td>${snake.name}</td>
-                <td>${morphLabel}</td>
-                <td>${feederSize}</td>
-                <td>${lastFedText}</td>
-                <td>
-                    <select onchange="updateFeedingResult(${index}, this.value)">
+                <td data-label="Name">${snake.name}</td>
+                <td data-label="ID">${morphLabel}</td>
+                <td data-label="Feeder">${feederSize}</td>
+                <td data-label="Last Fed">${lastFedText}</td>
+                <td data-label="Result" class="feeding-result-cell">
+                    <select aria-label="Feeding result for ${snake.name || "snake"}" onchange="updateFeedingResult(${index}, this.value)">
                         <option value="" ${pendingResult === "" ? "selected" : ""}>Select</option>
                         <option value="Accepted" ${pendingResult === "Accepted" ? "selected" : ""}>Accepted</option>
                         <option value="Refused" ${pendingResult === "Refused" ? "selected" : ""}>Refused</option>
@@ -124,7 +186,7 @@ function renderFeedingTable(dueItems) {
     }).join("");
 
     snakeTableWrapper.innerHTML = `
-        <table class="snake-table">
+        <table class="snake-table feeding-table">
             <thead>
                 <tr>
                     <th></th>
@@ -153,14 +215,28 @@ function markSelectedFed() {
         return;
     }
 
+    const fedCount = selectedSnakeIndexes.size;
+    const resultCounts = {};
+
+    selectedSnakeIndexes.forEach(index => {
+        const resultLabel = (pendingFeedingResults.get(index) || "no result").toLowerCase();
+
+        resultCounts[resultLabel] = (resultCounts[resultLabel] || 0) + 1;
+    });
+
     selectedSnakeIndexes.forEach(index => {
         if (snakes[index]) {
             snakes[index].lastFed = fedDate;
+
             if (!Array.isArray(snakes[index].feedingHistory)) {
                 snakes[index].feedingHistory = [];
             }
+
+            // Record which feeder was used, the same shape the snake form
+            // writes, so the history reads the same whichever page logged it.
             snakes[index].feedingHistory.push({
                 date: fedDate,
+                feederSize: snakes[index].feederSize || "",
                 result: pendingFeedingResults.get(index) || ""
             });
         }
@@ -169,7 +245,16 @@ function markSelectedFed() {
     pendingFeedingResults.clear();
     window.SnakeData.saveStorageArray("snakes", snakes);
     selectedSnakeIndexes.clear();
+    const resultDetail = Object.keys(resultCounts)
+        .map(label => `${resultCounts[label]} ${label}`)
+        .join(", ");
+
     renderFeedingTable(getSnakesDueToFeed(snakes));
+    showFeedingReport(
+        `Logged ${fedCount} snake${fedCount === 1 ? "" : "s"} for ${fedDate}` +
+        `${resultDetail ? ` (${resultDetail})` : ""}. ` +
+        (fedCount === 1 ? "It drops" : "They drop") + " off this list until the next interval."
+    );
 }
 
 function updateSelectedFeederSizes() {

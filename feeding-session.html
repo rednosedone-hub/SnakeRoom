@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room</title>
-    <link rel="stylesheet" href="style.css?v=19">
+    <link rel="stylesheet" href="style.css?v=21">
 </head>
 
 <body>
@@ -55,6 +55,8 @@
 
         </div>
 
+        <div class="import-report" id="feedingReport" role="status"></div>
+
         <h3>Snakes Due to Feed</h3>
         <div class="snake-table-wrapper" id="snakeTableWrapper"></div>
     </div>
@@ -64,7 +66,7 @@
     <script src="cloud-sync.js?v=7"></script>
     <script src="auto-sync.js?v=2"></script>
     <script src="feed-helpers.js"></script>
-    <script src="feeding-session.js"></script>
+    <script src="feeding-session.js?v=3"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
 </body>
 
