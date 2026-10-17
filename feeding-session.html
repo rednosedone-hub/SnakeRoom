@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room</title>
-    <link rel="stylesheet" href="style.css?v=22">
+    <link rel="stylesheet" href="style.css?v=26">
 </head>
 
 <body>
@@ -59,14 +59,25 @@
 
         <h3>Snakes Due to Feed</h3>
         <div class="snake-table-wrapper" id="snakeTableWrapper"></div>
+
+        <section class="form-section feeding-hold-section" id="feedingHoldSection" style="display: none;">
+            <h3>On Feeding Hold</h3>
+
+            <p class="empty-message">
+                Not due while the hold is active. Choosing Ovulation as a refusal reason puts a
+                snake here automatically.
+            </p>
+
+            <div id="feedingHoldList" class="feeding-hold-list"></div>
+        </section>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="data-helpers.js"></script>
     <script src="cloud-sync.js?v=7"></script>
-    <script src="auto-sync.js?v=2"></script>
-    <script src="feed-helpers.js"></script>
-    <script src="feeding-session.js?v=4"></script>
+    <script src="auto-sync.js?v=3"></script>
+    <script src="feed-helpers.js?v=2"></script>
+    <script src="feeding-session.js?v=6"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
 </body>
 

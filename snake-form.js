@@ -3,6 +3,8 @@ let currentGenes = [];
 let currentWeightHistory = [];
 let currentFeedingHistory = [];
 let currentShedHistory = [];
+// Set when a refusal reason means the snake should leave the feeding schedule.
+let pendingFeedingHold = null;
 
 const editingIndex = getEditingIndex();
 const requestedUid = new URLSearchParams(window.location.search).get("uid") || null;
@@ -611,6 +613,7 @@ function fillFormForEdit() {
     }
 
     setPhotoStatus(DEFAULT_PHOTO_HINT);
+    pendingFeedingHold = null;
 
     if (editingIndex === null || !snakes[editingIndex]) {
         document.getElementById("formPageTitle").textContent = "Add Snake";
@@ -633,6 +636,8 @@ function fillFormForEdit() {
         renderWeightHistory({ weight: "", weightHistory: [] });
         renderFeedingHistory({ feedingHistory: [] });
         renderShedHistory({ shedHistory: [] });
+        renderFeedingHoldNotice();
+        updateFeedingReasonVisibility(document.getElementById("feedingResultInput").value);
         return;
     }
 
@@ -665,6 +670,8 @@ function fillFormForEdit() {
     renderFeedingHistory({ feedingHistory: currentFeedingHistory });
     renderWeightHistory({ weight: snake.weight, weightHistory: currentWeightHistory });
     renderShedHistory({ shedHistory: currentShedHistory });
+    renderFeedingHoldNotice();
+    updateFeedingReasonVisibility(document.getElementById("feedingResultInput").value);
 }
 
 function getCurrentWeightHistory() {
@@ -689,6 +696,12 @@ function persistCurrentHistories() {
     snakes[editingIndex].lastFed = document.getElementById("lastFedInput").value;
     snakes[editingIndex].feedingHistory = [...getCurrentFeedingHistory()];
     snakes[editingIndex].shedHistory = [...getCurrentShedHistory()];
+
+    if (pendingFeedingHold) {
+        snakes[editingIndex].feedingHold = { ...pendingFeedingHold };
+        pendingFeedingHold = null;
+    }
+
     saveSnakes();
 }
 
@@ -711,25 +724,107 @@ function addWeightHistoryEntry() {
     persistCurrentHistories();
 }
 
+function setupFeedingReasonOptions() {
+    const select = document.getElementById("feedingReasonInput");
+
+    if (!select) {
+        return;
+    }
+
+    const reasons = window.FEEDING_REFUSAL_REASONS || [];
+
+    select.innerHTML = `<option value="">Select reason</option>` +
+        reasons.map(reason => `<option value="${reason}">${reason}</option>`).join("");
+}
+
+function updateFeedingReasonVisibility(value) {
+    const field = document.getElementById("feedingReasonField");
+    const select = document.getElementById("feedingReasonInput");
+
+    if (field) {
+        field.style.display = value === "Refused" ? "" : "none";
+    }
+
+    if (select && value !== "Refused") {
+        select.value = "";
+    }
+}
+
+function renderFeedingHoldNotice() {
+    const row = document.getElementById("feedingHoldRow");
+    const text = document.getElementById("feedingHoldText");
+
+    if (!row || !text) {
+        return;
+    }
+
+    const snake = editingIndex !== null && snakes[editingIndex] ? snakes[editingIndex] : null;
+    const hold = pendingFeedingHold || (snake && snake.feedingHold) || null;
+
+    if (!hold) {
+        row.style.display = "none";
+        text.textContent = "";
+        return;
+    }
+
+    row.style.display = "";
+    text.textContent = `Feeding hold: ${hold.reason} since ${hold.since || "unknown date"} \u2014 not on the feeding due list.`;
+}
+
+function endFeedingHoldFromForm() {
+    pendingFeedingHold = null;
+
+    if (editingIndex !== null && snakes[editingIndex]) {
+        delete snakes[editingIndex].feedingHold;
+        saveSnakes();
+    }
+
+    renderFeedingHoldNotice();
+    alert("Feeding hold ended. The snake is back on the normal feeding schedule.");
+}
+
 function addFeedingHistoryEntry() {
     const fedDate = document.getElementById("lastFedInput").value;
     const feederSize = document.getElementById("feederSizeInput").value.trim();
     const resultInput = document.getElementById("feedingResultInput");
     const result = resultInput ? resultInput.value : "";
+    const reasonInput = document.getElementById("feedingReasonInput");
+    const reason = result === "Refused" && reasonInput ? reasonInput.value : "";
 
     if (!fedDate) {
         alert("Enter a feeding date before adding a record.");
         return;
     }
 
-    currentFeedingHistory.push({
+    const entry = {
         date: fedDate,
         feederSize: feederSize,
         result: result
-    });
+    };
+
+    if (reason) {
+        entry.reason = reason;
+    }
+
+    currentFeedingHistory.push(entry);
     currentFeedingHistory.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    if (result === "Refused") {
+        // A refusal is not a meal, so this must not move the last fed date.
+        const lastMeal = editingIndex !== null && snakes[editingIndex]
+            ? snakes[editingIndex].lastFed || ""
+            : "";
+
+        document.getElementById("lastFedInput").value = lastMeal;
+
+        if (reason === "Ovulation") {
+            pendingFeedingHold = { reason, since: fedDate };
+        }
+    }
+
     renderFeedingHistory({ feedingHistory: getCurrentFeedingHistory() });
     persistCurrentHistories();
+    renderFeedingHoldNotice();
 }
 
 function addShedHistoryEntry() {
@@ -866,7 +961,8 @@ function renderFeedingHistory(snake) {
         const date = entry.date || entry.day || entry.label || "";
         const feederSize = entry.feederSize || entry.feeder || "";
         const result = entry.result || "";
-        const details = [feederSize, result].filter(Boolean).join(" - ");
+        const reason = entry.reason || "";
+        const details = [feederSize, result, reason].filter(Boolean).join(" - ");
 
         return `
             <div class="feeding-list-item">
@@ -1001,6 +1097,10 @@ function saveSnakeFromPage() {
     snake.photos = savedPhotos;
     snake.image = savedPhotos.length > 0 ? savedPhotos[0].url : "Images/TheSnakeRoom.jpg";
 
+    if (pendingFeedingHold) {
+        snake.feedingHold = { ...pendingFeedingHold };
+    }
+
     if (editingIndex === null || !snakes[editingIndex]) {
         snakes.push(snake);
     } else {
@@ -1020,6 +1120,8 @@ window.removeGene = removeGene;
 window.updateImagePreview = updateImagePreview;
 window.addWeightHistoryEntry = addWeightHistoryEntry;
 window.addFeedingHistoryEntry = addFeedingHistoryEntry;
+window.updateFeedingReasonVisibility = updateFeedingReasonVisibility;
+window.endFeedingHoldFromForm = endFeedingHoldFromForm;
 window.addShedHistoryEntry = addShedHistoryEntry;
 window.removeWeightHistoryEntry = removeWeightHistoryEntry;
 window.removeFeedingHistoryEntry = removeFeedingHistoryEntry;
@@ -1029,6 +1131,7 @@ window.makePhotoMain = makePhotoMain;
 window.saveSnakeFromPage = saveSnakeFromPage;
 
 setupGeneOptions();
+setupFeedingReasonOptions();
 fillFormForEdit();
 
 const photoFileInput = document.getElementById("photoFileInput");

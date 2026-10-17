@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Snake Record</title>
-    <link rel="stylesheet" href="style.css?v=22">
+    <link rel="stylesheet" href="style.css?v=26">
 </head>
 
 <body>
@@ -27,6 +27,7 @@
             <a href="breeding.html" class="main-button">Breeding</a>
             <a href="morphCalculator.html" class="main-button">Morph Calculator</a>
             <a href="available.html" class="main-button">Available</a>
+            <a href="#feedingSection" class="main-button">Log Feeding</a>
         </div>
 
         <div class="divider"></div>
@@ -131,7 +132,7 @@
                 </div>
             </section>
 
-            <section class="form-section">
+            <section class="form-section" id="feedingSection">
                 <h3>Feeding</h3>
 
                 <div class="form-grid">
@@ -152,12 +153,17 @@
                     </label>
                     <label class="form-field">
                         <span>Feeding Result</span>
-                        <select id="feedingResultInput">
+                        <select id="feedingResultInput" onchange="updateFeedingReasonVisibility(this.value)">
                             <option value="">Select result</option>
                             <option value="Accepted">Accepted</option>
                             <option value="Refused">Refused</option>
                             <option value="Regurgitated">Regurgitated</option>
                         </select>
+                    </label>
+
+                    <label class="form-field" id="feedingReasonField" style="display: none;">
+                        <span>Refusal Reason</span>
+                        <select id="feedingReasonInput"></select>
                     </label>
 
                     <div class="form-field" style="grid-column: 1 / -1; margin-top:12px;">
@@ -171,6 +177,13 @@
                     <span id="feederSuggestionText">Enter weight to suggest feeder size.</span>
                     <button type="button" onclick="useSuggestedFeederSize()" class="gene-action-button">
                         Use Suggested
+                    </button>
+                </div>
+
+                <div class="suggestion-row" id="feedingHoldRow" style="display: none;">
+                    <span id="feedingHoldText"></span>
+                    <button type="button" onclick="endFeedingHoldFromForm()" class="gene-action-button">
+                        End Feeding Hold
                     </button>
                 </div>
 
@@ -323,10 +336,11 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="data-helpers.js"></script>
     <script src="cloud-sync.js?v=7"></script>
-    <script src="auto-sync.js?v=2"></script>
+    <script src="auto-sync.js?v=3"></script>
     <script src="geneCatalog.js?v=3"></script>
     <script src="genes.js?v=5"></script>
-    <script src="snake-form.js?v=7"></script>
+    <script src="feed-helpers.js?v=2"></script>
+    <script src="snake-form.js?v=8"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
 </body>
 

@@ -1,6 +1,13 @@
 const snakes = window.SnakeData.loadSnakesWithIds([]);
 const selectedSnakeIndexes = new Set();
 const pendingFeedingResults = new Map();
+const pendingFeedingReasons = new Map();
+
+// Reasons a snake refuses food, shared with the snake form. Ovulation is the
+// one that changes the schedule: she comes off the due list until the hold ends.
+const REFUSAL_REASONS = window.FEEDING_REFUSAL_REASONS || ["Ovulation"];
+
+const HOLD_REASONS = ["Ovulation"];
 
 function getSnakesDueToFeed(snakes) {
     return snakes
@@ -66,12 +73,12 @@ function formatDayText(daysFromToday) {
 
 // A refusal is a real event but not a meal: the snake stays due, and the row
 // says when it last turned food down so it is obvious it was tried.
-function getLastRefusalDate(snake) {
+function getLastRefusal(snake) {
     if (!Array.isArray(snake.feedingHistory)) {
-        return "";
+        return null;
     }
 
-    let latest = "";
+    let latest = null;
 
     snake.feedingHistory.forEach(entry => {
         if (!entry || entry.result !== "Refused") {
@@ -80,8 +87,8 @@ function getLastRefusalDate(snake) {
 
         const date = entry.date || "";
 
-        if (date && date > latest) {
-            latest = date;
+        if (date && (!latest || date >= latest.date)) {
+            latest = { date, reason: entry.reason || "" };
         }
     });
 
@@ -93,6 +100,10 @@ function describeNextDue(snakes) {
     let neverFed = 0;
 
     snakes.forEach(snake => {
+        if (window.isOnFeedingHold(snake)) {
+            return;
+        }
+
         const daysSinceFed = getDaysSince(snake.lastFed);
 
         if (daysSinceFed === null) {
@@ -140,6 +151,19 @@ function updateBulkActionBar() {
 function updateFeedingResult(index, result) {
     // Held until "Mark Fed" writes the record, so re-renders never wipe a choice.
     pendingFeedingResults.set(index, result);
+
+    // The reason dropdown only applies to a refusal, so reveal it in place
+    // rather than re-rendering the whole list and losing other row choices.
+    const row = document.querySelector(`#snakeTableWrapper tr[data-row-index="${index}"]`);
+    const reasonCell = row ? row.querySelector(".feeding-reason-cell") : null;
+
+    if (reasonCell) {
+        reasonCell.style.display = result === "Refused" ? "" : "none";
+    }
+}
+
+function updateFeedingReason(index, reason) {
+    pendingFeedingReasons.set(index, reason);
 }
 
 function toggleSnakeSelection(index, isSelected) {
@@ -181,15 +205,16 @@ function renderFeedingTable(dueItems) {
         const morphLabel = window.SnakeData.getSnakeIdentityText(snake);
         const lastFedText = snake.lastFed ? snake.lastFed : "No feeding record";
         const pendingResult = pendingFeedingResults.get(index) || "";
-        const refusalDate = getLastRefusalDate(snake);
-        const refusalNote = refusalDate && refusalDate > (snake.lastFed || "")
-            ? `<span class="feeding-refused">Refused ${refusalDate}</span>`
+        const pendingReason = pendingFeedingReasons.get(index) || "";
+        const lastRefusal = getLastRefusal(snake);
+        const refusalNote = lastRefusal && lastRefusal.date > (snake.lastFed || "")
+            ? `<span class="feeding-refused">Refused ${lastRefusal.date}${lastRefusal.reason ? ` (${lastRefusal.reason})` : ""}</span>`
             : "";
 
         // The data-label attributes become the visible field names when the
         // table turns into cards on a phone (style.css, max-width: 700px).
         return `
-            <tr>
+            <tr data-row-index="${index}">
                 <td class="feeding-check">
                     <input
                         type="checkbox"
@@ -209,6 +234,14 @@ function renderFeedingTable(dueItems) {
                         <option value="Regurgitated" ${pendingResult === "Regurgitated" ? "selected" : ""}>Regurgitated</option>
                     </select>
                 </td>
+                <td data-label="Reason" class="feeding-reason-cell"${pendingResult === "Refused" ? "" : " style=\"display: none\""}>
+                    <select aria-label="Refusal reason for ${snake.name || "snake"}" onchange="updateFeedingReason(${index}, this.value)">
+                        <option value="">Select reason</option>
+                        ${REFUSAL_REASONS.map(reason => `
+                            <option value="${reason}" ${pendingReason === reason ? "selected" : ""}>${reason}</option>
+                        `).join("")}
+                    </select>
+                </td>
             </tr>
         `;
     }).join("");
@@ -223,6 +256,7 @@ function renderFeedingTable(dueItems) {
                     <th>Feeder</th>
                     <th>Last Fed</th>
                     <th>Result</th>
+                    <th>Reason</th>
                 </tr>
             </thead>
             <tbody>
@@ -252,9 +286,12 @@ function markSelectedFed() {
         resultCounts[resultLabel] = (resultCounts[resultLabel] || 0) + 1;
     });
 
+    let holdCount = 0;
+
     selectedSnakeIndexes.forEach(index => {
         if (snakes[index]) {
             const result = pendingFeedingResults.get(index) || "";
+            const reason = result === "Refused" ? (pendingFeedingReasons.get(index) || "") : "";
 
             // A refusal is logged, but it is not a meal: lastFed keeps the date
             // of the last food actually eaten, so the snake stays due.
@@ -268,15 +305,29 @@ function markSelectedFed() {
 
             // Record which feeder was used, the same shape the snake form
             // writes, so the history reads the same whichever page logged it.
-            snakes[index].feedingHistory.push({
+            const entry = {
                 date: fedDate,
                 feederSize: snakes[index].feederSize || "",
                 result
-            });
+            };
+
+            if (reason) {
+                entry.reason = reason;
+            }
+
+            snakes[index].feedingHistory.push(entry);
+
+            // Ovulation takes her off the list on purpose instead of leaving
+            // her there refusing every week.
+            if (HOLD_REASONS.includes(reason)) {
+                snakes[index].feedingHold = { reason, since: fedDate };
+                holdCount += 1;
+            }
         }
     });
 
     pendingFeedingResults.clear();
+    pendingFeedingReasons.clear();
     window.SnakeData.saveStorageArray("snakes", snakes);
     selectedSnakeIndexes.clear();
     const resultDetail = Object.keys(resultCounts)
@@ -284,17 +335,22 @@ function markSelectedFed() {
         .join(", ");
     const refusedCount = resultCounts.refused || 0;
     const acceptedCount = fedCount - refusedCount;
+    const stayCount = refusedCount - holdCount;
     const outcomeParts = [];
 
     if (acceptedCount > 0) {
         outcomeParts.push(`${acceptedCount} drop${acceptedCount === 1 ? "s" : ""} off until the next interval`);
     }
 
-    if (refusedCount > 0) {
-        outcomeParts.push(`${refusedCount} stay${refusedCount === 1 ? "s" : ""} on the list with ${refusedCount === 1 ? "its" : "their"} refusal date`);
+    if (stayCount > 0) {
+        outcomeParts.push(`${stayCount} stay${stayCount === 1 ? "s" : ""} on the list with ${stayCount === 1 ? "its" : "their"} refusal date`);
     }
 
-    renderFeedingTable(getSnakesDueToFeed(snakes));
+    if (holdCount > 0) {
+        outcomeParts.push(`${holdCount} ${holdCount === 1 ? "is" : "are"} now on a feeding hold`);
+    }
+
+    refreshFeedingViews();
     showFeedingReport(
         `Logged ${fedCount} snake${fedCount === 1 ? "" : "s"} for ${fedDate}` +
         `${resultDetail ? ` (${resultDetail})` : ""}. ` +
@@ -326,7 +382,7 @@ function updateSelectedFeederSizes() {
     });
 
     localStorage.setItem("snakes", JSON.stringify(snakes));
-    renderFeedingTable(getSnakesDueToFeed(snakes));
+    refreshFeedingViews();
     alert(`${updatedCount} feeder size${updatedCount === 1 ? "" : "s"} updated.`);
 }
 
@@ -335,11 +391,103 @@ function clearSelectedSnakes() {
     updateBulkActionBar();
 }
 
+// ---- Feeding holds ---------------------------------------------------------
+//
+// A snake on hold is deliberately not due. Ovulation adds one automatically;
+// ending the hold puts her back on the normal schedule.
+
+function renderFeedingHolds() {
+    const section = document.getElementById("feedingHoldSection");
+    const list = document.getElementById("feedingHoldList");
+
+    if (!section || !list) {
+        return;
+    }
+
+    const held = snakes
+        .map((snake, index) => ({ snake, index }))
+        .filter(item => window.isOnFeedingHold(item.snake));
+
+    if (held.length === 0) {
+        section.style.display = "none";
+        list.innerHTML = "";
+        return;
+    }
+
+    section.style.display = "";
+    list.innerHTML = held.map(({ snake, index }) => `
+        <div class="feeding-hold-item">
+            <div>
+                <strong>${snake.name || "Unnamed"}</strong>
+                <span class="feeding-hold-detail">
+                    ${window.SnakeData.getSnakeIdentityText(snake)} &middot;
+                    ${snake.feedingHold.reason} since ${snake.feedingHold.since || "unknown"}
+                </span>
+            </div>
+            <div class="feeding-hold-actions">
+                <button type="button" class="gene-action-button" onclick="logFedFromHold(${index})">
+                    Fed Today
+                </button>
+                <button type="button" class="gene-action-button" onclick="endFeedingHold(${index})">
+                    End Hold
+                </button>
+            </div>
+        </div>
+    `).join("");
+}
+
+function endFeedingHold(index) {
+    const snake = snakes[index];
+
+    if (!snake || !snake.feedingHold) {
+        return;
+    }
+
+    delete snake.feedingHold;
+    window.SnakeData.saveStorageArray("snakes", snakes);
+    refreshFeedingViews();
+    showFeedingReport(`${snake.name || "That snake"} is off the feeding hold and back on the normal schedule.`);
+}
+
+function logFedFromHold(index) {
+    const snake = snakes[index];
+
+    if (!snake) {
+        return;
+    }
+
+    const fedDate = getTodayText();
+
+    delete snake.feedingHold;
+    snake.lastFed = fedDate;
+
+    if (!Array.isArray(snake.feedingHistory)) {
+        snake.feedingHistory = [];
+    }
+
+    snake.feedingHistory.push({
+        date: fedDate,
+        feederSize: snake.feederSize || "",
+        result: "Accepted"
+    });
+    window.SnakeData.saveStorageArray("snakes", snakes);
+    refreshFeedingViews();
+    showFeedingReport(`${snake.name || "That snake"} logged as fed on ${fedDate} and taken off the feeding hold.`);
+}
+
+function refreshFeedingViews() {
+    renderFeedingTable(getSnakesDueToFeed(snakes));
+    renderFeedingHolds();
+}
+
 window.toggleSnakeSelection = toggleSnakeSelection;
 window.updateFeedingResult = updateFeedingResult;
+window.updateFeedingReason = updateFeedingReason;
 window.markSelectedFed = markSelectedFed;
 window.updateSelectedFeederSizes = updateSelectedFeederSizes;
 window.clearSelectedSnakes = clearSelectedSnakes;
+window.endFeedingHold = endFeedingHold;
+window.logFedFromHold = logFedFromHold;
 
-const dueSnakes = getSnakesDueToFeed(snakes);
-renderFeedingTable(dueSnakes);
+renderFeedingTable(getSnakesDueToFeed(snakes));
+renderFeedingHolds();

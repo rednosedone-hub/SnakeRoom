@@ -263,6 +263,7 @@
         const banner = document.getElementById("autoSyncBanner");
 
         if (!banner || !isSnapshotPage()) {
+            document.body.classList.remove("has-sync-banner");
             return;
         }
 
@@ -270,6 +271,7 @@
 
         if (pending === 0) {
             banner.style.display = "none";
+            document.body.classList.remove("has-sync-banner");
             return;
         }
 
@@ -319,6 +321,10 @@
         }
 
         banner.style.display = "flex";
+
+        // The banner is fixed to the bottom, so reserve room for it or it
+        // covers the last control on the page.
+        document.body.classList.add("has-sync-banner");
     }
 
     function clearPending() {

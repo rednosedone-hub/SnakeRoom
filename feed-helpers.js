@@ -1,3 +1,15 @@
+// Shared by the feeding session and the snake form so both offer the same
+// reasons. Only Ovulation changes the schedule (it is a feeding hold).
+const FEEDING_REFUSAL_REASONS = [
+    "Ovulation",
+    "In shed",
+    "Gravid / pre-lay",
+    "Not hungry",
+    "Stress / new arrival",
+    "Temperatures",
+    "Other"
+];
+
 function getDaysSince(dateText) {
     if (!dateText) {
         return null;
@@ -32,7 +44,18 @@ function getFeedingInterval(snake) {
     return interval;
 }
 
+// A feeding hold is a deliberate pause (ovulation, for example) rather than a
+// scheduling side effect: the snake is not due until the hold is ended, no
+// matter how long ago it last ate.
+function isOnFeedingHold(snake) {
+    return Boolean(snake && snake.feedingHold && snake.feedingHold.reason);
+}
+
 function isSnakeDueToFeed(snake) {
+    if (isOnFeedingHold(snake)) {
+        return false;
+    }
+
     const feedingIntervalDays = getFeedingInterval(snake);
     const daysSinceFed = getDaysSince(snake.lastFed);
 
@@ -60,8 +83,10 @@ function getTodayText() {
     return `${year}-${month}-${day}`;
 }
 
+window.FEEDING_REFUSAL_REASONS = FEEDING_REFUSAL_REASONS;
 window.getDaysSince = getDaysSince;
 window.getFeedingInterval = getFeedingInterval;
+window.isOnFeedingHold = isOnFeedingHold;
 window.isSnakeDueToFeed = isSnakeDueToFeed;
 window.getSnakesDueToFeed = getSnakesDueToFeed;
 window.getTodayText = getTodayText;

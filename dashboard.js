@@ -40,7 +40,15 @@ function getFeedingInterval(snake) {
     return interval;
 }
 
+function isOnFeedingHold(snake) {
+    return Boolean(snake && snake.feedingHold && snake.feedingHold.reason);
+}
+
 function isSnakeDueToFeed(snake) {
+    if (isOnFeedingHold(snake)) {
+        return false;
+    }
+
     const feedingIntervalDays = getFeedingInterval(snake);
     const daysSinceFed = getDaysSince(snake.lastFed);
 

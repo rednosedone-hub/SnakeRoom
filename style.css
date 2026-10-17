@@ -310,6 +310,55 @@ p {
     font-size: 15px;
 }
 
+/* Scanned bin labels open the snake form at the top, but the feeding controls
+   are thousands of pixels down: this anchor keeps them one tap away. */
+#feedingSection {
+    scroll-margin-top: 16px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    html {
+        scroll-behavior: smooth;
+    }
+}
+
+/* Snakes deliberately off the feeding schedule (ovulation and similar). */
+.feeding-hold-section {
+    margin-top: 26px;
+}
+
+.feeding-hold-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.feeding-hold-item {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    color: var(--text-color);
+    background-color: var(--background-color);
+    border: 2px solid var(--goldenrod-color);
+    border-radius: 8px;
+}
+
+.feeding-hold-detail {
+    display: block;
+    margin-top: 2px;
+    color: var(--silver-color);
+    font-size: 15px;
+}
+
+.feeding-hold-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
 /* Feeding day happens standing in front of a rack with a phone in one hand, so
    below 700px the wide table becomes one card per snake: the result dropdown
    is reachable without scrolling sideways. */
@@ -2056,6 +2105,11 @@ p {
     color: var(--gold-color);
     font-weight: bold;
     text-decoration: underline;
+}
+
+/* While the fixed banner is on screen, keep the end of the page clear of it. */
+body.has-sync-banner .page-container {
+    padding-bottom: 150px;
 }
 
 /* Goal planner */
