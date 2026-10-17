@@ -166,65 +166,113 @@ function getStonesLabel() {
 
 // ---- Goal decoding
 
-function decodeGoalPieces(goalText) {
-    const wanted = [];
-    const lowerText = goalText.toLowerCase();
-    const usedSpans = [];
+// Words that describe how a gene is carried rather than which gene it is. They
+// must never be prefix-matched ("het" is not an abbreviation of Het Red
+// Axanthic, and "orange" alone is ambiguous between Orange Dream and Orange
+// Ghost, so it is left to the full-phrase pass below).
+const GOAL_FILLER_WORDS = new Set([
+    "het", "hets", "visual", "super", "possible", "proven", "probable",
+    "and", "or", "with", "the", "of", "a", "an", "ni", "animal", "animals",
+    "male", "female", "pair", "pairing", "goal", "normal", "baby", "adult"
+]);
 
-    // 1. Try long combo names from the shared combo table (e.g. Batman,
-    //    BEL (Blue Eyed Leucistic), Killer Bee).
+function decodeGoalPieces(goalText) {
+    const text = String(goalText || "").toLowerCase();
+    const consumed = new Array(text.length).fill(false);
+    const wanted = [];
+    const isWordChar = char => Boolean(char) && /[a-z0-9]/i.test(char);
+
+    function spanIsFree(start, end) {
+        for (let i = start; i < end; i += 1) {
+            if (consumed[i]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    function consume(start, end) {
+        for (let i = start; i < end; i += 1) {
+            consumed[i] = true;
+        }
+    }
+
+    function addGene(geneName, position) {
+        const gene = window.GeneTools.findGene(geneName);
+
+        if (!gene) {
+            return;
+        }
+
+        if (wanted.some(piece => piece.gene.toLowerCase() === gene.name.toLowerCase())) {
+            return;
+        }
+
+        wanted.push({
+            gene: gene.name,
+            copies: 1,
+            recessive: gene.type === "recessive",
+            _at: position
+        });
+    }
+
+    // Every standalone occurrence of a phrase, skipping spans another phrase
+    // already claimed and refusing to match inside a longer word.
+    function scanPhrase(phrase, onMatch) {
+        const lowerPhrase = String(phrase || "").toLowerCase();
+
+        if (lowerPhrase.length === 0) {
+            return;
+        }
+
+        let index = text.indexOf(lowerPhrase);
+
+        while (index !== -1) {
+            const end = index + lowerPhrase.length;
+
+            if (!isWordChar(text[index - 1]) && !isWordChar(text[end]) && spanIsFree(index, end)) {
+                consume(index, end);
+                onMatch();
+            }
+
+            index = text.indexOf(lowerPhrase, index + 1);
+        }
+    }
+
+    // 1. Combo names first (Batman, Killer Bee, ...), longest first, so one
+    //    phrase covers every gene in the combo.
     Object.entries(window.GeneTools.comboNames)
         .sort((a, b) => b[1].length - a[1].length)
         .forEach(([geneKey, comboLabel]) => {
-            const lowerLabel = comboLabel.toLowerCase();
-            const index = lowerText.indexOf(lowerLabel);
-
-            if (index === -1) {
-                return;
-            }
-
-            const overlaps = usedSpans.some(span =>
-                index < span.end && index + lowerLabel.length > span.start
-            );
-
-            if (overlaps) {
-                return;
-            }
-
-            usedSpans.push({ start: index, end: index + lowerLabel.length });
-
-            geneKey.split(",").forEach(part => {
-                const geneName = part.trim();
-
-                if (geneName && !wanted.some(piece => piece.gene === geneName)) {
-                    const gene = window.GeneTools.findGene(geneName);
-
-                    wanted.push({
-                        gene: geneName,
-                        copies: 1,
-                        recessive: gene?.type === "recessive"
-                    });
-                }
+            scanPhrase(comboLabel, () => {
+                const at = text.indexOf(comboLabel.toLowerCase());
+                geneKey.split(",").forEach(part => addGene(part.trim(), at));
             });
         });
 
-    // 2. Then match remaining words to exact (or unique prefix) gene names.
-    goalText
-        .split(/[,\s]+/)
-        .filter(Boolean)
-        .forEach(word => {
-            const lowerWord = word.toLowerCase();
-            const inSpan = usedSpans.some(span => {
-                const before = lowerText.slice(0, lowerText.indexOf(lowerWord));
-                const after = lowerText.indexOf(lowerWord) + lowerWord.length;
+    // 2. Full gene names, longest first. This is what makes "orange dream"
+    //    and "yellow belly" work even though each is two words.
+    window.GeneTools.catalog
+        .map(gene => gene.name)
+        .sort((a, b) => b.length - a.length)
+        .forEach(geneName => {
+            scanPhrase(geneName, () => addGene(geneName, text.indexOf(geneName.toLowerCase())));
+        });
 
-                return before.length >= span.start - 1 && after <= span.end + 1;
-            });
+    // 3. Whatever single words are left: exact match, else a unique prefix
+    //    ("pins" -> Pinstripe). Ambiguous prefixes stay unmatched instead of
+    //    being guessed at.
+    const tokenPattern = /[a-z0-9]+/gi;
+    let match = tokenPattern.exec(text);
 
-            if (inSpan) {
-                return;
-            }
+    while (match) {
+        const word = match[0];
+        const start = match.index;
+        const end = start + word.length;
+        const lowerWord = word.toLowerCase();
 
+        if (!GOAL_FILLER_WORDS.has(lowerWord) && spanIsFree(start, end)) {
             const exact = window.GeneTools.catalog.find(gene =>
                 gene.name.toLowerCase() === lowerWord
             );
@@ -234,18 +282,30 @@ function decodeGoalPieces(goalText) {
                     gene.name.toLowerCase().startsWith(lowerWord)
                 );
 
-            const gene = exact || (prefixMatches.length === 1 ? prefixMatches[0] : null);
-
-            if (gene && !wanted.some(piece => piece.gene === gene.name)) {
-                wanted.push({
-                    gene: gene.name,
-                    copies: 1,
-                    recessive: gene.type === "recessive"
-                });
+            if (exact) {
+                addGene(exact.name, start);
+            } else if (prefixMatches.length === 1) {
+                addGene(prefixMatches[0].name, start);
             }
-        });
+        }
 
-    return wanted;
+        match = tokenPattern.exec(text);
+    }
+
+    // Report genes in the order they were written, not the order the matching
+    // passes happened to find them.
+    return wanted
+        .sort((a, b) => a._at - b._at)
+        .map(piece => {
+            const { _at, ...rest } = piece;
+            return rest;
+        });
+}
+
+// Vowel-initial genes are common (Orange Dream, Enchi, Albino), so the hint
+// text cannot assume "a".
+function geneArticle(geneName) {
+    return /^[aeiou]/i.test(String(geneName || "")) ? "an" : "a";
 }
 
 function getPieceLabel(piece, gene) {
@@ -353,7 +413,7 @@ function nextStepHint(piece, snakeMatches) {
         }
 
         if (hets.length === 0) {
-            return `No ${piece.gene} carriers yet. Need to buy or breed a ${piece.gene} het first.`;
+            return `No ${piece.gene} carriers yet. Need to buy or breed ${geneArticle(piece.gene)} ${piece.gene} het first.`;
         }
 
         if (hets.length >= 2) {
@@ -369,7 +429,7 @@ function nextStepHint(piece, snakeMatches) {
         return `You have ${codomAnimals.length} ${piece.gene} animal${codomAnimals.length === 1 ? "" : "s"} on hand (visual or super).`;
     }
 
-    return `No ${piece.gene} animals yet. Need to buy or breed a ${piece.gene} visual (1 copy) first.`;
+    return `No ${piece.gene} animals yet. Need to buy or breed ${geneArticle(piece.gene)} ${piece.gene} visual (1 copy) first.`;
 }
 
 // ---- Holdbacks: the hatchling a step tells you to keep
@@ -379,10 +439,33 @@ function nextStepHint(piece, snakeMatches) {
 // picked as a parent in later steps, which is how a real multi-generation path
 // gets mapped. Nothing is created in the collection until it actually hatches.
 
+// One clutch can give you more than one animal worth keeping (a Leopard Clown
+// and a Spotnose Clown from the same pairing), and those two are what you breed
+// together later. So a step holds a list, not a single pick.
+function getStepHoldbacks(step) {
+    if (Array.isArray(step.holdbacks)) {
+        return step.holdbacks;
+    }
+
+    // Goals saved before lists existed kept exactly one holdback.
+    return step.holdback ? [step.holdback] : [];
+}
+
+function setStepHoldbacks(step, holdbacks) {
+    step.holdbacks = holdbacks;
+    delete step.holdback;
+}
+
 function getGoalHoldbacks(goal) {
-    return (goal.steps || [])
-        .map((step, index) => ({ step, index, holdback: step.holdback }))
-        .filter(entry => Boolean(entry.holdback));
+    const entries = [];
+
+    (goal.steps || []).forEach((step, index) => {
+        getStepHoldbacks(step).forEach(holdback => {
+            entries.push({ step, index, holdback });
+        });
+    });
+
+    return entries;
 }
 
 function findHoldback(holdbackId) {
@@ -455,7 +538,13 @@ function slotGenes(slot) {
     if (slot.type === "holdback") {
         const found = findHoldback(slot.holdbackId);
 
-        return found ? getHoldbackGenes(found.holdback) : [];
+        if (found) {
+            return getHoldbackGenes(found.holdback);
+        }
+
+        // The holdback is gone but the plan still knows which animal it meant,
+        // so read its genes back out of the stored label.
+        return slot.label ? inferSlotGenes(slot.label) : [];
     }
 
     return inferSlotGenes(slot.label);
@@ -555,6 +644,17 @@ function addStep(goalId, femaleValue, maleValue) {
         alert("Choose both a female and a male for this step.");
         return;
     }
+
+    // Remember which animal the slot meant, so a later removal can still name
+    // it instead of leaving a nameless gap in the path.
+    [female, male].forEach(slot => {
+        if (slot.type !== "holdback") {
+            return;
+        }
+
+        const found = findHoldback(slot.holdbackId);
+        slot.label = found ? found.holdback.label : "";
+    });
 
     goal.steps.push({
         id: `step-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
@@ -957,8 +1057,10 @@ function genotypeSignature(genes) {
 function buildPredictionRow(entry, rankedIndex, goal, step) {
     // Skip gene breakdowns that just repeat the morph name.
     const breakdown = entry.outcome.genes.filter(gene => gene !== entry.outcome.morphName);
-    const kept = Boolean(step.holdback)
-        && genotypeSignature(getOutcomeGenotype(entry.outcome)) === genotypeSignature(step.holdback.genes);
+    const signature = genotypeSignature(getOutcomeGenotype(entry.outcome));
+    const kept = getStepHoldbacks(step).some(holdback =>
+        genotypeSignature(holdback.genes) === signature
+    );
 
     return `
             <div class="goal-prediction-row ${entry.isGoal ? "goal-prediction-hit" : ""}">
@@ -966,7 +1068,7 @@ function buildPredictionRow(entry, rankedIndex, goal, step) {
                 <span class="goal-prediction-chance">${(entry.outcome.probability * 100).toFixed(1)}%</span>
                 ${entry.isGoal ? `<span class="goal-prediction-badge">goal</span>` : ""}
                 ${kept ? `<span class="goal-prediction-badge">holding back</span>` : ""}
-                <button class="goal-keep-button" onclick="keepHoldback('${goal.id}', '${step.id}', ${rankedIndex})">Keep one</button>
+                <button class="goal-keep-button" onclick="keepHoldback('${goal.id}', '${step.id}', ${rankedIndex})">${kept ? "Don't keep" : "Keep one"}</button>
             </div>
             ${breakdown.length > 0 ? `<div class="goal-hint">${escapeHtml(breakdown.join(" · "))}</div>` : ""}
         `;
@@ -996,19 +1098,23 @@ function buildStepCard(goal, step, index) {
             </details>
         `
         : "";
-    const holdbackLine = step.holdback
-        ? `
-            <p class="goal-hint goal-holdback-line">
-                Holding back: <strong>${escapeHtml(step.holdback.label)}</strong> — ${(step.holdback.chance * 100).toFixed(1)}% per egg, or
-                ${(getHoldbackVariationChance(step.holdback) * 100).toFixed(1)}% if any variation of the same genes will do.
-                Pick the sex you need when it hatches, then breed it in a later step.
-                ${step.holdback.promotedSnakeId
-            ? ` <span class="goal-prediction-badge">in collection</span>`
-            : `<button class="goal-add-step" onclick="promoteHoldback('${goal.id}', '${step.id}')">Add as a real snake</button>`}
-                <button class="goal-add-step" onclick="clearHoldback('${goal.id}', '${step.id}')">Clear</button>
-            </p>
-        `
+    const holdbacks = getStepHoldbacks(step);
+    const holdbackSummary = holdbacks.length > 1
+        ? `<p class="goal-hint">Keeping ${holdbacks.length} from this clutch. When one hatches as a female and one as a male, breed those two together in a later step.</p>`
         : "";
+    const holdbackLine = holdbacks
+        .map(holdback => `
+            <p class="goal-hint goal-holdback-line">
+                Holding back: <strong>${escapeHtml(holdback.label)}</strong> — ${(holdback.chance * 100).toFixed(1)}% per egg, or
+                ${(getHoldbackVariationChance(holdback) * 100).toFixed(1)}% if any variation of the same genes will do.
+                Pick the sex you need when it hatches, then breed it in a later step.
+                ${holdback.promotedSnakeId
+            ? ` <span class="goal-prediction-badge">in collection</span>`
+            : `<button class="goal-add-step" onclick="promoteHoldback('${goal.id}', '${step.id}', '${holdback.id}')">Add as a real snake</button>`}
+                <button class="goal-add-step" onclick="clearHoldback('${goal.id}', '${step.id}', '${holdback.id}')">Clear</button>
+            </p>
+        `)
+        .join("");
 
     return `
         <div class="goal-step-card ${step.done ? "goal-step-done" : ""}">
@@ -1026,6 +1132,7 @@ function buildStepCard(goal, step, index) {
             ${mismatch ? `<p class="goal-warn">${escapeHtml(mismatch)}</p>` : ""}
             ${warning ? `<p class="goal-warn">${escapeHtml(warning)}</p>` : ""}
             ${step.notes ? `<p class="goal-hint">Notes: ${escapeHtml(step.notes)}</p>` : ""}
+            ${holdbackSummary}
             ${holdbackLine}
             <div class="goal-predictions">${predictions}</div>
             ${morePredictions}
@@ -1257,21 +1364,60 @@ function keepHoldback(goalId, stepId, rankedIndex) {
         return;
     }
 
-    step.holdback = {
-        id: step.holdback?.id || `hold-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    const holdbacks = getStepHoldbacks(step);
+    const signature = genotypeSignature(getOutcomeGenotype(entry.outcome));
+    const alreadyKept = holdbacks.findIndex(holdback =>
+        genotypeSignature(holdback.genes) === signature
+    );
+
+    // Clicking the row you already kept takes it back off the list, so the
+    // button is a toggle rather than a one-way switch.
+    if (alreadyKept >= 0) {
+        const [removed] = holdbacks.splice(alreadyKept, 1);
+        retireHoldback(goal, removed.id, removed.label);
+        setStepHoldbacks(step, holdbacks);
+        saveGoals();
+        renderGoalDetail(goalId);
+        return;
+    }
+
+    holdbacks.push({
+        id: `hold-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
         label: entry.outcome.morphName,
         chance: entry.outcome.probability,
         variationChance: getVariationChance(ranked, entry, goal.pieces),
         genes: getOutcomeGenotype(entry.outcome),
         sourceStepId: step.id,
         createdAt: new Date().toISOString()
-    };
+    });
+    setStepHoldbacks(step, holdbacks);
 
     saveGoals();
     renderGoalDetail(goalId);
 }
 
-function clearHoldback(goalId, stepId) {
+// Without a holdback id this clears the whole step, which is what older saved
+// markup asked for; with one it removes just that animal.
+// Removing a planned animal would leave later steps pointing at nothing, which
+// made them render "holdback removed" and produce no outcomes. Instead their
+// slots become "need" slots: the math still runs, and the label says which
+// animal the plan went back to expecting.
+function retireHoldback(goal, holdbackId, label) {
+    (goal.steps || []).forEach(step => {
+        ["female", "male"].forEach(key => {
+            const slot = step[key];
+
+            // Without a label there is no way to know which genes to expect,
+            // so that slot is left showing that its holdback is gone rather
+            // than quietly predicting a normal snake.
+            if (slot && slot.type === "holdback" && slot.holdbackId === holdbackId && label) {
+                step[key] = { type: "need", label };
+            }
+        });
+    });
+}
+
+function clearHoldback(goalId, stepId, holdbackId) {
     const goal = getGoal(goalId);
     const step = goal?.steps.find(item => item.id === stepId);
 
@@ -1279,17 +1425,29 @@ function clearHoldback(goalId, stepId) {
         return;
     }
 
-    delete step.holdback;
+    const holdbacks = getStepHoldbacks(step);
+    const retired = holdbackId
+        ? holdbacks.filter(holdback => holdback.id === holdbackId)
+        : holdbacks;
+    const remaining = holdbackId
+        ? holdbacks.filter(holdback => holdback.id !== holdbackId)
+        : [];
+
+    retired.forEach(holdback => retireHoldback(goal, holdback.id, holdback.label));
+    setStepHoldbacks(step, remaining);
     saveGoals();
     renderGoalDetail(goalId);
 }
 
 // The planned animal only becomes a real record once it hatches, and steps that
 // already breed with it follow the real record from then on.
-function promoteHoldback(goalId, stepId) {
+function promoteHoldback(goalId, stepId, holdbackId) {
     const goal = getGoal(goalId);
     const step = goal?.steps.find(item => item.id === stepId);
-    const holdback = step?.holdback;
+    const holdbacks = step ? getStepHoldbacks(step) : [];
+    const holdback = holdbackId
+        ? holdbacks.find(item => item.id === holdbackId)
+        : holdbacks[0];
 
     if (!goal || !step || !holdback) {
         return;
@@ -1355,6 +1513,23 @@ window.addEventListener("DOMContentLoaded", () => {
             ...piece,
             recessive: window.GeneTools.findGene(piece.gene)?.type === "recessive"
         }));
+
+        // A goal saved with one holdback per step becomes a list of one.
+        (goal.steps || []).forEach(step => {
+            if (!Array.isArray(step.holdbacks)) {
+                setStepHoldbacks(step, getStepHoldbacks(step));
+            }
+
+            // Slots left pointing at a holdback that no longer exists become
+            // "need" slots, which keeps the step's math running.
+            ["female", "male"].forEach(key => {
+                const slot = step[key];
+
+                if (slot && slot.type === "holdback" && slot.label && !findHoldback(slot.holdbackId)) {
+                    step[key] = { type: "need", label: slot.label };
+                }
+            });
+        });
     });
     saveGoals();
 
