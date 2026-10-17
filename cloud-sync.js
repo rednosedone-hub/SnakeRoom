@@ -628,7 +628,15 @@
                 return "empty";
             }
 
-            applySnapshot(data.snapshot);
+            // Restoring cloud data is not a local edit, so it must not mark
+            // anything dirty (auto-sync would otherwise queue a push of the
+            // bytes it just downloaded).
+            if (window.AutoSync && window.AutoSync.withWritesIgnored) {
+                window.AutoSync.withWritesIgnored(() => applySnapshot(data.snapshot));
+            } else {
+                applySnapshot(data.snapshot);
+            }
+
             saveSettings({
                 ...readSettings(),
                 lastPulledAt: new Date().toISOString(),

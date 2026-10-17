@@ -25,6 +25,21 @@
     const DEBOUNCE_MS = 8000;
     const DIRTY_KEYS = window.CloudSync.SNAPSHOT_KEYS;
 
+    // Collection facts (who you own, what they ate) push themselves. Breeding
+    // plans are experiments — you try combinations, most of which you throw
+    // away — so they stay on this device until you ask for them to be saved.
+    // A push always sends the whole snapshot, so plans ride along with the next
+    // collection push; the point is that planning alone never forces one.
+    const AUTO_PUSH_KEYS = ["snakes", "breedingPairs", "clutches", "customGeneCatalog"];
+
+    const KEY_LABELS = {
+        snakes: "collection",
+        breedingPairs: "breeding pairs",
+        clutches: "clutches",
+        breedingGoals: "breeding plans",
+        customGeneCatalog: "custom genes"
+    };
+
     const state = readState();
 
     function readState() {
@@ -49,10 +64,25 @@
     // touching any page code.
     const originalSave = window.SnakeData.saveStorageArray;
 
+    // A pull writes the cloud copy into local storage; that is not a local
+    // change, so writes made while restoring are ignored.
+    let ignoringWrites = false;
+
+    function withWritesIgnored(callback) {
+        const previous = ignoringWrites;
+        ignoringWrites = true;
+
+        try {
+            return callback();
+        } finally {
+            ignoringWrites = previous;
+        }
+    }
+
     window.SnakeData.saveStorageArray = function (key, items) {
         originalSave.call(window.SnakeData, key, items);
 
-        if (DIRTY_KEYS.includes(key)) {
+        if (!ignoringWrites && DIRTY_KEYS.includes(key)) {
             markDirty(key);
         }
     };
@@ -74,7 +104,7 @@
     localStorage.setItem = function (key, value) {
         originalSetItem(key, value);
 
-        if (DIRTY_KEYS.includes(key)) {
+        if (!ignoringWrites && DIRTY_KEYS.includes(key)) {
             markDirty(key);
         }
     };
@@ -83,9 +113,34 @@
 
     let pushTimer = null;
 
+    function pendingKeys() {
+        return Object.keys(state.dirtyKeys || {});
+    }
+
+    // Anything that changes the records, as opposed to just the plans.
+    function hasCollectionChanges() {
+        return pendingKeys().some(key => AUTO_PUSH_KEYS.includes(key));
+    }
+
+    function describePending() {
+        const labels = pendingKeys().map(key => KEY_LABELS[key] || key);
+
+        if (labels.length === 0) {
+            return "your changes";
+        }
+
+        if (labels.length === 1) {
+            return labels[0];
+        }
+
+        return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+    }
+
     function scheduleAutoPush() {
-        if (!isOnline()) {
-            return; // stays queued; the reconnect flow asks to commit
+        if (!isOnline() || !hasCollectionChanges()) {
+            // No connection, or only plans changed: stay queued locally until
+            // the user saves them (or until a collection change pushes them).
+            return;
         }
 
         clearTimeout(pushTimer);
@@ -213,28 +268,110 @@
 
         const pending = state.dirtyCount || 0;
 
-        if (pending > 0) {
-            const online = isOnline();
-
-            banner.innerHTML = online
-                ? `<span>${pending} change${pending === 1 ? "" : "s"} saved locally. ` +
-                  `<a href="#" id="autoSyncCommitLink">Commit to cloud now</a></span>`
-                : `<span>${pending} change${pending === 1 ? "" : "s"} saved locally. ` +
-                  `You're offline \u2014 they'll be committed when you're back on the internet.</span>`;
-
-            const link = document.getElementById("autoSyncCommitLink");
-
-            if (link) {
-                link.addEventListener("click", event => {
-                    event.preventDefault();
-                    commitPendingChanges();
-                });
-            }
-
-            banner.style.display = "flex";
-        } else {
+        if (pending === 0) {
             banner.style.display = "none";
+            return;
         }
+
+        const what = describePending();
+        const What = what.charAt(0).toUpperCase() + what.slice(1);
+        const online = isOnline();
+        let message;
+
+        if (state.conflict) {
+            // No verb agreement to get wrong: "your breeding plans is" was the
+            // kind of sentence this avoids.
+            message = `<span>The cloud backup changed on another device since this one last synced. ` +
+                `Changes to your ${what} are still only on this device.</span>`;
+        } else if (!online) {
+            message = `<span>${pending} change${pending === 1 ? "" : "s"} saved locally (${what}). ` +
+                `You're offline \u2014 ${pending === 1 ? "it'll" : "they'll"} be saved when you're back online.</span>`;
+        } else if (hasCollectionChanges()) {
+            message = `<span>${pending} change${pending === 1 ? "" : "s"} saved locally (${what}).</span>`;
+        } else {
+            // Plans only: nothing automatic is going to happen, and that is the
+            // point — experimenting should not nag or upload half-finished ideas.
+            message = `<span>${What} are kept on this device. ` +
+                `Nothing is sent to the cloud until you save them.</span>`;
+        }
+
+        banner.innerHTML = `${message}
+            <span class="auto-sync-actions">
+                <a href="#" id="autoSyncCommitLink">${state.conflict ? "Keep this device's changes" : "Save to cloud"}</a>
+                <a href="#" id="autoSyncDiscardLink">${state.conflict ? "Use cloud version" : "Discard"}</a>
+            </span>`;
+
+        const commitLink = document.getElementById("autoSyncCommitLink");
+        const discardLink = document.getElementById("autoSyncDiscardLink");
+
+        if (commitLink) {
+            commitLink.addEventListener("click", event => {
+                event.preventDefault();
+                commitPendingChanges();
+            });
+        }
+
+        if (discardLink) {
+            discardLink.addEventListener("click", event => {
+                event.preventDefault();
+                discardPendingChanges();
+            });
+        }
+
+        banner.style.display = "flex";
+    }
+
+    function clearPending() {
+        state.dirtyKeys = {};
+        state.dirtyCount = 0;
+        state.conflict = false;
+        saveState();
+        updateBanner();
+    }
+
+    // Throwing local changes away means going back to the last cloud copy, not
+    // just hiding the badge: the experiments are the thing being discarded.
+    async function discardPendingChanges() {
+        const what = describePending();
+        const online = isOnline();
+
+        if (!online) {
+            alert("You're offline. Reconnect, then discard to restore the cloud copy.");
+            return;
+        }
+
+        if (!confirm(`Discard the unsaved ${what} and load the cloud copy instead?\n\nThis cannot be undone.`)) {
+            return;
+        }
+
+        const result = await window.CloudSync.pullCore({ silent: true });
+
+        if (result === "pulled") {
+            clearPending();
+            window.location.reload();
+            return;
+        }
+
+        if (result === "no-session") {
+            alert("Sign in on the Cloud Sync page first \u2014 discarding restores the copy stored in your account.");
+            return;
+        }
+
+        if (result === "empty") {
+            // Nothing in the cloud to restore. Clearing the badge would claim
+            // the changes were discarded when they are still the only copy.
+            const clearBadge = confirm(
+                "There is no cloud backup to restore yet.\n\n" +
+                "Your changes are the only copy. Clear the pending badge and keep them on this device?"
+            );
+
+            if (clearBadge) {
+                clearPending();
+            }
+            return;
+        }
+
+        alert("Could not reach the cloud copy. Nothing was discarded.");
     }
 
     async function commitPendingChanges() {
@@ -253,12 +390,15 @@
         const result = await window.CloudSync.pushCore({ interactive: false });
 
         if (result === "pushed") {
-            state.dirtyKeys = {};
-            state.dirtyCount = 0;
-            state.conflict = false;
             state.lastPushAt = new Date().toISOString();
-            saveState();
-            updateBanner();
+            clearPending();
+            return;
+        }
+
+        if (result === "no-session") {
+            alert("Sign in on the Cloud Sync page to save to the cloud. For now the changes stay on this device.");
+        } else if (result !== "conflict") {
+            alert("Could not save to the cloud right now. Your changes are still on this device; try again from the Cloud Sync page.");
         }
     }
 
@@ -267,7 +407,7 @@
     function handleBackOnline() {
         updateBanner();
 
-        if (state.dirtyCount > 0) {
+        if (state.dirtyCount > 0 && hasCollectionChanges()) {
             const answer = confirm(
                 "You're back online. " +
                 `${state.dirtyCount} change${state.dirtyCount === 1 ? "" : "s"} were saved locally while you were offline.\n\n` +
@@ -290,7 +430,7 @@
 
     // Flush on navigate so no change is lost when you browse away.
     window.addEventListener("pagehide", () => {
-        if (isOnline() && state.dirtyCount > 0) {
+        if (isOnline() && hasCollectionChanges()) {
             // Fire-and-forget: the snapshot is saved synchronously in local
             // storage either way, so the next page simply retry-pushes.
             runAutoPush();
@@ -311,7 +451,11 @@
         markDirty,
         runAutoPush,
         commitPendingChanges,
+        discardPendingChanges,
         maybeAutoPull,
-        updateBanner
+        updateBanner,
+        withWritesIgnored,
+        describePending,
+        hasCollectionChanges
     };
 })();

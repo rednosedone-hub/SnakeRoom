@@ -1514,6 +1514,8 @@ function escapeHtml(value) {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
+    const beforeMigration = JSON.stringify(goals);
+
     goals.forEach(goal => {
         goal.pieces = (goal.pieces || []).map(piece => ({
             ...piece,
@@ -1537,7 +1539,13 @@ window.addEventListener("DOMContentLoaded", () => {
             });
         });
     });
-    saveGoals();
+
+    // Only write when the migrations above actually changed something: a
+    // save on every load marked the plans dirty (and so showed the cloud
+    // banner) even when the page was merely opened.
+    if (JSON.stringify(goals) !== beforeMigration) {
+        saveGoals();
+    }
 
     goalInput.addEventListener("keydown", event => {
         if (event.key === "Enter") {
