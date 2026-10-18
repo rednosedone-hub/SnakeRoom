@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Snake Room - Account</title>
+    <link rel="stylesheet" href="style.css?v=27">
+</head>
+
+<body data-no-auth-gate>
+    <div class="page-container">
+        <div class="hero-section">
+            <img src="Images/TheSnakeRoom.jpg" class="hero-image" alt="The Snake Room logo">
+
+            <div class="container">
+                <h1>The Snake Room</h1>
+                <h2>Account</h2>
+            </div>
+        </div>
+
+        <div class="button-row">
+            <a href="index.html" class="main-button">Home</a>
+            <a href="snakes.html" class="main-button">Collection</a>
+            <a href="data-tools.html" class="main-button">Data Tools</a>
+        </div>
+
+        <div class="divider"></div>
+
+        <main class="snake-form-page">
+
+            <section class="form-section">
+                <h3>Account Status</h3>
+
+                <div class="import-report" id="cloudStatusReport">Checking connection&hellip;</div>
+
+                <p class="empty-message">
+                    Everything you change saves to the cloud on its own a few seconds after you make
+                    it, and comes back on any device you sign in to. There is nothing to press.
+                </p>
+
+                <div class="data-action-grid">
+                    <button type="button" class="secondary-button" id="pushButton">
+                        Save Now
+                    </button>
+
+                    <button type="button" class="secondary-button" id="pullButton">
+                        Restore
+                    </button>
+
+                    <button type="button" class="secondary-button" id="signOutButton" style="display: none;">
+                        Sign Out
+                    </button>
+                </div>
+
+                <div class="import-report" id="syncReport"></div>
+            </section>
+
+            <section class="form-section" id="signInSection">
+                <h3>Sign In</h3>
+
+                <p class="empty-message">
+                    Sign in once on each device. A password sign-in sends no email, so it is the
+                    reliable option on a phone. No account yet? Press Create Account.
+                </p>
+
+                <div class="form-grid">
+                    <label class="form-field">
+                        <span>Email</span>
+                        <input type="email" id="emailInput" placeholder="you@example.com"
+                            autocomplete="username" inputmode="email" spellcheck="false"
+                            autocapitalize="none" autocorrect="off">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Password</span>
+                        <input type="password" id="passwordInput" placeholder="Your password"
+                            autocomplete="current-password" autocapitalize="none" autocorrect="off">
+                    </label>
+                </div>
+
+                <div class="form-page-actions">
+                    <button type="button" class="main-button" id="signInPasswordButton">
+                        Sign In
+                    </button>
+
+                    <button type="button" class="secondary-button" id="createAccountButton">
+                        Create Account
+                    </button>
+
+                    <button type="button" class="secondary-button" id="resetPasswordButton">
+                        Forgot Password
+                    </button>
+
+                    <button type="button" class="secondary-button" id="resendConfirmButton"
+                        style="display: none;">
+                        Resend Confirmation Email
+                    </button>
+                </div>
+
+                <div class="import-report" id="authReport"></div>
+
+                <p class="empty-message">
+                    Your session renews itself, so the only thing that signs you out is the browser
+                    clearing site data &mdash; add the app to your Home Screen and that stops
+                    happening. Prefer an emailed link? Type your email above, then
+                    <button type="button" class="small-link-button" id="sendMagicLinkButton">
+                        Send Magic Link
+                    </button>
+                </p>
+            </section>
+
+            <section class="form-section" id="recoveryPanel" style="display: none;">
+                <h3>Set A New Password</h3>
+
+                <p class="empty-message">
+                    You followed a password reset link, so you are signed in to the account for
+                    this one change. Choose a new password below.
+                </p>
+
+                <div class="form-grid">
+                    <label class="form-field">
+                        <span>New Password</span>
+                        <input type="password" id="newPasswordInput"
+                            autocomplete="new-password" autocapitalize="none" autocorrect="off">
+                    </label>
+                </div>
+
+                <div class="form-page-actions">
+                    <button type="button" class="main-button" id="saveNewPasswordButton">
+                        Save New Password
+                    </button>
+                </div>
+
+                <div class="import-report" id="recoveryReport"></div>
+            </section>
+
+            <section class="form-section" id="planSection">
+                <h3>Plan</h3>
+
+                <div class="plan-card" id="planCard"></div>
+
+                <p class="empty-message" id="planNote">
+                    Billing is not switched on yet, so nothing is charged and no limit is applied.
+                    The plans below are what the app will enforce once subscriptions start.
+                </p>
+
+                <div class="plan-grid" id="planGrid"></div>
+            </section>
+
+            <section class="form-section">
+                <details class="account-advanced">
+                    <summary>Advanced setup (only needed for a brand-new cloud project)</summary>
+
+                    <p class="empty-message">
+                        The app already points at its Supabase project, so a normal user never needs
+                        anything in here. It is kept for rebuilding the backend from scratch: the
+                        database table, the photo bucket, the one-time photo upload, and a manual
+                        connection override.
+                    </p>
+
+                    <div class="form-field" style="margin-top:12px;">
+                        <h4>Connection override</h4>
+                        <div class="form-grid">
+                            <label class="form-field">
+                                <span>Project URL</span>
+                                <input type="text" id="supabaseUrlInput" placeholder="https://your-project.supabase.co">
+                            </label>
+
+                            <label class="form-field">
+                                <span>Publishable Key</span>
+                                <input type="password" id="supabaseKeyInput" placeholder="sb_publishable_...">
+                            </label>
+                        </div>
+
+                        <div class="form-page-actions">
+                            <button type="button" class="main-button" id="saveConnectionButton">
+                                Save Connection
+                            </button>
+
+                            <button type="button" class="secondary-button" id="clearConnectionButton">
+                                Clear Connection
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-field" style="margin-top:12px;">
+                        <h4>Database table</h4>
+                        <p class="empty-message">
+                            Run this once in the Supabase SQL Editor. It creates the backup table and
+                            its row level security rules.
+                        </p>
+                        <pre class="sql-block" id="setupSqlBlock"></pre>
+                        <button type="button" class="gene-action-button" id="copySqlButton">
+                            Copy SQL
+                        </button>
+                    </div>
+
+                    <div class="form-field" style="margin-top:12px;">
+                        <h4>Photo bucket</h4>
+                        <p class="empty-message">
+                            Run this once too. Photos live in the <code>snake-photos</code> bucket,
+                            under a private folder per account.
+                        </p>
+                        <pre class="sql-block" id="photoSqlBlock"></pre>
+                        <button type="button" class="gene-action-button" id="copyPhotoSqlButton">
+                            Copy Photo SQL
+                        </button>
+                    </div>
+
+                    <div class="form-field" style="margin-top:12px;">
+                        <h4>Back up the photos that ship with the site (one time, on a computer)</h4>
+                        <p class="empty-message">
+                            Uploads every photo the snakes currently point at into this account's
+                            private cloud folder, then repoints the records at the cloud copies.
+                        </p>
+                        <input type="file" id="photoFolderInput" webkitdirectory multiple>
+                        <div class="form-page-actions">
+                            <button type="button" class="main-button" id="backupPhotosButton">
+                                Back Up Photo Folder
+                            </button>
+                        </div>
+                        <div class="import-report" id="photoReport"></div>
+                    </div>
+                </details>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="data-helpers.js"></script>
+    <script src="cloud-sync.js?v=8"></script>
+    <script src="auto-sync.js?v=4"></script>
+    <script src="plans.js?v=1"></script>
+    <script src="account.js?v=1"></script>
+    <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
+</body>
+
+</html>

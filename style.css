@@ -987,6 +987,141 @@ p {
     color: #ffb3b3;
 }
 
+/* ---- Account page ------------------------------------------------------ */
+
+.plan-card {
+    border: 2px solid var(--goldenrod-color);
+    border-radius: 8px;
+    background-color: #14110a;
+    padding: 18px 20px;
+}
+
+.plan-card-name {
+    margin: 0 0 4px;
+    color: var(--gold-color);
+    font-size: 22px;
+    font-family: 'SerpentRegular', serif;
+}
+
+.plan-card-tagline {
+    margin: 0 0 10px;
+    color: var(--text-color);
+    font-size: 17px;
+}
+
+.plan-lines {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--text-color);
+    font-size: 17px;
+}
+
+.plan-lines li {
+    margin-bottom: 4px;
+}
+
+.plan-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 16px;
+    margin-top: 18px;
+}
+
+.plan-option {
+    border: 1px solid #4a4128;
+    border-radius: 8px;
+    padding: 16px;
+    background-color: #0d0b07;
+}
+
+.plan-option-current {
+    border-color: var(--gold-color);
+    box-shadow: 0 0 0 1px var(--gold-color) inset;
+}
+
+.plan-badge {
+    margin: 10px 0 0;
+    color: var(--gold-color);
+    font-size: 15px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.account-advanced summary {
+    cursor: pointer;
+    color: var(--gold-color);
+    font-size: 19px;
+}
+
+.account-advanced[open] summary {
+    margin-bottom: 14px;
+}
+
+/* The signed-out gate. Fixed, dark, and easy to leave: it asks once, and
+   "Keep this device only" is a real answer. */
+.account-gate {
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background-color: rgba(0, 0, 0, 0.82);
+}
+
+.account-gate-card {
+    width: min(520px, 100%);
+    border: 2px solid var(--gold-color);
+    border-radius: 10px;
+    padding: 26px;
+    background-color: var(--background-color);
+    box-shadow: 6px 6px 0 0 var(--black-color);
+    text-align: left;
+}
+
+.account-gate-card h2 {
+    margin: 0 0 12px;
+    color: var(--gold-color);
+    font-family: 'SerpentRegular', serif;
+    font-size: 26px;
+}
+
+.account-gate-card p {
+    margin: 0 0 18px;
+    color: var(--text-color);
+    font-size: 18px;
+    line-height: 1.45;
+}
+
+.account-gate-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+.account-gate-skip {
+    display: block;
+    margin: 4px 0 0;
+    padding: 8px 0 4px;
+    border: none;
+    background: none;
+    box-shadow: none;
+    color: var(--text-color);
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 16px;
+    line-height: 1.35;
+    text-align: left;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.account-gate-skip:hover,
+.account-gate-skip:focus-visible {
+    color: var(--gold-color);
+}
+
 .dashboard-list {
     display: flex;
     flex-wrap: wrap;

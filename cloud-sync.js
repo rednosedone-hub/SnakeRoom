@@ -314,7 +314,7 @@
                 showStatus(`Connected and signed in as ${session.user.email || session.user.id}. Ready to sync.${stampText}`);
                 updateSignOutVisibility(true);
             } else {
-                showStatus("Connection ready, but not signed in. Enter your email and password below and press Sign In With Password.");
+                showStatus("Connection ready, but not signed in. Enter your email and password below and press Sign In.");
                 updateSignOutVisibility(false);
             }
 
@@ -336,25 +336,25 @@
             return;
         }
 
-        let label = "Cloud backup \u2014 tap to sign in";
+        let label = "Sign in to back up your collection";
         let chipState = "signed-out";
 
         try {
             const settings = readSettings();
 
             if (!settings.supabaseUrl || !settings.supabaseKey) {
-                label = "Cloud backup \u2014 not set up";
+                label = "Cloud account not set up";
                 chipState = "off";
             } else {
                 const session = await getSession();
 
                 if (session) {
-                    label = `Cloud backup \u2014 ${session.user.email || "signed in"}`;
+                    label = `Signed in \u2014 ${session.user.email || "cloud backup on"}`;
                     chipState = "signed-in";
                 }
             }
         } catch (error) {
-            label = "Cloud backup \u2014 check connection";
+            label = "Account \u2014 check connection";
             chipState = "off";
         }
 
@@ -874,7 +874,7 @@
                 if (getCollectionCounts().snakes === 0) {
                     await pullSnapshot();
                 } else {
-                    setSyncReport("Account ready. Press Push To Cloud to save this device's collection under it.");
+                    setAuthReport(`Account created and signed in as ${email}. This device's collection is being saved to the account now.`);
                 }
 
                 return;
@@ -1025,8 +1025,9 @@
                 await activeClient.auth.signOut();
             }
 
-            setSyncReport("Signed out.");
+            setSyncReport("Signed out. The collection on this device is untouched.");
             await refreshStatus();
+            await refreshStatusChip();
         } catch (error) {
             setSyncReport(`Sign out failed: ${error.message}`, true);
         }
@@ -1096,7 +1097,7 @@
         const raw = error && error.message ? error.message : String(error);
 
         if (/bucket not found/i.test(raw)) {
-            return "Photo storage isn't set up yet. Open the Cloud Sync page, press Copy Photo SQL, and run it once in the Supabase SQL Editor, then try again.";
+            return "Photo storage isn't set up yet. Open the Account page, find Advanced setup, press Copy Photo SQL, and run it once in the Supabase SQL Editor, then try again.";
         }
 
         return raw;
@@ -1376,7 +1377,7 @@
         // Emailed links (magic link, confirmation, password reset) land back on
         // this page with tokens in the URL fragment. Parse them, clean the
         // address bar, and switch on the new-password panel for a reset. Only
-        // the Cloud Sync page has the account UI, so nothing to do elsewhere.
+        // the account page has that panel, so nothing to do elsewhere.
         if (!document.getElementById("recoveryPanel")) {
             return;
         }

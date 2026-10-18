@@ -242,9 +242,9 @@
     // ---- Pending changes panel -----------------------------------------------
 
     function isSnapshotPage() {
-        // Login and settings pages: the panel is jumpy there, and the login
-        // page already has its own sync UI.
-        return !/cloud-sync\.html/.test(window.location.pathname);
+        // The account page has its own sync controls, so the floating panel
+        // would only repeat them.
+        return !/account\.html/.test(window.location.pathname);
     }
 
     function buildBanner() {
@@ -359,7 +359,7 @@
         }
 
         if (result === "no-session") {
-            alert("Sign in on the Cloud Sync page first \u2014 discarding restores the copy stored in your account.");
+            alert("Sign in on the Account page first \u2014 discarding restores the copy stored in your account.");
             return;
         }
 
@@ -402,9 +402,9 @@
         }
 
         if (result === "no-session") {
-            alert("Sign in on the Cloud Sync page to save to the cloud. For now the changes stay on this device.");
+            alert("Sign in on the Account page to save to the cloud. For now the changes stay on this device.");
         } else if (result !== "conflict") {
-            alert("Could not save to the cloud right now. Your changes are still on this device; try again from the Cloud Sync page.");
+            alert("Could not save to the cloud right now. Your changes are still on this device; try again from the Account page.");
         }
     }
 
