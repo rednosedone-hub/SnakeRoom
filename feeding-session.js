@@ -61,16 +61,6 @@ function showFeedingReport(message, isError = false) {
     report.classList.toggle("import-error", isError);
 }
 
-// What the page says when nothing is due. A bare "nothing due" on feeding day
-// looks like the app has lost the collection, so say when the next ones land.
-function formatDayText(daysFromToday) {
-    const target = new Date();
-
-    target.setDate(target.getDate() + daysFromToday);
-
-    return target.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
-}
-
 // A refusal is a real event but not a meal: the snake stays due, and the row
 // says when it last turned food down so it is obvious it was tried.
 function getLastRefusal(snake) {
@@ -93,45 +83,6 @@ function getLastRefusal(snake) {
     });
 
     return latest;
-}
-
-function describeNextDue(snakes) {
-    const waits = [];
-    let neverFed = 0;
-
-    snakes.forEach(snake => {
-        if (window.isOnFeedingHold(snake)) {
-            return;
-        }
-
-        const daysSinceFed = getDaysSince(snake.lastFed);
-
-        if (daysSinceFed === null) {
-            neverFed += 1;
-            return;
-        }
-
-        const daysUntil = getFeedingInterval(snake) - daysSinceFed;
-
-        if (daysUntil > 0) {
-            waits.push(daysUntil);
-        }
-    });
-
-    if (waits.length === 0) {
-        return neverFed > 0
-            ? `${neverFed} snake${neverFed === 1 ? " has" : "s have"} no feeding record yet, so ${neverFed === 1 ? "it never shows" : "they never show"} as due. Set a last fed date on those to schedule them.`
-            : "";
-    }
-
-    const soonest = Math.min(...waits);
-    const count = waits.filter(days => days === soonest).length;
-    const when = soonest === 1 ? "tomorrow" : `in ${soonest} days`;
-    const neverFedNote = neverFed > 0
-        ? ` ${neverFed} snake${neverFed === 1 ? " has" : "s have"} no feeding record, so ${neverFed === 1 ? "it is" : "they are"} not scheduled.`
-        : "";
-
-    return `Next due ${formatDayText(soonest)} (${when}): ${count} snake${count === 1 ? "" : "s"}.${neverFedNote}`;
 }
 
 function updateBulkActionBar() {

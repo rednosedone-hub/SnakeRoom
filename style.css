@@ -1182,6 +1182,44 @@ p {
     color: var(--gold-color);
 }
 
+/* A snake that is not due yet but is inside the ordering window: present, so
+   feeders can be bought, but visually quieter than the ones due now. */
+.dashboard-list-item.is-upcoming {
+    border-style: dashed;
+    opacity: 0.92;
+}
+
+/* The last-fed line owns its own row so the due/upcoming tag never crowds the
+   name, morph and feeder size above it. */
+.dashboard-list-item > span:last-child {
+    grid-column: 1 / -1;
+}
+
+.feed-due-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 2px 8px;
+    border: 1px solid var(--goldenrod-color);
+    border-radius: 999px;
+    color: var(--text-color);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.feed-due-tag.is-due {
+    border-color: #d98a8a;
+    color: #ffc4c4;
+}
+
+.feed-due-tag.is-soon {
+    border-color: #6fbf73;
+    color: #b6e6b8;
+}
+
+.feeding-lead-note {
+    margin-top: 6px;
+}
+
 .weight-chart-frame {
     margin-top: 18px;
 }

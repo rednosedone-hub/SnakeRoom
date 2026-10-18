@@ -1,66 +1,17 @@
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
 function countByValue(items, fieldName, value) {
     return items.filter(item => item[fieldName] === value).length;
 }
 
 function setText(id, text) {
     document.getElementById(id).textContent = text;
-}
-
-function getDaysSince(dateText) {
-    if (!dateText) {
-        return null;
-    }
-
-    const cleanDateText = String(dateText).trim();
-    const dateParts = cleanDateText.split("-").map(Number);
-
-    if (dateParts.length !== 3 || dateParts.some(part => Number.isNaN(part))) {
-        return null;
-    }
-
-    const today = new Date();
-    const todayDate = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate()
-    );
-    const date = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
-    const millisecondsPerDay = 1000 * 60 * 60 * 24;
-
-    return Math.floor((todayDate - date) / millisecondsPerDay);
-}
-
-function getFeedingInterval(snake) {
-    const interval = parseInt(snake.feedingIntervalDays, 10);
-
-    if (Number.isNaN(interval) || interval <= 0) {
-        return 7;
-    }
-
-    return interval;
-}
-
-function isOnFeedingHold(snake) {
-    return Boolean(snake && snake.feedingHold && snake.feedingHold.reason);
-}
-
-function isSnakeDueToFeed(snake) {
-    if (isOnFeedingHold(snake)) {
-        return false;
-    }
-
-    const feedingIntervalDays = getFeedingInterval(snake);
-    const daysSinceFed = getDaysSince(snake.lastFed);
-
-    if (daysSinceFed === null) {
-        return false;
-    }
-
-    return daysSinceFed >= feedingIntervalDays;
-}
-
-function getSnakesDueToFeed(snakes) {
-    return snakes.filter(isSnakeDueToFeed);
 }
 
 function getFeederSummary(snakes) {
@@ -76,25 +27,69 @@ function getFeederSummary(snakes) {
         .map(feederSize => `${counts[feederSize]} ${feederSize}`);
 }
 
+function describeDaysAgo(days) {
+    if (days === 0) {
+        return "Last fed today";
+    }
+
+    return `Last fed ${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+// One row per snake, with the reason it is on the list. A snake due in two days
+// is here so its feeders can be ordered, not so it can be fed early.
+function describeDueTag(status) {
+    if (status.state === "due") {
+        const overdue = Math.abs(status.daysUntil);
+
+        return overdue === 0
+            ? "Due today"
+            : `Overdue ${overdue} day${overdue === 1 ? "" : "s"}`;
+    }
+
+    return `Due in ${status.daysUntil} day${status.daysUntil === 1 ? "" : "s"} \u00b7 ${window.formatFeedDayText(status.daysUntil)}`;
+}
+
+function buildFeedingSummary(dueStatuses, soonStatuses) {
+    const dueFeeders = getFeederSummary(dueStatuses.map(status => status.snake)).join(", ");
+    const soonFeeders = getFeederSummary(soonStatuses.map(status => status.snake)).join(", ");
+
+    if (dueStatuses.length > 0 && soonStatuses.length > 0) {
+        return `Need ${dueFeeders} now. ${soonFeeders} due within ${window.FEEDING_LEAD_DAYS} days.`;
+    }
+
+    if (dueStatuses.length > 0) {
+        return `Need ${dueFeeders}`;
+    }
+
+    if (soonStatuses.length > 0) {
+        const lastDay = Math.max(...soonStatuses.map(status => status.daysUntil));
+
+        return `Order ${soonFeeders} \u2014 due by ${window.formatFeedDayText(lastDay)}.`;
+    }
+
+    return "";
+}
+
 function renderDashboard() {
     const snakes = window.SnakeData.loadSnakesWithIds(window.SnakeData.defaultSnakes);
     const breedingPairs = window.SnakeData.readStorageArray("breedingPairs", []);
     const clutches = window.SnakeData.readStorageArray("clutches", []);
-    const feedingsDue = getSnakesDueToFeed(snakes);
+    const allStatuses = snakes.map(snake => window.getFeedingStatus(snake));
+    const dueStatuses = allStatuses.filter(status => status.state === "due");
+    const soonStatuses = allStatuses.filter(status => status.state === "soon");
+    const feedingsDue = dueStatuses.map(status => status.snake);
 
-    window.feedingDebug = snakes.map(snake => {
-        const daysSinceFed = getDaysSince(snake.lastFed);
-        const feedingIntervalDays = getFeedingInterval(snake);
-
-        return {
-            name: snake.name,
-            lastFed: snake.lastFed,
-            daysSinceFed: daysSinceFed,
-            feedingIntervalDays: feedingIntervalDays,
-            feederSize: snake.feederSize,
-            isDue: isSnakeDueToFeed(snake)
-        };
-    });
+    window.feedingDebug = allStatuses.map(status => ({
+        name: status.snake.name,
+        lastFed: status.snake.lastFed,
+        daysSinceFed: status.daysSinceFed,
+        feedingIntervalDays: status.interval,
+        feederSize: status.snake.feederSize,
+        state: status.state,
+        daysUntil: status.daysUntil,
+        dueDate: status.dueDate,
+        isDue: status.state === "due"
+    }));
 
     const females = countByValue(snakes, "sex", "Female");
     const males = countByValue(snakes, "sex", "Male");
@@ -122,34 +117,39 @@ function renderDashboard() {
             : `${activeClutches} clutches waiting to hatch, ${convertedClutches} converted`
     );
 
-    if (feedingsDue.length === 0) {
-        setText("feedingSummary", "No snakes are due today.");
-        document.getElementById("feedingDueList").innerHTML = `
+    const feedingSummary = buildFeedingSummary(dueStatuses, soonStatuses) || window.describeNextDue(snakes);
+
+    setText(
+        "feedingSummary",
+        feedingSummary || "No snakes have a feeding date yet."
+    );
+
+    const list = document.getElementById("feedingDueList");
+
+    if (dueStatuses.length === 0 && soonStatuses.length === 0) {
+        const nextDueText = window.describeNextDue(snakes);
+
+        list.innerHTML = `
             <p class="empty-message">
-                Feeding due dates will appear here after we add feeding records.
+                Nothing due in the next ${window.FEEDING_LEAD_DAYS} days.
             </p>
+            ${nextDueText ? `<p class="empty-message feeding-next-due">${nextDueText}</p>` : ""}
         `;
         return;
     }
 
-    const feederSummary = getFeederSummary(feedingsDue);
-
-    setText(
-        "feedingSummary",
-        feederSummary.length > 0
-            ? `Need ${feederSummary.join(", ")}`
-            : "No snakes are due today."
-    );
-
-    document.getElementById("feedingDueList").innerHTML = feedingsDue.map(snake => {
-        const daysSinceFed = getDaysSince(snake.lastFed);
+    list.innerHTML = window.getSnakesDueOrComingUp(snakes).map(status => {
+        const snake = status.snake;
+        const feederSize = snake.feederSize || "No feeder size";
+        const lastFed = status.daysSinceFed === null ? "No feeding record" : describeDaysAgo(status.daysSinceFed);
+        const tagClass = status.state === "due" ? "is-due" : "is-soon";
 
         return `
-            <div class="dashboard-list-item">
+            <div class="dashboard-list-item${status.state === "soon" ? " is-upcoming" : ""}">
                 <strong>${snake.name}</strong>
                 <span>${window.SnakeData.getSnakeIdentityText(snake)}</span>
-                <span>${snake.feederSize || "No feeder size"}</span>
-                <span>Last fed ${daysSinceFed} days ago</span>
+                <span>${feederSize}</span>
+                <span>${lastFed} <span class="feed-due-tag ${tagClass}">${escapeHtml(describeDueTag(status))}</span></span>
             </div>
         `;
     }).join("");
