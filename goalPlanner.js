@@ -198,7 +198,7 @@ function decodeGoalPieces(goalText) {
         }
     }
 
-    function addGene(geneName, position) {
+    function addGene(geneName, position, copies = 1) {
         const gene = window.GeneTools.findGene(geneName);
 
         if (!gene) {
@@ -211,7 +211,7 @@ function decodeGoalPieces(goalText) {
 
         wanted.push({
             gene: gene.name,
-            copies: 1,
+            copies: gene.type === "recessive" ? 1 : copies,
             recessive: gene.type === "recessive",
             _at: position
         });
@@ -240,7 +240,25 @@ function decodeGoalPieces(goalText) {
         }
     }
 
-    // 1. Combo names first (Batman, Killer Bee, ...), longest first, so one
+    // 1. Super forms before anything else. "Super Orange Dream" (or the
+    //    catalog's own name for a super, like "Ivory" for a Super Yellow Belly)
+    //    means two copies; if the plain gene pass ran first it would settle for
+    //    a single-copy visual and call that the goal.
+    window.GeneTools.catalog
+        .filter(gene => gene.type !== "recessive" && gene.superType !== "none")
+        .sort((a, b) => b.name.length - a.name.length)
+        .forEach(gene => {
+            const written = `super ${gene.name}`;
+            scanPhrase(written, () => addGene(gene.name, text.indexOf(written.toLowerCase()), 2));
+
+            if (gene.superName) {
+                scanPhrase(gene.superName, () =>
+                    addGene(gene.name, text.indexOf(gene.superName.toLowerCase()), 2)
+                );
+            }
+        });
+
+    // 2. Combo names (Batman, Killer Bee, ...), longest first, so one
     //    phrase covers every gene in the combo.
     Object.entries(window.GeneTools.comboNames)
         .sort((a, b) => b[1].length - a[1].length)
@@ -251,7 +269,7 @@ function decodeGoalPieces(goalText) {
             });
         });
 
-    // 2. Full gene names, longest first. This is what makes "orange dream"
+    // 3. Full gene names, longest first. This is what makes "orange dream"
     //    and "yellow belly" work even though each is two words.
     window.GeneTools.catalog
         .map(gene => gene.name)
@@ -260,7 +278,7 @@ function decodeGoalPieces(goalText) {
             scanPhrase(geneName, () => addGene(geneName, text.indexOf(geneName.toLowerCase())));
         });
 
-    // 3. Whatever single words are left: exact match, else a unique prefix
+    // 4. Whatever single words are left: exact match, else a unique prefix
     //    ("pins" -> Pinstripe). Ambiguous prefixes stay unmatched instead of
     //    being guessed at.
     const tokenPattern = /[a-z0-9]+/gi;
@@ -302,6 +320,33 @@ function decodeGoalPieces(goalText) {
         });
 }
 
+// A goal's pieces are derived from its text. Goals saved before the decoder
+// understood supers stored a single-copy Orange Dream, so they have to be
+// re-read once or they keep accepting a plain visual as "Super Orange Dream".
+function refreshGoalPieces() {
+    const signature = list => (list || [])
+        .map(piece => `${piece.gene}:${piece.copies}`)
+        .join("|");
+    let changed = false;
+
+    goals.forEach(goal => {
+        const decoded = decodeGoalPieces(goal.goalText);
+
+        if (decoded.length === 0 || signature(decoded) === signature(goal.pieces)) {
+            return;
+        }
+
+        goal.pieces = decoded;
+        changed = true;
+    });
+
+    if (changed) {
+        saveGoals();
+    }
+}
+
+refreshGoalPieces();
+
 // Vowel-initial genes are common (Orange Dream, Enchi, Albino), so the hint
 // text cannot assume "a".
 function geneArticle(geneName) {
@@ -317,7 +362,24 @@ function getPieceLabel(piece, gene) {
         return `${piece.gene} (Visual / Het)`;
     }
 
+    if (piece.copies === 2) {
+        return `${gene.superName || `Super ${piece.gene}`} (2 copies)`;
+    }
+
     return piece.gene;
+}
+
+// How many copies of a piece an animal needs before it counts as the goal.
+// A recessive visual also needs two, but it needs two of the same allele rather
+// than two of a co-dominant, which is the same count of copies on the record.
+function getPieceRequiredCopies(piece) {
+    const gene = window.GeneTools.findGene(piece.gene);
+
+    if (piece.copies === 2 || gene?.type === "recessive") {
+        return 2;
+    }
+
+    return 1;
 }
 
 // ---- Collection scanning
@@ -336,7 +398,13 @@ function getSnakeGeneCount(snake, piece) {
         return geneRecord.copies === 2 ? "Visual" : "Het";
     }
 
-    return geneRecord.copies === 2 ? "Visual" : "Visual";
+    // A super only means something when the goal asks for one; otherwise a
+    // two-copy animal is just a strong carrier of a single-copy piece.
+    if (piece.copies === 2 && geneRecord.copies === 2) {
+        return "Super";
+    }
+
+    return "Visual";
 }
 
 function buildSnakeMatches(pieces) {
@@ -358,6 +426,10 @@ function getHetCount(piece, snakeMatches) {
 
 function getVisualSnakes(piece, snakeMatches) {
     return snakeMatches.filter(entry => entry.matches[piece._idx] === "Visual").map(entry => entry.snake);
+}
+
+function getSuperSnakes(piece, snakeMatches) {
+    return snakeMatches.filter(entry => entry.matches[piece._idx] === "Super").map(entry => entry.snake);
 }
 
 function getHetSnakes(piece, snakeMatches) {
@@ -422,6 +494,23 @@ function nextStepHint(piece, snakeMatches) {
         }
 
         return `Only 1 ${piece.gene} het on hand. Need 1 more ${piece.gene} carrier before a het cross can make a visual.`;
+    }
+
+    // A super goal is a different animal from a visual, so it needs its own
+    // arithmetic: two singles give the super 25% of the time.
+    if (piece.copies === 2) {
+        const supers = getSuperSnakes(piece, snakeMatches);
+        const singles = visuals.map(snake => snake.name);
+
+        if (supers.length > 0) {
+            return `You have ${supers.length} ${piece.gene} super${supers.length === 1 ? "" : "s"} on hand (2 copies).`;
+        }
+
+        if (singles.length > 0) {
+            return `No super yet. ${singles.length} ${piece.gene} animal${singles.length === 1 ? "" : "s"} carr${singles.length === 1 ? "ies" : "y"} one copy (${singles.join(" and ")}). Pair two of those for a 25% shot at the super per egg.`;
+        }
+
+        return `No ${piece.gene} animals yet. Need ${geneArticle(piece.gene)} ${piece.gene} visual (1 copy) first, then pair two of them for a 25% shot at the super.`;
     }
 
     // Co-dom: 1 copy = visual, 2 copies = super.
@@ -720,9 +809,9 @@ function outcomePieceHits(outcome, pieces) {
         const record = outcome.geneDetails.find(gene =>
             gene.name.toLowerCase() === piece.gene.toLowerCase()
         );
-        const recessive = window.GeneTools.findGene(piece.gene)?.type === "recessive";
+        const required = getPieceRequiredCopies(piece);
         const present = Boolean(record) && record.copies !== 0;
-        const full = Boolean(record) && (recessive ? record.copies === 2 : record.copies >= 1);
+        const full = Boolean(record) && record.copies >= required;
 
         return { present, full };
     });
@@ -825,7 +914,9 @@ function getClosestTiers(ranked, pieces) {
     // With no piece at full strength yet, carriers are the closest thing this
     // pairing makes, so those group by which goal genes they at least carry.
     const keyFor = item => item.hits
-        .map((hit, index) => ((bestFullCount > 0 ? hit.full : hit.present) ? pieces[index].gene : ""))
+        .map((hit, index) => (bestFullCount > 0 ? hit.full : hit.present)
+            ? getPieceLabel(pieces[index], window.GeneTools.findGene(pieces[index].gene))
+            : "")
         .filter(Boolean)
         .join(" + ") || "none";
 
@@ -867,6 +958,11 @@ function describeMissing(entry, pieces) {
 
             if (hit.full) {
                 return "";
+            }
+
+            if (hit.present && piece.copies === 2
+                && window.GeneTools.findGene(piece.gene)?.type !== "recessive") {
+                return `${piece.gene} (1 of 2 copies)`;
             }
 
             return hit.present
@@ -965,7 +1061,7 @@ function snakeMovesGoalForward(snake, pieces) {
             return count === "Het" || count === "Visual";
         }
 
-        return count === "Visual";
+        return count === "Visual" || count === "Super";
     });
 }
 
@@ -1000,6 +1096,12 @@ function buildSlotOptions(goal, kind) {
     options.push(`<option value="need:NI animal">NI animal</option>`);
     options.push(`<option value="need:Buy new animal">Need to buy</option>`);
     pieces.forEach(piece => {
+        if (piece.copies === 2) {
+            options.push(`<option value="need:Super ${piece.gene} NI">Need to buy Super ${piece.gene} (2 copies, any sex)</option>`);
+            options.push(`<option value="need:Visual ${piece.gene} NI">Need to buy Visual ${piece.gene} (1 copy, any sex)</option>`);
+            return;
+        }
+
         options.push(`<option value="need:Het ${piece.gene} NI">Need to buy Het ${piece.gene} (any sex)</option>`);
         options.push(`<option value="need:Visual ${piece.gene} NI">Need to buy Visual ${piece.gene} (any sex)</option>`);
     });
@@ -1165,10 +1267,21 @@ function renderGoalDetail(goalId) {
 
         const scanRows = pieces.map((piece, index) => {
             const gene = window.GeneTools.findGene(piece.gene);
-            const visualEntries = snakeMatches.filter(entry => entry.matches[index] === "Visual");
+            const superPiece = piece.copies === 2 && gene?.type !== "recessive";
+            const visualEntries = snakeMatches.filter(entry =>
+                entry.matches[index] === (superPiece ? "Super" : "Visual")
+            );
             const hetEntries = snakeMatches.filter(entry => entry.matches[index] === "Het");
+            // One-copy animals cannot fill a super slot, but they are the parents
+            // that make one, so they are worth naming.
+            const singleCopyEntries = superPiece
+                ? snakeMatches.filter(entry => entry.matches[index] === "Visual")
+                : [];
 
             const visuals = visualEntries.map(entry =>
+                getSnakeLine(entry.snake)
+            );
+            const singleCopies = singleCopyEntries.map(entry =>
                 getSnakeLine(entry.snake)
             );
             const hets = hetEntries.map(entry =>
@@ -1176,11 +1289,14 @@ function renderGoalDetail(goalId) {
             );
 
             const hint = nextStepHint(piece, snakeMatches);
+            const visualCell = `${visuals.length > 0 ? escapeHtml(visuals.join(", ")) : "None"}${singleCopies.length > 0
+                ? `<div class="goal-hint">1 copy only: ${escapeHtml(singleCopies.join(", "))}</div>`
+                : ""}`;
 
             return `
             <tr>
                 <td>${escapeHtml(getPieceLabel(piece, gene))}</td>
-                <td>${visuals.length > 0 ? escapeHtml(visuals.join(", ")) : "None"}</td>
+                <td>${visualCell}</td>
                 <td>${hets.length > 0 ? escapeHtml(hets.join(", ")) : (gene?.type === "recessive" ? "None" : "n/a")}</td>
                 <td>${escapeHtml(hint)}</td>
             </tr>
