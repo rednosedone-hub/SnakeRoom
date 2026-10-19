@@ -83,7 +83,8 @@ const geneCatalog = {
     "Orange Dream": { type: "codominant", superName: "Super Orange Dream" },
     "Calico": { type: "codominant", superName: "Super Calico" },
     "Leopard": { type: "codominant", superName: "Super Leopard" },
-    "GHI": { type: "codominant", superName: "Super GHI" }
+    "GHI": { type: "codominant", superName: "Super GHI" },
+    "Split": { type: "codominant", superName: "Super Split" }
 };
 
 const comboNames = {
