@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Collection</title>
-    <link rel="stylesheet" href="style.css?v=28">
+    <link rel="stylesheet" href="style.css?v=31">
 </head>
 
 <body>
@@ -24,11 +24,10 @@
         <div class="button-row">
             <a href="index.html" class="main-button">Home</a>
             <a href="breeding.html" class="main-button">Breeding</a>
-            <!--<a href="breedingOutcomes.html" class="main-button">Outcomes</a> -->
             <a href="available.html" class="main-button">Available</a>
             <a href="morphCalculator.html" class="main-button">Morph Calculator</a>
+            <a href="bin-cards.html" class="main-button">Bin Cards</a>
             <a href="data-tools.html" class="main-button">Data Tools</a>
-            <!-- <a href="weight-sheet.html" class="main-button">Weight Sheet</a> -->
         </div>
 
         <div class="divider"></div>
@@ -54,10 +53,6 @@
 
             <button onclick="window.location.href='snake-form.html'" class="main-button">
                 Add Snake
-            </button>
-
-            <button onclick="window.location.href='bin-cards.html'" class="main-button">
-                Bin Cards
             </button>
 
             <span class="view-toggle">
@@ -139,6 +134,7 @@
     <script src="genes.js?v=6"></script>
     <script src="snakes.js?v=6"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
+    <script src="nav-scroll.js?v=1"></script>
 </body>
 
 </html>

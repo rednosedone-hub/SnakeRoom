@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Bin Cards</title>
-    <link rel="stylesheet" href="style.css?v=28">
+    <link rel="stylesheet" href="style.css?v=31">
 </head>
 
 <body>
@@ -38,13 +38,8 @@
                     <span>Print</span>
                     <select id="printScopeSelect">
                         <option value="All">All Snakes</option>
-                        <option value="Single">Single Snake</option>
+                        <option value="Selected">Selected Snakes</option>
                     </select>
-                </label>
-
-                <label class="form-field" id="singleSnakeField" style="display: none;">
-                    <span>Snake</span>
-                    <select id="singleSnakeSelect"></select>
                 </label>
 
                 <label class="form-field">
@@ -70,6 +65,13 @@
                     </select>
                 </label>
 
+                <label class="form-field">
+                    <span>Clutch</span>
+                    <select id="clutchFilter">
+                        <option value="All">All Clutches</option>
+                    </select>
+                </label>
+
                 <label class="form-field checkbox-field bin-checkbox">
                     <span>Include Photo</span>
                     <input type="checkbox" id="includePhotoInput" checked>
@@ -86,6 +88,21 @@
                         Print Cards
                     </button>
                 </div>
+
+                <div class="form-field bin-snake-picker-field" id="snakePickerField" style="display: none;">
+                    <span>Snakes to print <span class="bin-picker-count" id="snakePickerCount">0 selected</span></span>
+
+                    <div class="bin-snake-picker" id="snakePickerList" role="group" aria-label="Snakes to print"></div>
+
+                    <div class="bin-picker-actions">
+                        <button type="button" class="secondary-button" id="selectAllVisibleButton">
+                            Select all shown
+                        </button>
+                        <button type="button" class="secondary-button" id="clearSelectionButton">
+                            Clear
+                        </button>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -99,8 +116,9 @@
     <script src="account-gate.js?v=1"></script>
     <script src="geneCatalog.js?v=3"></script>
     <script src="genes.js?v=6"></script>
-    <script src="bin-cards.js?v=2"></script>
+    <script src="bin-cards.js?v=4"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
+    <script src="nav-scroll.js?v=1"></script>
 </body>
 
 </html>
