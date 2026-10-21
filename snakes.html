@@ -24,11 +24,11 @@
         <div class="button-row">
             <a href="index.html" class="main-button">Home</a>
             <a href="breeding.html" class="main-button">Breeding</a>
-            <a href="breedingOutcomes.html" class="main-button">Outcomes</a>
+            <!--<a href="breedingOutcomes.html" class="main-button">Outcomes</a> -->
             <a href="available.html" class="main-button">Available</a>
             <a href="morphCalculator.html" class="main-button">Morph Calculator</a>
             <a href="data-tools.html" class="main-button">Data Tools</a>
-            <a href="weight-sheet.html" class="main-button">Weight Sheet</a>
+            <!-- <a href="weight-sheet.html" class="main-button">Weight Sheet</a> -->
         </div>
 
         <div class="divider"></div>
@@ -47,6 +47,10 @@
             </span>
 
             <span class="toolbar-spacer"></span>
+
+            <button onclick="window.location.href='weight-sheet.html'" class="main-button">
+                Weight Sheet
+            </button>
 
             <button onclick="window.location.href='snake-form.html'" class="main-button">
                 Add Snake
@@ -132,7 +136,7 @@
     <script src="auto-sync.js?v=4"></script>
     <script src="account-gate.js?v=1"></script>
     <script src="geneCatalog.js?v=3"></script>
-    <script src="genes.js?v=5"></script>
+    <script src="genes.js?v=6"></script>
     <script src="snakes.js?v=6"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
 </body>

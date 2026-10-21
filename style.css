@@ -177,7 +177,7 @@ p {
     border-radius: 5px;
     cursor: pointer;
     font-family: 'Times New Roman', Times, serif;
-    font-size: 17px;
+    font-size: 15px;
 }
 
 .edit-button {
@@ -470,7 +470,7 @@ p {
 
 .snake-card {
     background-color: var(--background-color);
-    width: 300px;
+    width: 250px;
     padding: 15px;
     align-items: center;
     border-radius: 15px;
@@ -498,8 +498,8 @@ p {
 }
 
 .snake-thumbnail {
-    width: 220px;
-    height: 220px;
+    width: 150px;
+    height: 150px;
     object-fit: cover;
     border-radius: 10px;
     cursor: pointer;

@@ -157,7 +157,9 @@ function describeGene(geneRecord) {
 
         const possibleHetLabel = getPossibleHetLabel(geneRecord);
 
-        return possibleHetLabel || `${geneRecord.name} Het`;
+        // A proven carrier is certain, so the label says 100% instead of the
+        // bare "Clown Het" that reads like a 50% or 66% parent next to it.
+        return possibleHetLabel || `100% Het ${geneRecord.name}`;
     }
 
     if (geneRecord.copies === 2) {

@@ -479,7 +479,7 @@ function renderSnakes() {
         const acquiredDateText = snake.acquiredDate ? snake.acquiredDate : "No acquired date";
         const feederText = snake.feederSize ? `Feeder: ${snake.feederSize}` : "No feeder size";
         const feedingText = snake.lastFed
-            ? `Last fed: ${snake.lastFed} / every ${snake.feedingIntervalDays || 7} days`
+            ? `Last fed: ${snake.lastFed}`
             : "No feeding date";
         const genePills = Array.isArray(snake.genes) && snake.genes.length > 0
             ? snake.genes.map(gene => `<span class="gene-pill ${getStoredGenePillClass(gene)}">${getGeneDescription(gene)}</span>`).join("")
@@ -498,8 +498,7 @@ function renderSnakes() {
             <div class="snake-info">
                 <div class="snake-header">
                     <h3 class="snake-name">${snake.name}</h3>
-                    <span class="${sexClass}">${sexIcon}</span>
-                    ${photoCountBadge}
+                    <span class="${sexClass}">${photoCountBadge}${sexIcon}</span>
                 </div>
 
                 <p class="snake-morph">${identityText}
@@ -519,11 +518,6 @@ function renderSnakes() {
 
                 <div class="snake-genes">
                     ${genePills}
-                </div>
-
-                <div class="snake-qr">
-                    <img src="${window.SnakeData.getSnakeQrImageUrl(snake, 130)}" alt="QR code for ${snake.name}">
-                    <span>Scan for record</span>
                 </div>
 
                 <div class="card-buttons">

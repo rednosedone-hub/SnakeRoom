@@ -218,8 +218,10 @@ function decodeGoalPieces(goalText) {
     }
 
     // Every standalone occurrence of a phrase, skipping spans another phrase
-    // already claimed and refusing to match inside a longer word.
-    function scanPhrase(phrase, onMatch) {
+    // already claimed and refusing to match inside a longer word. isAllowed
+    // can veto an occurrence without consuming it (used for super names that
+    // are part of a gene's own name).
+    function scanPhrase(phrase, onMatch, isAllowed) {
         const lowerPhrase = String(phrase || "").toLowerCase();
 
         if (lowerPhrase.length === 0) {
@@ -231,13 +233,31 @@ function decodeGoalPieces(goalText) {
         while (index !== -1) {
             const end = index + lowerPhrase.length;
 
-            if (!isWordChar(text[index - 1]) && !isWordChar(text[end]) && spanIsFree(index, end)) {
+            if (!isWordChar(text[index - 1]) && !isWordChar(text[end]) && spanIsFree(index, end)
+                && (!isAllowed || isAllowed(index))) {
                 consume(index, end);
-                onMatch();
+                onMatch(index);
             }
 
             index = text.indexOf(lowerPhrase, index + 1);
         }
+    }
+
+    // Some genes are named after their own super ("Het Red Axanthic" becomes
+    // "Red Axanthic" with two copies), so a bare super name only means two
+    // copies where it is not the tail of the plain gene's own name.
+    function superNameAllowed(gene, index) {
+        const geneName = gene.name.toLowerCase();
+        const superName = String(gene.superName || "").toLowerCase();
+
+        if (!superName || superName === geneName || !geneName.includes(superName)) {
+            return true;
+        }
+
+        const stem = geneName.slice(0, geneName.indexOf(superName)).trim();
+        const before = text.slice(0, index).trimEnd();
+
+        return !stem || !new RegExp(`(^|[^a-z0-9])${escapeRegExpText(stem)}$`).test(before);
     }
 
     // 1. Super forms before anything else. "Super Orange Dream" (or the
@@ -249,11 +269,13 @@ function decodeGoalPieces(goalText) {
         .sort((a, b) => b.name.length - a.name.length)
         .forEach(gene => {
             const written = `super ${gene.name}`;
-            scanPhrase(written, () => addGene(gene.name, text.indexOf(written.toLowerCase()), 2));
+            scanPhrase(written, index => addGene(gene.name, index, 2));
 
             if (gene.superName) {
-                scanPhrase(gene.superName, () =>
-                    addGene(gene.name, text.indexOf(gene.superName.toLowerCase()), 2)
+                scanPhrase(
+                    gene.superName,
+                    index => addGene(gene.name, index, 2),
+                    index => superNameAllowed(gene, index)
                 );
             }
         });
@@ -639,6 +661,31 @@ function slotGenes(slot) {
     return inferSlotGenes(slot.label);
 }
 
+function escapeRegExpText(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Het labels carry their certainty ("100% Het Clown", "66% Het Clown" or the
+// older "Clown Het"), so a retired holdback is read back with the same odds
+// instead of being upgraded to a proven carrier. Returns null when the label
+// does not call the gene a het at all.
+function readHetChance(text, plainName) {
+    const escapedName = escapeRegExpText(plainName);
+    const percentMatch = new RegExp(`(\\d{1,3})%\\s*het\\s+${escapedName}\\b`).exec(text);
+
+    if (percentMatch) {
+        const percent = Number(percentMatch[1]);
+
+        return percent >= 100 ? 1 : percent / 100;
+    }
+
+    if (new RegExp(`\\bhet\\s+${escapedName}\\b`).test(text)) {
+        return 1;
+    }
+
+    return null;
+}
+
 // Guess which genes an animal "you need" carries based on its label text (e.g.
 // "Mojave Het Clown NI animal" or "Super Pastel"). Visual forms count as 2
 // copies, het forms as 1.
@@ -649,8 +696,18 @@ function inferSlotGenes(label) {
     window.GeneTools.catalog.forEach(gene => {
         const plainName = gene.name.toLowerCase();
         const superName = (gene.superName || `super ${plainName}`).toLowerCase();
+        // Some genes are named after their own super: "Het Red Axanthic" grows
+        // into "Red Axanthic" with two copies. The super name sits inside the
+        // plain name, so it only counts as the two-copy form when the label
+        // does not spell out the plain gene itself.
+        const superIsPartOfName = superName !== plainName && plainName.includes(superName);
+        const superMentioned = text.includes(superName)
+            && (!superIsPartOfName
+                || !text.includes(plainName)
+                || text.includes(`super ${superName}`)
+                || text.includes(`super ${plainName}`));
 
-        if (text.includes(superName) && superName !== plainName) {
+        if (superMentioned) {
             genes.push({ name: gene.name, copies: 2, type: gene.type });
             return;
         }
@@ -667,6 +724,18 @@ function inferSlotGenes(label) {
 
         if (text.includes(`${plainName} het`)) {
             genes.push({ name: gene.name, copies: 1, type: "recessive" });
+            return;
+        }
+
+        const hetChance = gene.type === "recessive" ? readHetChance(text, plainName) : null;
+
+        if (hetChance !== null) {
+            genes.push({
+                name: gene.name,
+                copies: 1,
+                type: "recessive",
+                ...(hetChance < 1 ? { hetOdds: hetChance } : {})
+            });
             return;
         }
 
@@ -1096,13 +1165,22 @@ function buildSlotOptions(goal, kind) {
     options.push(`<option value="need:NI animal">NI animal</option>`);
     options.push(`<option value="need:Buy new animal">Need to buy</option>`);
     pieces.forEach(piece => {
+        const gene = window.GeneTools.findGene(piece.gene);
+
         if (piece.copies === 2) {
-            options.push(`<option value="need:Super ${piece.gene} NI">Need to buy Super ${piece.gene} (2 copies, any sex)</option>`);
+            const superLabel = gene?.superName || `Super ${piece.gene}`;
+
+            options.push(`<option value="need:${superLabel} NI">Need to buy ${superLabel} (2 copies, any sex)</option>`);
             options.push(`<option value="need:Visual ${piece.gene} NI">Need to buy Visual ${piece.gene} (1 copy, any sex)</option>`);
             return;
         }
 
-        options.push(`<option value="need:Het ${piece.gene} NI">Need to buy Het ${piece.gene} (any sex)</option>`);
+        // Only recessives are bought as hets. A co-dominant piece is bought as
+        // the animal itself, so "Het Red Axanthic" does not become "Het Het
+        // Red Axanthic" and Enchi is not called a het either.
+        const buyerLabel = gene?.type === "recessive" ? `Het ${piece.gene}` : piece.gene;
+
+        options.push(`<option value="need:${buyerLabel} NI">Need to buy ${buyerLabel} (any sex)</option>`);
         options.push(`<option value="need:Visual ${piece.gene} NI">Need to buy Visual ${piece.gene} (any sex)</option>`);
     });
 
@@ -1610,9 +1688,12 @@ function promoteHoldback(goalId, stepId, holdbackId) {
 
 // ---- Utilities
 
+// Name each gene the way the collection does, so two copies of Het Red
+// Axanthic read "Red Axanthic" and a proven carrier reads "100% Het ..."
+// instead of a bare name that could mean either.
 function getSnakeLine(snake) {
     const geneNames = (snake.genes || [])
-        .map(g => g.name)
+        .map(gene => (gene && gene.name ? window.GeneTools.describeGene(gene) : ""))
         .filter(Boolean);
 
     const geneLine = geneNames.join(", ");

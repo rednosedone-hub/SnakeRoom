@@ -77,12 +77,16 @@
 
         if (otherChance > 0) {
             const oneCopyChance = femaleChance * (1 - maleChance) + maleChance * (1 - femaleChance);
+            const hetOdds = oneCopyChance / otherChance;
 
             // The row is labelled by the chance a hatchling really carries one
-            // copy, the same convention that named 66% / 50% het before.
+            // copy, the same convention that named 66% / 50% het before. When a
+            // visual parent guarantees that copy the odds are 100%, so no
+            // possible-het tag is stored: every carrier from that clutch is a
+            // proven het.
             options.push({
                 copies: 1,
-                hetOdds: oneCopyChance / otherChance,
+                hetOdds: hetOdds >= 1 ? null : hetOdds,
                 probability: otherChance
             });
         }
