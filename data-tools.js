@@ -8,6 +8,16 @@ const csvHeaders = [
     "status",
     "hatchDate",
     "acquiredDate",
+    "acquisitionSource",
+    "purchasedFrom",
+    "purchasePrice",
+    "purchaseDate",
+    "sireId",
+    "damId",
+    "salePrice",
+    "saleDate",
+    "soldTo",
+    "saleExpoId",
     "weight",
     "lastFed",
     "feedingIntervalDays",
@@ -133,6 +143,16 @@ function snakeToRow(snake) {
         status: snake.status || "",
         hatchDate: snake.hatchDate || "",
         acquiredDate: snake.acquiredDate || "",
+        acquisitionSource: snake.acquisitionSource || "",
+        purchasedFrom: snake.purchasedFrom || "",
+        purchasePrice: snake.purchasePrice || "",
+        purchaseDate: snake.purchaseDate || "",
+        sireId: snake.sireId || "",
+        damId: snake.damId || "",
+        salePrice: snake.salePrice || "",
+        saleDate: snake.saleDate || "",
+        soldTo: snake.soldTo || "",
+        saleExpoId: snake.saleExpoId || "",
         weight: snake.weight || "",
         lastFed: snake.lastFed || "",
         feedingIntervalDays: snake.feedingIntervalDays || "",
@@ -180,6 +200,11 @@ function downloadTemplateCsv() {
             status: "Holdback",
             hatchDate: "2026-01-15",
             acquiredDate: "2026-03-01",
+            acquisitionSource: "purchased",
+            purchasedFrom: "Example Breeder",
+            purchasePrice: "250",
+            purchaseDate: "2026-03-01",
+            salePrice: "400",
             feedingIntervalDays: "7",
             image: "Images/TheSnakeRoom.jpg",
             genes: "Pastel:codom:1;Enchi:codom:1"
@@ -264,6 +289,16 @@ function rowToSnake(rowObject, index) {
         status: getCell(rowObject, "status") || "Holdback",
         hatchDate: getCell(rowObject, "hatchDate"),
         acquiredDate: getCell(rowObject, "acquiredDate"),
+        acquisitionSource: getCell(rowObject, "acquisitionSource"),
+        purchasedFrom: getCell(rowObject, "purchasedFrom"),
+        purchasePrice: getCell(rowObject, "purchasePrice"),
+        purchaseDate: getCell(rowObject, "purchaseDate"),
+        sireId: getCell(rowObject, "sireId"),
+        damId: getCell(rowObject, "damId"),
+        salePrice: getCell(rowObject, "salePrice"),
+        saleDate: getCell(rowObject, "saleDate"),
+        soldTo: getCell(rowObject, "soldTo"),
+        saleExpoId: getCell(rowObject, "saleExpoId"),
         weight: getCell(rowObject, "weight"),
         lastFed: getCell(rowObject, "lastFed"),
         feedingIntervalDays: getCell(rowObject, "feedingIntervalDays") || 7,
@@ -325,6 +360,26 @@ function mergeImportedSnake(existingSnake, importedSnake, rowObject) {
     if (!getCell(rowObject, "shedHistoryJson")) {
         mergedSnake.shedHistory = existingSnake.shedHistory || [];
     }
+
+    // A CSV exported before the money fields existed has no columns for them.
+    // Treat a blank cell the same way as the history columns above: keep what
+    // this device already knows instead of silently erasing a purchase price.
+    [
+        "acquisitionSource",
+        "purchasedFrom",
+        "purchasePrice",
+        "purchaseDate",
+        "sireId",
+        "damId",
+        "salePrice",
+        "saleDate",
+        "soldTo",
+        "saleExpoId"
+    ].forEach(key => {
+        if (!getCell(rowObject, key)) {
+            mergedSnake[key] = existingSnake[key] || "";
+        }
+    });
 
     return mergedSnake;
 }

@@ -692,7 +692,12 @@ function deleteSnake(index) {
         return;
     }
 
-    if (!confirm(`Delete ${snake.name || "this snake"}? Active breeding pairs that use it will be removed.`)) {
+    const hasMoneyHistory = Number(snake.purchasePrice) > 0 || Number(snake.salePrice) > 0;
+    const moneyWarning = hasMoneyHistory
+        ? " Its purchase or sale record will also disappear from Finances."
+        : "";
+
+    if (!confirm(`Delete ${snake.name || "this snake"}? Active breeding pairs that use it will be removed.${moneyWarning}`)) {
         return;
     }
 

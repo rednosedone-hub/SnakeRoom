@@ -21,7 +21,8 @@
             features: {
                 breeding: false,
                 planner: false,
-                storefront: false
+                storefront: false,
+                finance: false
             }
         },
         breeder: {
@@ -33,7 +34,8 @@
             features: {
                 breeding: true,
                 planner: true,
-                storefront: false
+                storefront: false,
+                finance: false
             }
         },
         pro: {
@@ -45,7 +47,8 @@
             features: {
                 breeding: true,
                 planner: true,
-                storefront: true
+                storefront: true,
+                finance: true
             }
         },
         // The account that runs the app. Not for sale, not shown on a pricing
@@ -59,7 +62,8 @@
             features: {
                 breeding: true,
                 planner: true,
-                storefront: true
+                storefront: true,
+                finance: true
             }
         }
     };
@@ -122,6 +126,9 @@
             `${plan.photosPerSnake === Infinity ? "Unlimited" : plan.photosPerSnake} photo${plan.photosPerSnake === 1 ? "" : "s"} per animal`,
             plan.features.breeding ? "Breeding and outcomes" : "No breeding area",
             plan.features.planner ? "Goal planner" : "No goal planner",
+            plan.features.finance
+                ? "Money tools: purchases, sales, feeders and show costs"
+                : "No money tools",
             plan.features.storefront ? "Storefront listings" : "No storefront listings"
         ];
     }

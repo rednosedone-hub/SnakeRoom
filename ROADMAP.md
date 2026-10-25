@@ -27,8 +27,8 @@ Everything downstream derives from snake statuses, which already exist in the ap
 - **Available** → automatically published to the public listings. Photo, morph, price shown.
 - **Deposit taken** → status **On Hold**. Still public, with an **On Hold** badge.
 - **Sold** → sale recorded (price + date), public badge flips to **Sold**, and the listing
-  **auto-disappears from the public page 7 days later**. The sale stays in the private
-  sales history forever for accounting.
+  **auto-disappears from the public page 7 days later**. The sale stays on the snake record
+  and in the private Finances ledger forever for accounting.
 - **Any other status** (Breeder, Holdback, Juvenile, ...) or snake deletion → listing is
   removed from the public side automatically.
 
@@ -64,12 +64,16 @@ makes the calculator more useful and the funnel wider over time.
 
 ## 5. Phased build order
 
-### Phase 0 — private ledger (small, useful now, nothing public)
-- **Price field** on the snake form (private, like bin number).
-- **Sale recording**: marking a snake **Sold** captures price + sale date into a `sales`
-  list that rides along in the normal snapshot backup (`SNAPSHOT_KEYS`).
-- **Sales history view** on the Available page (private): sold snakes with price/date,
-  count and gross totals — accounting from day one.
+### Phase 0 — private ledger (built, nothing public)
+- **Acquisition & sale on the snake record**: purchase price, who it came from, how it was
+  acquired, sale price, buyer, sale date and the show it sold at — all private, all on the
+  snake itself. Produced snakes record sire, dam and clutch instead of a purchase price.
+- **Finances page** (`finance.html`, Pro/Owner): overview of money in, money out and net;
+  snakes bought and sold; feeder prices and feeder orders; a show planner that totals booth,
+  travel and other costs against sales linked to that show; and other costs (supplies, vet,
+  shipping).
+- **Backup**: expenses, shows and feeder settings ride along in the normal snapshot
+  (`financeExpenses`, `financeExpos`, `financeSettings`).
 - **ROADMAP.md** (this file).
 
 ### Phase 1 — public storefront (when animals are ready to list)
@@ -86,8 +90,15 @@ makes the calculator more useful and the funnel wider over time.
 - **Newly hatched feed** — Outcomes data as social proof ("hatched 4 this month").
 - FAQ / care basics + contact/inquiry flow (fewer questions, more serious buyers).
 - Per-morph SEO landing pages.
-- **Accounting ledger growth** — feeder costs, shipping, profit per clutch, which pairs
-  actually make money.
+- **Finance growth** — the private ledger covers the basics today; these are the next
+  useful layers, none built yet:
+  - profit per clutch and per pairing, so the roadmap can say which pairs actually pay for
+    themselves;
+  - feed cost per snake and per season, not just the whole collection;
+  - show year-over-year comparison — same show, different years, side by side;
+  - CSV export of purchases, sales, expenses and shows for an accountant or a spreadsheet;
+  - server-side enforcement of the `finance` flag once snapshot writes move behind an Edge
+    Function (see §8), so a Pro feature is actually protected rather than hidden in the UI.
 - Custom domain for Soulless Serpents; dedicated sales ledger table in Supabase if the
   local snapshot copy ever outgrows it.
 
@@ -101,8 +112,8 @@ makes the calculator more useful and the funnel wider over time.
 2. **Public morph calculator has no roster** — gene picker only; the private calculator
    keeps collection integration.
 3. **Public cards show photo + details** — buyers want to see the animal before buying.
-4. **Price lives on the snake** — Available carries it publicly; Sold records it in the
-   private sales history with the date.
+4. **Price lives on the snake** — Available carries it publicly; Sold records price, date,
+   buyer and show on the snake, and the private Finances page totals them.
 5. **The public site is Soulless Serpents** — eventually its own repo/domain; the
    bridge design works from either site.
 6. **No rush** — just started breeding; only Phase 0 is a near-term build. Options stay
@@ -143,16 +154,18 @@ Accounts are real today, not planned:
 
 ### Tiers (the numbers live in `plans.js`)
 
-| Plan | Animals | Photos per animal | Breeding + outcomes | Goal planner | Storefront listings |
-|---|---|---|---|---|---|
-| **Free** | 20 | 1 | — | — | — |
-| **Breeder** | 100 | 3 | ✓ | ✓ | — |
-| **Pro** | unlimited | 10 | ✓ | ✓ | ✓ |
-| **Owner** (not sold) | unlimited | unlimited | ✓ | ✓ | ✓ |
+| Plan | Animals | Photos per animal | Breeding + outcomes | Goal planner | Money tools | Storefront listings |
+|---|---|---|---|---|---|---|
+| **Free** | 20 | 1 | — | — | — | — |
+| **Breeder** | 100 | 3 | ✓ | ✓ | — | — |
+| **Pro** | unlimited | 10 | ✓ | ✓ | ✓ | ✓ |
+| **Owner** (not sold) | unlimited | unlimited | ✓ | ✓ | ✓ | ✓ |
 
-`plans.js` is the single source of truth: `SnakePlans.getPlan()`, `.allows("breeding")` and
-`.describePlan()` are what pages will call. Changing a limit is a one-line edit. Until a
-`profiles` table exists, `DEFAULT_PLAN` is `owner`, so the app is unrestricted.
+`plans.js` is the single source of truth: `SnakePlans.getPlan()`, `.allows("breeding")`,
+`.allows("finance")` and `.describePlan()` are what pages call. Changing a limit is a
+one-line edit. Until a `profiles` table exists, `DEFAULT_PLAN` is `owner`, so the app is
+unrestricted. The money tools are locked by the `finance` flag today; the check is
+client-side, like the other plan limits.
 
 ### Enforcement, in three steps
 

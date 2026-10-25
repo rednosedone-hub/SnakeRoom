@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Snake Room - Finances</title>
+    <link rel="stylesheet" href="style.css?v=36">
+</head>
+
+<body>
+    <div class="page-container finance-page">
+        <div class="hero-section">
+            <img src="Images/TheSnakeRoom.jpg" class="hero-image" alt="The Snake Room logo">
+
+            <div class="container">
+                <h1>The Snake Room</h1>
+                <h2>Finances</h2>
+            </div>
+        </div>
+
+        <div class="button-row">
+            <a href="index.html" class="main-button">Home</a>
+            <a href="snakes.html" class="main-button">Collection</a>
+            <a href="breeding.html" class="main-button">Breeding</a>
+            <a href="account.html" class="main-button">Account</a>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="import-report" id="finReport" style="display: none;"></div>
+
+        <div class="form-section finance-locked" id="financeLocked" style="display: none;">
+            <h3>Money tools are a Pro feature</h3>
+            <p id="financeLockedText">
+                Money tools track what you paid for snakes, what they sold for, feeder costs and
+                what each show costs and earns.
+            </p>
+            <p class="empty-message" id="financeLockedPlan"></p>
+            <div class="data-action-grid">
+                <a class="main-button" href="account.html">See Plans</a>
+                <a class="secondary-button" href="snakes.html">Back to Collection</a>
+            </div>
+        </div>
+
+        <div id="financeBody" style="display: none;">
+            <div class="fin-tab-row" id="finTabRow" role="tablist" aria-label="Finances sections">
+                <button type="button" class="fin-tab is-active" data-fin-tab="overview" role="tab"
+                    aria-selected="true">Overview</button>
+                <button type="button" class="fin-tab" data-fin-tab="snakes" role="tab"
+                    aria-selected="false">Snakes</button>
+                <button type="button" class="fin-tab" data-fin-tab="feeders" role="tab"
+                    aria-selected="false">Feeders</button>
+                <button type="button" class="fin-tab" data-fin-tab="expos" role="tab"
+                    aria-selected="false">Shows</button>
+                <button type="button" class="fin-tab" data-fin-tab="costs" role="tab"
+                    aria-selected="false">Other Costs</button>
+            </div>
+
+            <section class="fin-panel is-active" data-fin-panel="overview" role="tabpanel">
+                <div class="fin-panel-head">
+                    <div>
+                        <h3>Overview</h3>
+                        <p class="empty-message fin-panel-lead">
+                            Purchases and sales come from each snake's record. Feeder orders, other
+                            costs and show costs are entered here. Changing the currency changes the
+                            symbol only &mdash; past amounts are not converted.
+                        </p>
+                    </div>
+
+                    <div class="fin-toolbar">
+                        <label class="fin-inline-field">
+                            <span>Currency</span>
+                            <select id="finCurrencyInput"></select>
+                        </label>
+
+                        <label class="fin-inline-field">
+                            <span>Period</span>
+                            <select id="finYearSelect"></select>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="fin-kpi-grid">
+                    <div class="fin-kpi">
+                        <span class="fin-kpi-label">Money in</span>
+                        <strong class="fin-kpi-value" id="finRevenue">$0.00</strong>
+                        <span class="fin-kpi-note" id="finRevenueNote">No sales recorded yet.</span>
+                    </div>
+
+                    <div class="fin-kpi">
+                        <span class="fin-kpi-label">Money out</span>
+                        <strong class="fin-kpi-value" id="finSpend">$0.00</strong>
+                        <span class="fin-kpi-note" id="finSpendNote">No costs recorded yet.</span>
+                    </div>
+
+                    <div class="fin-kpi fin-kpi-net">
+                        <span class="fin-kpi-label">Net</span>
+                        <strong class="fin-kpi-value" id="finNet">$0.00</strong>
+                        <span class="fin-kpi-note" id="finNetNote">Money in minus money out.</span>
+                    </div>
+
+                    <div class="fin-kpi">
+                        <span class="fin-kpi-label">Feeding cost used</span>
+                        <strong class="fin-kpi-value" id="finFeedingUsed">$0.00</strong>
+                        <span class="fin-kpi-note" id="finFeedingUsedNote">Estimated from your feeder prices.</span>
+                    </div>
+                </div>
+
+                <div class="fin-two-column">
+                    <div class="fin-block">
+                        <h4>Money by type</h4>
+                        <table class="fin-table fin-breakdown-table">
+                            <tbody id="finBreakdownBody"></tbody>
+                        </table>
+                        <p class="empty-message" id="finBreakdownEmpty">No money recorded for this period yet.</p>
+                    </div>
+
+                    <div class="fin-block">
+                        <h4>Recent money</h4>
+                        <div class="fin-activity" id="finActivity"></div>
+                        <p class="empty-message" id="finActivityEmpty">Nothing recorded for this period yet.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="fin-panel" data-fin-panel="snakes" role="tabpanel">
+                <div class="fin-panel-head">
+                    <div>
+                        <h3>Snakes bought and sold</h3>
+                        <p class="empty-message fin-panel-lead">
+                            Purchase price, who it came from, sale price and buyer live on each
+                            snake's record. Edit a snake to correct its money details.
+                        </p>
+                    </div>
+
+                    <a class="small-link-button" href="snakes.html">Open Collection</a>
+                </div>
+
+                <div class="fin-subsection">
+                    <h4>Bought</h4>
+                    <div class="fin-table-wrap">
+                        <table class="fin-table">
+                            <thead>
+                                <tr>
+                                    <th>Snake</th>
+                                    <th>Bought from</th>
+                                    <th>Date</th>
+                                    <th class="fin-amount-cell">Price</th>
+                                </tr>
+                            </thead>
+                            <tbody id="finPurchasesBody"></tbody>
+                            <tfoot id="finPurchasesFoot"></tfoot>
+                        </table>
+                    </div>
+                    <p class="empty-message" id="finPurchasesEmpty">
+                        No purchase prices recorded yet. Add one on a snake's record under
+                        Acquisition &amp; Sale.
+                    </p>
+                </div>
+
+                <div class="fin-subsection">
+                    <h4>Sold</h4>
+                    <div class="fin-table-wrap">
+                        <table class="fin-table">
+                            <thead>
+                                <tr>
+                                    <th>Snake</th>
+                                    <th>Buyer</th>
+                                    <th>Show</th>
+                                    <th>Date</th>
+                                    <th class="fin-amount-cell">Price</th>
+                                </tr>
+                            </thead>
+                            <tbody id="finSalesBody"></tbody>
+                            <tfoot id="finSalesFoot"></tfoot>
+                        </table>
+                    </div>
+                    <p class="empty-message" id="finSalesEmpty">
+                        No sales recorded yet. Set a sale price and date on a snake's record when
+                        it sells.
+                    </p>
+                </div>
+
+                <div class="fin-warning" id="finSalesWarnings" style="display: none;"></div>
+            </section>
+
+            <section class="fin-panel" data-fin-panel="feeders" role="tabpanel">
+                <div class="fin-panel-head">
+                    <div>
+                        <h3>Feeders</h3>
+                        <p class="empty-message fin-panel-lead">
+                            Two views of feed money: what the collection actually ate (estimated
+                            from your price per size) and what you paid for feeder orders.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="fin-two-column">
+                    <div class="fin-block">
+                        <h4>Price per feeder</h4>
+                        <p class="empty-message">
+                            Set what you pay for each size, in the currency chosen on Overview.
+                            Feeding records use these prices to estimate what your collection is
+                            eating through.
+                        </p>
+
+                        <div class="feeder-price-grid" id="feederPriceRows"></div>
+
+                        <div class="fin-actions">
+                            <button type="button" class="main-button" id="saveFeederPricesButton">
+                                Save Prices
+                            </button>
+                            <span class="fin-status" id="feederPriceStatus"></span>
+                        </div>
+                    </div>
+
+                    <div class="fin-block">
+                        <h4>What the collection ate</h4>
+                        <div class="fin-table-wrap">
+                            <table class="fin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Feeder size</th>
+                                        <th class="fin-amount-cell">Fed</th>
+                                        <th class="fin-amount-cell">Each</th>
+                                        <th class="fin-amount-cell">Cost</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="feederUsageBody"></tbody>
+                                <tfoot id="feederUsageFoot"></tfoot>
+                            </table>
+                        </div>
+                        <p class="empty-message" id="feederUsageNote"></p>
+                    </div>
+                </div>
+
+                <div class="fin-subsection">
+                    <h4>Feeder orders</h4>
+                    <p class="empty-message">
+                        Record the bags or boxes of feeders you buy. These are real money out and
+                        are counted in the Overview net. The estimate above is a separate check of
+                        what the collection is using.
+                    </p>
+
+                    <form class="form-grid fin-form" id="feederOrderForm">
+                        <label class="form-field">
+                            <span>Order date</span>
+                            <input type="date" id="feederOrderDate">
+                        </label>
+
+                        <label class="form-field">
+                            <span>Supplier</span>
+                            <input type="text" id="feederOrderVendor" placeholder="Supplier or shop">
+                        </label>
+
+                        <label class="form-field">
+                            <span>Amount</span>
+                            <input type="number" id="feederOrderAmount" min="0" step="0.01" placeholder="0.00">
+                        </label>
+
+                        <label class="form-field">
+                            <span>Note</span>
+                            <input type="text" id="feederOrderNote" placeholder="Optional note, e.g. 50 rat pups">
+                        </label>
+
+                        <div class="form-field fin-form-actions">
+                            <span>&nbsp;</span>
+                            <button type="submit" class="main-button">Add Feeder Order</button>
+                        </div>
+                    </form>
+
+                    <div class="fin-table-wrap">
+                        <table class="fin-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Supplier</th>
+                                    <th>Note</th>
+                                    <th class="fin-amount-cell">Amount</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="finFeederOrdersBody"></tbody>
+                        </table>
+                    </div>
+                    <p class="empty-message" id="finFeederOrdersEmpty">No feeder orders recorded yet.</p>
+                    <p class="fin-subtotal" id="finFeederOrdersTotal"></p>
+                </div>
+            </section>
+
+            <section class="fin-panel" data-fin-panel="expos" role="tabpanel">
+                <div class="fin-panel-head">
+                    <div>
+                        <h3>Show planner</h3>
+                        <p class="empty-message fin-panel-lead">
+                            Plan a show, record the table and travel costs, and see what actually
+                            sold there. A snake counts toward a show when its sale says it was sold
+                            there. Enter show costs here, not under Other Costs, so they are not
+                            counted twice.
+                        </p>
+                    </div>
+                </div>
+
+                <form class="form-grid fin-form fin-expo-form" id="expoForm">
+                    <input type="hidden" id="expoIdInput">
+
+                    <label class="form-field">
+                        <span>Show name</span>
+                        <input type="text" id="expoNameInput" placeholder="e.g. Canadian Reptile Breeders Expo">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Show date</span>
+                        <input type="date" id="expoDateInput">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Location</span>
+                        <input type="text" id="expoLocationInput" placeholder="City or venue">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Table / booth cost</span>
+                        <input type="number" id="expoBoothInput" min="0" step="0.01" placeholder="0.00">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Travel cost</span>
+                        <input type="number" id="expoTravelInput" min="0" step="0.01" placeholder="0.00">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Other show costs</span>
+                        <input type="number" id="expoOtherCostInput" min="0" step="0.01" placeholder="0.00">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Other revenue at the show</span>
+                        <input type="number" id="expoOtherRevenueInput" min="0" step="0.01"
+                            placeholder="e.g. supplies sold">
+                    </label>
+
+                    <label class="form-field fin-span-all">
+                        <span>Notes</span>
+                        <input type="text" id="expoNotesInput" placeholder="Optional notes">
+                    </label>
+
+                    <div class="form-field fin-form-actions fin-span-all">
+                        <span>&nbsp;</span>
+                        <div class="fin-actions">
+                            <button type="submit" class="main-button" id="expoSubmitButton">Add Show</button>
+                            <button type="button" class="secondary-button" id="expoCancelButton"
+                                style="display: none;">Cancel Edit</button>
+                        </div>
+                    </div>
+                </form>
+
+                <p class="fin-status" id="expoStatus"></p>
+                <div class="expo-list" id="expoList"></div>
+                <p class="empty-message" id="expoEmpty">
+                    No shows added yet. Add the next expo above to plan its costs before you go.
+                </p>
+            </section>
+
+            <section class="fin-panel" data-fin-panel="costs" role="tabpanel">
+                <div class="fin-panel-head">
+                    <div>
+                        <h3>Other costs</h3>
+                        <p class="empty-message fin-panel-lead">
+                            Supplies, vet bills, shipping and anything else that is not a feeder
+                            order or a show cost. Feeder orders live on the Feeders tab so they are
+                            never counted twice.
+                        </p>
+                    </div>
+                </div>
+
+                <form class="form-grid fin-form" id="expenseForm">
+                    <label class="form-field">
+                        <span>Date</span>
+                        <input type="date" id="expenseDateInput">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Category</span>
+                        <select id="expenseCategoryInput"></select>
+                    </label>
+
+                    <label class="form-field">
+                        <span>Paid to</span>
+                        <input type="text" id="expenseVendorInput" placeholder="Shop, vet, courier">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Amount</span>
+                        <input type="number" id="expenseAmountInput" min="0" step="0.01" placeholder="0.00">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Note</span>
+                        <input type="text" id="expenseNoteInput" placeholder="Optional note">
+                    </label>
+
+                    <div class="form-field fin-form-actions">
+                        <span>&nbsp;</span>
+                        <button type="submit" class="main-button">Add Cost</button>
+                    </div>
+                </form>
+
+                <div class="fin-table-wrap">
+                    <table class="fin-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Category</th>
+                                <th>Paid to</th>
+                                <th>Note</th>
+                                <th class="fin-amount-cell">Amount</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="finExpensesBody"></tbody>
+                    </table>
+                </div>
+                <p class="empty-message" id="finExpensesEmpty">No other costs recorded yet.</p>
+                <p class="fin-subtotal" id="finExpensesTotal"></p>
+            </section>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script src="data-helpers.js"></script>
+    <script src="cloud-sync.js?v=9"></script>
+    <script src="auto-sync.js?v=5"></script>
+    <script src="account-gate.js?v=1"></script>
+    <script src="plans.js?v=2"></script>
+    <script src="finance-helpers.js?v=1"></script>
+    <script src="finance.js?v=1"></script>
+    <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
+    <script src="nav-scroll.js?v=1"></script>
+</body>
+
+</html>

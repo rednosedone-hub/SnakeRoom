@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Snake Record</title>
-    <link rel="stylesheet" href="style.css?v=31">
+    <link rel="stylesheet" href="style.css?v=36">
 </head>
 
 <body>
@@ -27,6 +27,7 @@
             <a href="breeding.html" class="main-button">Breeding</a>
             <a href="morphCalculator.html" class="main-button">Morph Calculator</a>
             <a href="available.html" class="main-button">Available</a>
+            <a href="finance.html" class="main-button">Finances</a>
             <a href="#feedingSection" class="main-button">Log Feeding</a>
         </div>
 
@@ -34,6 +35,13 @@
 
         <main class="snake-form-page">
             <div class="import-report" id="qrSnakeReport" style="display:none; margin-bottom:12px;"></div>
+
+            <div class="section-controls">
+                <button type="button" class="secondary-button small-action-button"
+                    onclick="expandAllSnakeSections()">Expand All</button>
+                <button type="button" class="secondary-button small-action-button"
+                    onclick="collapseAllSnakeSections()">Collapse All</button>
+            </div>
 
             <section class="form-section">
                 <h3>Basic Info</h3>
@@ -90,6 +98,111 @@
                         <input type="date" id="acquiredDateInput">
                     </label>
                 </div>
+            </section>
+
+            <section class="form-section" id="moneySection">
+                <h3>Acquisition &amp; Sale</h3>
+
+                <p class="empty-message">
+                    Where this snake came from and what it cost. Purchases and sales recorded
+                    here feed the Finances page, and produced snakes can be linked to their
+                    parents and clutch.
+                </p>
+
+                <div class="form-grid">
+                    <label class="form-field">
+                        <span>How did you get this snake?</span>
+                        <select id="acquisitionSourceInput" onchange="updateAcquisitionFields()">
+                            <option value="">Not recorded</option>
+                            <option value="purchased">Bought or acquired</option>
+                            <option value="produced">Produced here</option>
+                        </select>
+                    </label>
+
+                    <label class="form-field money-purchase-field" id="purchasedFromField">
+                        <span>Bought from</span>
+                        <input type="text" id="purchasedFromInput" list="sellerOptions"
+                            placeholder="Breeder, shop or show">
+                    </label>
+
+                    <label class="form-field money-purchase-field" id="purchasePriceField">
+                        <span>Purchase price</span>
+                        <input type="number" id="purchasePriceInput" min="0" step="0.01"
+                            placeholder="0.00" oninput="updateMoneySummary()">
+                    </label>
+
+                    <label class="form-field money-purchase-field" id="purchaseDateField">
+                        <span>Purchase date</span>
+                        <input type="date" id="purchaseDateInput" oninput="updateMoneySummary()">
+                    </label>
+                </div>
+
+                <div class="parentage-block" id="parentageFields" style="display: none;">
+                    <h4>Parentage</h4>
+                    <p class="empty-message">
+                        Pick the parents from your collection so this hatchling's line is clear.
+                        The clutch link keeps it with the rest of the clutch.
+                    </p>
+
+                    <div class="form-grid">
+                        <label class="form-field">
+                            <span>Sire (father)</span>
+                            <select id="sireInput"></select>
+                        </label>
+
+                        <label class="form-field">
+                            <span>Dam (mother)</span>
+                            <select id="damInput"></select>
+                        </label>
+
+                        <label class="form-field">
+                            <span>Clutch</span>
+                            <select id="clutchInput"></select>
+                        </label>
+                    </div>
+
+                    <p class="empty-message" id="parentageNote"></p>
+                </div>
+
+                <div class="sale-block">
+                    <h4>Sale</h4>
+                    <p class="empty-message">
+                        Fill this in when the snake sells, then set Status to Sold so the
+                        collection and the money ledger agree. Choosing a show links the sale
+                        to that show's totals.
+                    </p>
+
+                    <div class="form-grid">
+                        <label class="form-field">
+                            <span>Sold to</span>
+                            <input type="text" id="soldToInput" list="buyerOptions"
+                                placeholder="Buyer name">
+                        </label>
+
+                        <label class="form-field">
+                            <span>Sale price</span>
+                            <input type="number" id="salePriceInput" min="0" step="0.01"
+                                placeholder="0.00" oninput="updateMoneySummary()">
+                        </label>
+
+                        <label class="form-field">
+                            <span>Sale date</span>
+                            <input type="date" id="saleDateInput" oninput="updateMoneySummary()">
+                        </label>
+
+                        <label class="form-field">
+                            <span>Sold at</span>
+                            <select id="saleExpoInput">
+                                <option value="">Not at a show</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="money-summary-line" id="acquisitionSummary"></div>
+
+                <datalist id="sellerOptions"></datalist>
+                <datalist id="buyerOptions"></datalist>
             </section>
 
             <section class="form-section">
@@ -335,13 +448,14 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="data-helpers.js"></script>
-    <script src="cloud-sync.js?v=8"></script>
-    <script src="auto-sync.js?v=4"></script>
+    <script src="cloud-sync.js?v=9"></script>
+    <script src="auto-sync.js?v=5"></script>
     <script src="account-gate.js?v=1"></script>
     <script src="geneCatalog.js?v=3"></script>
     <script src="genes.js?v=6"></script>
     <script src="feed-helpers.js?v=3"></script>
-    <script src="snake-form.js?v=8"></script>
+    <script src="finance-helpers.js?v=1"></script>
+    <script src="snake-form.js?v=10"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

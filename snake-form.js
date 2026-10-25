@@ -605,6 +605,148 @@ async function recoverMissingUidSnake() {
     }
 }
 
+// ---- Collapsible sections -------------------------------------------------
+//
+// The record is long, so every top-level section folds away. The folded state
+// is remembered on this device only: it is a reading preference, not collection
+// data, so it does not ride along in the cloud snapshot.
+
+const SECTION_STATE_KEY = "snakeFormSectionState";
+const collapsedSectionRefs = new Map();
+
+function sectionKeyFromTitle(title) {
+    return String(title || "section")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "section";
+}
+
+function readCollapsedSections() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(SECTION_STATE_KEY));
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch (error) {
+        return {};
+    }
+}
+
+function saveCollapsedSections(state) {
+    try {
+        localStorage.setItem(SECTION_STATE_KEY, JSON.stringify(state));
+    } catch (error) {
+        // Private mode: the sections simply open next visit.
+    }
+}
+
+function setSectionCollapsed(ref, collapsed) {
+    ref.section.classList.toggle("is-collapsed", collapsed);
+    ref.button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    ref.body.hidden = collapsed;
+
+    const state = readCollapsedSections();
+
+    if (collapsed) {
+        state[ref.key] = true;
+    } else {
+        delete state[ref.key];
+    }
+
+    saveCollapsedSections(state);
+}
+
+function setAllSnakeSectionsCollapsed(collapsed) {
+    collapsedSectionRefs.forEach(ref => setSectionCollapsed(ref, collapsed));
+}
+
+function expandSectionContaining(element) {
+    if (!element) {
+        return;
+    }
+
+    const section = element.closest(".form-section");
+
+    if (!section) {
+        return;
+    }
+
+    collapsedSectionRefs.forEach(ref => {
+        if (ref.section === section) {
+            setSectionCollapsed(ref, false);
+        }
+    });
+}
+
+function expandSnakeSectionFromHash() {
+    const hash = window.location.hash.replace("#", "");
+
+    if (!hash) {
+        return;
+    }
+
+    expandSectionContaining(document.getElementById(hash));
+}
+
+function setupCollapsibleSections() {
+    const savedState = readCollapsedSections();
+
+    document.querySelectorAll(".snake-form-page > .form-section").forEach(section => {
+        const heading = section.querySelector("h3");
+
+        if (!heading) {
+            return;
+        }
+
+        const title = heading.textContent.trim();
+        const key = sectionKeyFromTitle(title);
+        const body = document.createElement("div");
+        body.className = "form-section-body";
+        body.id = `sectionBody-${key}`;
+
+        // Move everything after the heading into the collapsible body.
+        const nodes = [];
+        let node = heading.nextSibling;
+
+        while (node) {
+            nodes.push(node);
+            node = node.nextSibling;
+        }
+
+        nodes.forEach(item => body.appendChild(item));
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "form-section-toggle";
+        button.id = `sectionToggle-${key}`;
+        button.setAttribute("aria-controls", body.id);
+        button.setAttribute("aria-expanded", "true");
+        button.innerHTML = `
+            <span class="form-section-title"></span>
+            <span class="form-section-chevron" aria-hidden="true">\u25be</span>
+        `;
+        button.querySelector(".form-section-title").textContent = title;
+
+        section.insertBefore(button, heading);
+        heading.remove();
+        section.appendChild(body);
+
+        const ref = { key, section, button, body };
+        collapsedSectionRefs.set(key, ref);
+        button.addEventListener("click", () => setSectionCollapsed(ref, !section.classList.contains("is-collapsed")));
+
+        if (savedState[key]) {
+            setSectionCollapsed(ref, true);
+        }
+    });
+}
+
+window.expandAllSnakeSections = function () {
+    setAllSnakeSectionsCollapsed(false);
+};
+
+window.collapseAllSnakeSections = function () {
+    setAllSnakeSectionsCollapsed(true);
+};
+
 function fillFormForEdit() {
     const photoFileInput = document.getElementById("photoFileInput");
 
@@ -903,6 +1045,179 @@ function renderWeightChart(history) {
     `;
 }
 
+// ---- History preview and filters -----------------------------------------
+//
+// Each history shows its three newest entries. "Show all" opens the full list
+// with a filter, and every remove button keeps pointing at the original entry
+// because the display order is newest-first.
+
+const HISTORY_PREVIEW_COUNT = 3;
+
+const historyViewState = {
+    weight: { expanded: false, filter: "" },
+    feeding: { expanded: false, filter: "" },
+    shed: { expanded: false, filter: "" }
+};
+
+const WEIGHT_PERIOD_FILTERS = [
+    { value: "", label: "All entries" },
+    { value: "30", label: "Last 30 days" },
+    { value: "90", label: "Last 90 days" },
+    { value: "year", label: "This year" }
+];
+
+function historyDateValue(date) {
+    if (!date) {
+        return -Infinity;
+    }
+
+    const time = new Date(date).getTime();
+    return Number.isNaN(time) ? -Infinity : time;
+}
+
+function sortHistoryNewestFirst(entries) {
+    return entries.slice().sort((a, b) => {
+        const timeA = historyDateValue(a.date);
+        const timeB = historyDateValue(b.date);
+
+        if (timeA !== timeB) {
+            return timeB - timeA;
+        }
+
+        return b.index - a.index;
+    });
+}
+
+function prepareHistoryView(kind, entries, matchesFilter) {
+    const view = historyViewState[kind] || { expanded: false, filter: "" };
+    const sorted = sortHistoryNewestFirst(entries);
+    const hasMoreThanPreview = entries.length > HISTORY_PREVIEW_COUNT;
+
+    // With three or fewer entries there is nothing to reveal or filter, so drop
+    // any stale full-list state rather than springing it open on the next add.
+    if (!hasMoreThanPreview) {
+        view.expanded = false;
+        view.filter = "";
+    }
+    const filtered = hasMoreThanPreview && view.expanded && view.filter
+        ? sorted.filter(item => matchesFilter(item, view.filter))
+        : sorted;
+    const visible = hasMoreThanPreview && view.expanded
+        ? filtered
+        : sorted.slice(0, HISTORY_PREVIEW_COUNT);
+
+    return {
+        entries: visible,
+        total: entries.length,
+        shown: visible.length,
+        expanded: view.expanded,
+        filter: view.filter
+    };
+}
+
+function buildHistoryFilterOptions(values, allLabel, selected) {
+    const unique = [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+    return `<option value="">${escapeMoneyText(allLabel)}</option>` + unique
+        .map(value => `<option value="${escapeMoneyText(value)}"${value === selected ? " selected" : ""}>${escapeMoneyText(value)}</option>`)
+        .join("");
+}
+
+function buildWeightFilterOptions(selected) {
+    return WEIGHT_PERIOD_FILTERS
+        .map(item => `<option value="${item.value}"${item.value === selected ? " selected" : ""}>${escapeMoneyText(item.label)}</option>`)
+        .join("");
+}
+
+function buildHistoryFooter(kind, meta, filterOptionsHtml) {
+    if (meta.total <= HISTORY_PREVIEW_COUNT) {
+        return "";
+    }
+
+    const filterControl = meta.expanded
+        ? `<label class="history-filter"><span>Filter</span><select onchange="setHistoryFilter('${kind}', this.value)">${filterOptionsHtml}</select></label>`
+        : "";
+
+    return `
+        <div class="history-controls">
+            <span class="history-count">
+                Showing ${meta.shown} of ${meta.total}${meta.expanded && meta.filter ? " matching" : ""}
+            </span>
+            <button type="button" class="small-link-button history-toggle" onclick="toggleHistoryView('${kind}')">
+                ${meta.expanded ? "Show last 3" : `Show all ${meta.total}`}
+            </button>
+            ${filterControl}
+        </div>
+    `;
+}
+
+function weightMatchesHistoryFilter(item, filter) {
+    if (!filter) {
+        return true;
+    }
+
+    const time = historyDateValue(item.date);
+
+    if (time === -Infinity) {
+        return false;
+    }
+
+    if (filter === "30") {
+        return time >= Date.now() - 30 * 24 * 60 * 60 * 1000;
+    }
+
+    if (filter === "90") {
+        return time >= Date.now() - 90 * 24 * 60 * 60 * 1000;
+    }
+
+    if (filter === "year") {
+        return new Date(time).getFullYear() === new Date().getFullYear();
+    }
+
+    return true;
+}
+
+function rerenderHistory(kind) {
+    if (kind === "weight") {
+        renderWeightHistory({
+            weight: document.getElementById("weightInput")?.value || "",
+            weightHistory: getCurrentWeightHistory()
+        });
+        return;
+    }
+
+    if (kind === "feeding") {
+        renderFeedingHistory({ feedingHistory: getCurrentFeedingHistory() });
+        return;
+    }
+
+    if (kind === "shed") {
+        renderShedHistory({ shedHistory: getCurrentShedHistory() });
+    }
+}
+
+window.toggleHistoryView = function (kind) {
+    const view = historyViewState[kind];
+
+    if (!view) {
+        return;
+    }
+
+    view.expanded = !view.expanded;
+    rerenderHistory(kind);
+};
+
+window.setHistoryFilter = function (kind, value) {
+    const view = historyViewState[kind];
+
+    if (!view) {
+        return;
+    }
+
+    view.filter = value || "";
+    rerenderHistory(kind);
+};
+
 function renderWeightHistory(snake) {
     const list = document.getElementById("weightHistoryList");
     if (!list) return;
@@ -927,21 +1242,29 @@ function renderWeightHistory(snake) {
         return;
     }
 
-    list.innerHTML = history.map((entry, index) => {
-        const date = entry.date || entry.day || entry.label || "";
-        const weightValue = entry.weight || entry.value || entry.result || entry;
+    const entries = history.map((entry, index) => ({
+        entry,
+        index,
+        date: entry.date || entry.day || entry.label || "",
+        weight: entry.weight || entry.value || entry.result || entry
+    }));
+    const meta = prepareHistoryView("weight", entries, weightMatchesHistoryFilter);
 
-        return `
-            <div class="dashboard-list-item">
-                <span>${date}</span>
-                <span>${weightValue} g</span>
-                <button type="button" class="gene-action-button" 
-                onclick="removeWeightHistoryEntry(${index})">
-                    Remove
-                </button>
-            </div>
-        `;
-    }).join("");
+    const rows = meta.entries.map(item => `
+        <div class="dashboard-list-item">
+            <span>${item.date}</span>
+            <span>${item.weight} g</span>
+            <button type="button" class="gene-action-button"
+            onclick="removeWeightHistoryEntry(${item.index})">
+                Remove
+            </button>
+        </div>
+    `).join("");
+
+    const emptyLine = rows ? "" : `<p class="empty-message">No weight entries match this filter.</p>`;
+
+    list.innerHTML = rows + emptyLine +
+        buildHistoryFooter("weight", meta, buildWeightFilterOptions(meta.filter));
 
     renderWeightChart(history);
 }
@@ -957,8 +1280,15 @@ function renderFeedingHistory(snake) {
         return;
     }
 
-    list.innerHTML = history.map((entry, index) => {
-        const date = entry.date || entry.day || entry.label || "";
+    const entries = history.map((entry, index) => ({
+        entry,
+        index,
+        date: entry.date || entry.day || entry.label || ""
+    }));
+    const meta = prepareHistoryView("feeding", entries, (item, filter) => (item.entry.result || "") === filter);
+
+    const rows = meta.entries.map(item => {
+        const entry = item.entry;
         const feederSize = entry.feederSize || entry.feeder || "";
         const result = entry.result || "";
         const reason = entry.reason || "";
@@ -966,15 +1296,24 @@ function renderFeedingHistory(snake) {
 
         return `
             <div class="feeding-list-item">
-                <span>${date}</span>
+                <span>${item.date}</span>
                 <span>${details || "Fed"}</span>
-                <button type="button" class="gene-action-button" 
-                    onclick="removeFeedingHistoryEntry(${index})">
+                <button type="button" class="gene-action-button"
+                    onclick="removeFeedingHistoryEntry(${item.index})">
                     Remove
                 </button>
             </div>
         `;
     }).join("");
+
+    const emptyLine = rows ? "" : `<p class="empty-message">No feeding entries match this filter.</p>`;
+    const filterOptions = buildHistoryFilterOptions(
+        [...history.map(entry => entry.result || ""), "Accepted", "Refused", "Regurgitated"],
+        "All results",
+        meta.filter
+    );
+
+    list.innerHTML = rows + emptyLine + buildHistoryFooter("feeding", meta, filterOptions);
 }
 
 function renderShedHistory(snake) {
@@ -988,23 +1327,39 @@ function renderShedHistory(snake) {
         return;
     }
 
-    list.innerHTML = history.map((entry, index) => {
-        const date = entry.date || "";
+    const entries = history.map((entry, index) => ({
+        entry,
+        index,
+        date: entry.date || ""
+    }));
+    const meta = prepareHistoryView("shed", entries, (item, filter) => (item.entry.quality || "Shed") === filter);
+
+    const rows = meta.entries.map(item => {
+        const entry = item.entry;
         const quality = entry.quality || "Shed";
         const notes = entry.notes || "";
         const details = [quality, notes].filter(Boolean).join(" - ");
 
         return `
             <div class="feeding-list-item">
-                <span>${date}</span>
+                <span>${item.date}</span>
                 <span>${details}</span>
                 <button type="button" class="gene-action-button"
-                    onclick="removeShedHistoryEntry(${index})">
+                    onclick="removeShedHistoryEntry(${item.index})">
                     Remove
                 </button>
             </div>
         `;
     }).join("");
+
+    const emptyLine = rows ? "" : `<p class="empty-message">No shed entries match this filter.</p>`;
+    const filterOptions = buildHistoryFilterOptions(
+        [...history.map(entry => entry.quality || "Shed"), "Complete", "Partial", "Retained Eye Caps", "Retained Tail Tip"],
+        "All qualities",
+        meta.filter
+    );
+
+    list.innerHTML = rows + emptyLine + buildHistoryFooter("shed", meta, filterOptions);
 }
 
 function removeWeightHistoryEntry(index) {
@@ -1043,11 +1398,326 @@ function removeShedHistoryEntry(index) {
     persistCurrentHistories();
 }
 
+// ---- Acquisition & sale ---------------------------------------------------
+//
+// The money fields are deliberately simple: what it cost, who it came from,
+// what it sold for, and where. The Finances page totals these same fields, so
+// nothing is typed twice. Produced snakes show parentage instead of a purchase
+// price, and a produced snake is never counted as a purchase.
+
+function escapeMoneyText(value) {
+    return String(value === undefined || value === null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function moneyOrBlank(value) {
+    const number = Number(value);
+
+    if (!Number.isFinite(number) || number <= 0) {
+        return "";
+    }
+
+    return Math.round(number * 100) / 100;
+}
+
+function formatSnakeMoney(value) {
+    if (window.SnakeFinance) {
+        return window.SnakeFinance.formatMoney(value);
+    }
+
+    return `$${Number(value || 0).toFixed(2)}`;
+}
+
+function normalizeParentLabel(value) {
+    return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function findSnakeIdByParentLabel(label) {
+    const target = normalizeParentLabel(label);
+
+    if (!target) {
+        return "";
+    }
+
+    const currentId = editingIndex !== null && snakes[editingIndex] ? snakes[editingIndex].id : "";
+    const match = snakes.find(snake => {
+        if (!snake || snake.id === currentId) {
+            return false;
+        }
+
+        const candidates = [
+            snake.name,
+            snake.ID,
+            snake.morph,
+            `${snake.name || ""} - ${snake.ID || snake.morph || ""}`,
+            `${snake.name || ""} — ${snake.ID || snake.morph || ""}`
+        ];
+
+        return candidates.some(candidate => normalizeParentLabel(candidate) === target);
+    });
+
+    return match ? match.id : "";
+}
+
+function getParentOptionLabel(snake) {
+    const identity = snake.ID || snake.morph || "";
+    const sex = snake.sex ? ` (${snake.sex})` : "";
+
+    return identity ? `${snake.name || "Unnamed"} — ${identity}${sex}` : `${snake.name || "Unnamed"}${sex}`;
+}
+
+function fillParentSelect(selectId, selectedId, fallbackLabel, emptyLabel) {
+    const select = document.getElementById(selectId);
+
+    if (!select) {
+        return;
+    }
+
+    const currentId = editingIndex !== null && snakes[editingIndex] ? snakes[editingIndex].id : "";
+    const options = [`<option value="">${escapeMoneyText(emptyLabel)}</option>`];
+
+    snakes.forEach(snake => {
+        if (!snake || snake.id === currentId) {
+            return;
+        }
+
+        options.push(`<option value="${escapeMoneyText(snake.id)}">${escapeMoneyText(getParentOptionLabel(snake))}</option>`);
+    });
+
+    // A parent that was sold on or deleted should not silently become "blank"
+    // the next time this record is saved. Keep the id and label the gap.
+    if (selectedId && !snakes.some(snake => snake.id === selectedId)) {
+        const missingLabel = fallbackLabel
+            ? `${fallbackLabel} (no longer in the collection)`
+            : "Parent no longer in the collection";
+
+        options.push(`<option value="${escapeMoneyText(selectedId)}">${escapeMoneyText(missingLabel)}</option>`);
+    }
+
+    select.innerHTML = options.join("");
+    select.value = selectedId || findSnakeIdByParentLabel(fallbackLabel) || "";
+}
+
+function fillClutchSelect(selectedId) {
+    const select = document.getElementById("clutchInput");
+
+    if (!select) {
+        return;
+    }
+
+    const clutches = window.SnakeData.readStorageArray("clutches", []);
+    const options = [`<option value="">Not linked</option>`];
+    let hasSelected = false;
+
+    clutches.forEach(clutch => {
+        if (!clutch || !clutch.id) {
+            return;
+        }
+
+        if (clutch.id === selectedId) {
+            hasSelected = true;
+        }
+
+        const dateLine = clutch.laidDate ? ` · laid ${clutch.laidDate}` : "";
+        options.push(`<option value="${escapeMoneyText(clutch.id)}">${escapeMoneyText(clutch.id + dateLine)}</option>`);
+    });
+
+    if (selectedId && !hasSelected) {
+        options.push(`<option value="${escapeMoneyText(selectedId)}">${escapeMoneyText(selectedId)}</option>`);
+    }
+
+    select.innerHTML = options.join("");
+    select.value = selectedId || "";
+
+    const note = document.getElementById("parentageNote");
+
+    if (note) {
+        if (clutches.length === 0) {
+            note.textContent = "No clutches on file yet. The Outcomes page creates clutch records when eggs hatch; you can still pick the parents here.";
+        } else {
+            note.textContent = "Leave a parent blank if it is not known. Picking parents keeps this animal's line searchable in breeding plans.";
+        }
+    }
+}
+
+function fillSaleExpoSelect(selectedId) {
+    const select = document.getElementById("saleExpoInput");
+
+    if (!select) {
+        return;
+    }
+
+    const expos = window.SnakeFinance ? window.SnakeFinance.getExpos() : [];
+    const options = [`<option value="">Not at a show</option>`];
+    let hasSelected = false;
+
+    expos
+        .slice()
+        .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+        .forEach(expo => {
+            if (expo.id === selectedId) {
+                hasSelected = true;
+            }
+
+            const dateLine = expo.date ? ` · ${expo.date}` : "";
+            options.push(`<option value="${escapeMoneyText(expo.id)}">${escapeMoneyText(expo.name + dateLine)}</option>`);
+        });
+
+    if (selectedId && !hasSelected) {
+        options.push(`<option value="${escapeMoneyText(selectedId)}">Show no longer on file</option>`);
+    }
+
+    select.innerHTML = options.join("");
+    select.value = selectedId || "";
+}
+
+function fillMoneyDatalists() {
+    const sellers = new Set();
+    const buyers = new Set();
+
+    snakes.forEach(snake => {
+        if (snake && snake.purchasedFrom) {
+            sellers.add(snake.purchasedFrom);
+        }
+
+        if (snake && snake.soldTo) {
+            buyers.add(snake.soldTo);
+        }
+    });
+
+    const renderList = (id, values) => {
+        const list = document.getElementById(id);
+
+        if (!list) {
+            return;
+        }
+
+        list.innerHTML = [...values]
+            .sort((a, b) => a.localeCompare(b))
+            .map(value => `<option value="${escapeMoneyText(value)}"></option>`)
+            .join("");
+    };
+
+    renderList("sellerOptions", sellers);
+    renderList("buyerOptions", buyers);
+}
+
+function updateAcquisitionFields() {
+    const sourceInput = document.getElementById("acquisitionSourceInput");
+
+    if (!sourceInput) {
+        return;
+    }
+
+    const source = sourceInput.value;
+    const showingParentage = source === "produced";
+
+    document.querySelectorAll(".money-purchase-field").forEach(field => {
+        field.style.display = showingParentage ? "none" : "";
+    });
+
+    const parentage = document.getElementById("parentageFields");
+
+    if (parentage) {
+        parentage.style.display = showingParentage ? "" : "none";
+    }
+
+    updateMoneySummary();
+}
+
+function updateMoneySummary() {
+    const summary = document.getElementById("acquisitionSummary");
+
+    if (!summary) {
+        return;
+    }
+
+    const source = document.getElementById("acquisitionSourceInput").value;
+    const purchase = source === "produced" ? 0 : Number(document.getElementById("purchasePriceInput").value) || 0;
+    const sale = Number(document.getElementById("salePriceInput").value) || 0;
+    const parts = [];
+
+    if (source === "produced") {
+        parts.push('<span class="money-summary-item">Produced here — no purchase price counted.</span>');
+    } else if (purchase > 0) {
+        parts.push(`<span class="money-summary-item">Cost <strong>${formatSnakeMoney(purchase)}</strong></span>`);
+    }
+
+    if (sale > 0) {
+        parts.push(`<span class="money-summary-item">Sold for <strong>${formatSnakeMoney(sale)}</strong></span>`);
+    }
+
+    if (sale > 0) {
+        const difference = sale - purchase;
+        const label = difference >= 0 ? "Profit" : "Loss";
+        const className = difference >= 0 ? "money-profit" : "money-loss";
+
+        parts.push(`<span class="money-summary-item ${className}">${label} <strong>${formatSnakeMoney(Math.abs(difference))}</strong></span>`);
+    } else if (purchase > 0) {
+        parts.push('<span class="money-summary-item">Not sold yet — profit appears once a sale price is recorded.</span>');
+    }
+
+    summary.innerHTML = parts.length > 0
+        ? parts.join("")
+        : '<span class="money-summary-item">No money recorded for this snake yet.</span>';
+}
+
+function initMoneySection() {
+    const sourceInput = document.getElementById("acquisitionSourceInput");
+
+    if (!sourceInput) {
+        return;
+    }
+
+    const snake = editingIndex !== null && snakes[editingIndex] ? snakes[editingIndex] : null;
+    const derivedSource = snake
+        ? (snake.acquisitionSource || (snake.clutchId || snake.dam || snake.sire ? "produced" : ""))
+        : "";
+
+    sourceInput.value = derivedSource;
+    document.getElementById("purchasedFromInput").value = snake ? snake.purchasedFrom || "" : "";
+    document.getElementById("purchasePriceInput").value = snake && snake.purchasePrice ? snake.purchasePrice : "";
+    document.getElementById("purchaseDateInput").value = snake ? snake.purchaseDate || snake.acquiredDate || "" : "";
+    document.getElementById("soldToInput").value = snake ? snake.soldTo || "" : "";
+    document.getElementById("salePriceInput").value = snake && snake.salePrice ? snake.salePrice : "";
+    document.getElementById("saleDateInput").value = snake ? snake.saleDate || "" : "";
+
+    fillParentSelect("sireInput", snake ? snake.sireId || "" : "", snake ? snake.sire || "" : "", "Not recorded");
+    fillParentSelect("damInput", snake ? snake.damId || "" : "", snake ? snake.dam || "" : "", "Not recorded");
+    fillClutchSelect(snake ? snake.clutchId || "" : "");
+    fillSaleExpoSelect(snake ? snake.saleExpoId || "" : "");
+    fillMoneyDatalists();
+    updateAcquisitionFields();
+
+    const statusInput = document.getElementById("statusInput");
+
+    if (statusInput) {
+        statusInput.addEventListener("change", () => {
+            const saleDate = document.getElementById("saleDateInput");
+
+            if (statusInput.value === "Sold" && saleDate && !saleDate.value) {
+                const today = new Date();
+                const month = String(today.getMonth() + 1).padStart(2, "0");
+                const day = String(today.getDate()).padStart(2, "0");
+
+                saleDate.value = `${today.getFullYear()}-${month}-${day}`;
+            }
+
+            updateMoneySummary();
+        });
+    }
+}
+
 function saveSnakeFromPage() {
     const name = document.getElementById("nameInput").value.trim();
     const morph = document.getElementById("snakeIDInput").value.trim();
 
     if (name === "" || morph === "") {
+        expandSectionContaining(document.getElementById("nameInput"));
         alert("Please enter at least a name and ID.");
         return;
     }
@@ -1055,6 +1725,7 @@ function saveSnakeFromPage() {
     const imageValue = document.getElementById("imageInput").value.trim();
 
     if (imageValue.startsWith("blob:")) {
+        expandSectionContaining(document.getElementById("imageInput"));
         alert("The photo is still uploading. Try saving again in a moment.");
         return;
     }
@@ -1062,6 +1733,12 @@ function saveSnakeFromPage() {
     const existingSnake = editingIndex !== null && snakes[editingIndex]
         ? snakes[editingIndex]
         : {};
+
+    const source = document.getElementById("acquisitionSourceInput").value;
+    const sireId = document.getElementById("sireInput").value;
+    const damId = document.getElementById("damInput").value;
+    const sireSnake = snakes.find(candidate => candidate.id === sireId) || null;
+    const damSnake = snakes.find(candidate => candidate.id === damId) || null;
 
     const snake = {
         ...existingSnake,
@@ -1081,7 +1758,30 @@ function saveSnakeFromPage() {
         hatchDate: document.getElementById("hatchDateInput").value,
         acquiredDate: document.getElementById("acquiredDateInput").value,
         status: document.getElementById("statusInput").value,
-        genes: currentGenes
+        genes: currentGenes,
+        acquisitionSource: source,
+        purchasedFrom: source === "produced"
+            ? ""
+            : document.getElementById("purchasedFromInput").value.trim(),
+        purchasePrice: source === "produced"
+            ? ""
+            : moneyOrBlank(document.getElementById("purchasePriceInput").value),
+        purchaseDate: source === "produced"
+            ? ""
+            : document.getElementById("purchaseDateInput").value,
+        sireId,
+        damId,
+        sire: sireSnake
+            ? window.SnakeData.getSnakeLabelByReference(snakes, sireSnake.id)
+            : (sireId ? existingSnake.sire || "" : (existingSnake.sireId ? "" : existingSnake.sire || "")),
+        dam: damSnake
+            ? window.SnakeData.getSnakeLabelByReference(snakes, damSnake.id)
+            : (damId ? existingSnake.dam || "" : (existingSnake.damId ? "" : existingSnake.dam || "")),
+        clutchId: document.getElementById("clutchInput").value,
+        soldTo: document.getElementById("soldToInput").value.trim(),
+        salePrice: moneyOrBlank(document.getElementById("salePriceInput").value),
+        saleDate: document.getElementById("saleDateInput").value,
+        saleExpoId: document.getElementById("saleExpoInput").value
     };
 
     // The Main Photo URL field is authoritative for the main photo; the
@@ -1118,6 +1818,8 @@ window.addGene = addGene;
 window.addCustomGene = addCustomGene;
 window.removeGene = removeGene;
 window.updateImagePreview = updateImagePreview;
+window.updateAcquisitionFields = updateAcquisitionFields;
+window.updateMoneySummary = updateMoneySummary;
 window.addWeightHistoryEntry = addWeightHistoryEntry;
 window.addFeedingHistoryEntry = addFeedingHistoryEntry;
 window.updateFeedingReasonVisibility = updateFeedingReasonVisibility;
@@ -1130,9 +1832,13 @@ window.removePhoto = removePhoto;
 window.makePhotoMain = makePhotoMain;
 window.saveSnakeFromPage = saveSnakeFromPage;
 
+setupCollapsibleSections();
 setupGeneOptions();
 setupFeedingReasonOptions();
 fillFormForEdit();
+initMoneySection();
+expandSnakeSectionFromHash();
+window.addEventListener("hashchange", expandSnakeSectionFromHash);
 
 const photoFileInput = document.getElementById("photoFileInput");
 const cameraFileInput = document.getElementById("cameraFileInput");

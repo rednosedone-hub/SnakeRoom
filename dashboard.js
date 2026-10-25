@@ -11,7 +11,48 @@ function countByValue(items, fieldName, value) {
 }
 
 function setText(id, text) {
-    document.getElementById(id).textContent = text;
+    const element = document.getElementById(id);
+
+    if (element) {
+        element.textContent = text;
+    }
+}
+
+// The home screen earns one money line: net so far, and what the collection is
+// eating through. The full ledger lives on the Finances page.
+function renderFinanceSummary(snakes) {
+    if (!window.SnakeFinance || !document.getElementById("financeNet")) {
+        return;
+    }
+
+    const expenses = window.SnakeFinance.getExpenses();
+    const expos = window.SnakeFinance.getExpos();
+    const totals = window.SnakeFinance.summarize(
+        window.SnakeFinance.getEvents(snakes, expenses, expos)
+    );
+    const feeding = window.SnakeFinance.getFeederUsage(
+        snakes,
+        window.SnakeFinance.getSettings().feederPrices
+    );
+
+    setText("financeNet", window.SnakeFinance.formatMoney(totals.net));
+
+    if (totals.revenue === 0 && totals.spend === 0) {
+        setText(
+            "financeSummary",
+            "No money recorded yet. Add purchase prices, feeder orders and show costs."
+        );
+        return;
+    }
+
+    const feedingLine = feeding.total > 0
+        ? ` Feed used: ${window.SnakeFinance.formatMoney(feeding.total)}.`
+        : "";
+
+    setText(
+        "financeSummary",
+        `${window.SnakeFinance.formatMoney(totals.revenue)} in, ${window.SnakeFinance.formatMoney(totals.spend)} out.${feedingLine}`
+    );
 }
 
 function getFeederSummary(snakes) {
@@ -97,6 +138,8 @@ function renderDashboard() {
     const activePlans = breedingPairs.filter(pair => !pair.clutchId).length;
     const activeClutches = clutches.filter(clutch => !clutch.convertedToSnakes).length;
     const convertedClutches = clutches.length - activeClutches;
+
+    renderFinanceSummary(snakes);
 
     setText("totalSnakes", snakes.length);
     setText("activeBreedingPlans", activePlans);

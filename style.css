@@ -2772,3 +2772,858 @@ body.has-sync-banner .page-container {
 .goal-ideas-list .empty-message {
     margin-top: 10px;
 }
+
+/* Finances
+   -------------------------------------------------------------------------
+   The money pages reuse the app's ink-and-gold palette. The goal is a ledger
+   that reads at a glance: one row per cost, right-aligned amounts, green for
+   money in and muted red for money out. */
+
+.fin-panel {
+    display: none;
+}
+
+.fin-panel.is-active {
+    display: block;
+}
+
+.finance-page .fin-panel {
+    position: relative;
+    margin-top: 26px;
+    padding: 22px;
+    border: 2px solid var(--gold-color);
+    border-radius: 8px;
+    background-color: var(--background-color);
+    box-shadow: 5px 5px 2px 1px var(--black-color);
+}
+
+.fin-panel-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+
+.fin-panel-head h3 {
+    margin: 0 0 6px;
+}
+
+.fin-panel-lead {
+    max-width: 780px;
+    margin: 0;
+}
+
+.fin-tab-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 26px;
+}
+
+.fin-tab {
+    padding: 8px 16px;
+    border: 2px solid var(--goldenrod-color);
+    border-radius: 8px;
+    background-color: #14110a;
+    color: var(--text-color);
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 17px;
+    cursor: pointer;
+    box-shadow: 3px 3px 1px 1px var(--black-color);
+}
+
+.fin-tab:hover {
+    border-color: var(--gold-color);
+    color: var(--gold-color);
+}
+
+.fin-tab.is-active {
+    border-color: var(--gold-color);
+    background-color: var(--gold-color);
+    color: var(--black-color);
+    font-weight: bold;
+}
+
+.fin-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.fin-inline-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    color: var(--gold-color);
+    font-size: 14px;
+}
+
+.fin-inline-field select {
+    padding: 8px 10px;
+    border: 2px solid var(--gold-color);
+    border-radius: 8px;
+    background-color: rgb(42, 42, 119);
+    color: var(--gold-color);
+    font-size: 14px;
+}
+
+.fin-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+    gap: 14px;
+    margin-top: 22px;
+}
+
+.fin-kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px 16px;
+    border: 1px solid var(--goldenrod-color);
+    border-radius: 8px;
+    background-color: #14110a;
+}
+
+.fin-kpi-label {
+    color: var(--goldenrod-color);
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.fin-kpi-value {
+    color: var(--gold-color);
+    font-family: 'CloisterBlack', fantasy, serif;
+    font-size: 34px;
+    line-height: 1.1;
+}
+
+.fin-kpi-note {
+    color: var(--text-color);
+    font-size: 14px;
+    line-height: 1.35;
+    opacity: 0.85;
+}
+
+.fin-kpi-net {
+    border-color: var(--gold-color);
+    box-shadow: 0 0 0 1px var(--gold-color) inset;
+}
+
+.fin-two-column {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+    margin-top: 22px;
+}
+
+.fin-block {
+    padding: 16px;
+    border: 1px solid #4a4128;
+    border-radius: 8px;
+    background-color: #0d0b07;
+}
+
+.fin-block h4 {
+    margin: 0 0 12px;
+}
+
+.fin-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    margin-top: 10px;
+}
+
+.fin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 15px;
+}
+
+.fin-table th,
+.fin-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #3a3123;
+    color: var(--text-color);
+    text-align: left;
+    vertical-align: top;
+}
+
+.fin-table th {
+    color: var(--gold-color);
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.fin-table tfoot th,
+.fin-table tfoot td {
+    border-bottom: none;
+    border-top: 2px solid var(--goldenrod-color);
+    color: var(--gold-color);
+}
+
+.fin-table tbody tr:hover {
+    background-color: rgba(255, 215, 0, 0.05);
+}
+
+.fin-table a {
+    color: var(--gold-color);
+}
+
+.fin-amount-cell {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.fin-row-action {
+    width: 1%;
+    text-align: right;
+}
+
+.fin-direction {
+    display: inline-block;
+    min-width: 34px;
+    margin-right: 6px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 11px;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.fin-direction.fin-in {
+    border: 1px solid #6fbf73;
+    color: #b6e6b8;
+}
+
+.fin-direction.fin-out {
+    border: 1px solid #d98a8a;
+    color: #ffc4c4;
+}
+
+.fin-positive {
+    color: #b6e6b8;
+}
+
+.fin-negative {
+    color: #ffb3b3;
+}
+
+.fin-activity {
+    display: grid;
+    gap: 10px;
+}
+
+.fin-activity-row {
+    display: grid;
+    grid-template-columns: 92px 1fr auto;
+    gap: 12px;
+    align-items: start;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #3a3123;
+}
+
+.fin-activity-date {
+    color: var(--silver-color);
+    font-size: 13px;
+}
+
+.fin-activity-main strong {
+    display: block;
+    color: var(--gold-color);
+    font-size: 16px;
+}
+
+.fin-activity-main small {
+    display: block;
+    color: var(--text-color);
+    font-size: 14px;
+    opacity: 0.85;
+}
+
+.fin-activity-amount {
+    font-size: 16px;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.fin-subsection {
+    margin-top: 28px;
+}
+
+.fin-subsection h4 {
+    margin: 0 0 6px;
+}
+
+.fin-subtotal {
+    margin: 12px 0 0;
+    color: var(--gold-color);
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.fin-form {
+    margin-top: 16px;
+}
+
+.fin-span-all {
+    grid-column: 1 / -1;
+}
+
+.fin-form-actions {
+    justify-content: flex-end;
+    align-items: flex-end;
+}
+
+.fin-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+}
+
+.fin-status {
+    min-height: 22px;
+    color: #b6e6b8;
+    font-size: 16px;
+}
+
+.fin-status.fin-error,
+.fin-error {
+    color: #ff9a9a;
+}
+
+.fin-delete-button {
+    padding: 4px 10px;
+    border: 1px solid #8a3b3b;
+    border-radius: 6px;
+    background: transparent;
+    color: #ffb3b3;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.fin-delete-button:hover {
+    border-color: #ff9a9a;
+    color: #ffd1d1;
+}
+
+.fin-muted {
+    margin: 0;
+    color: var(--silver-color);
+    font-size: 14px;
+}
+
+.fin-warning {
+    margin-top: 22px;
+    padding: 14px 16px;
+    border: 1px solid #d98a8a;
+    border-radius: 8px;
+    background-color: #2a0f0f;
+    color: #ffc4c4;
+}
+
+.fin-warning p {
+    margin: 0 0 8px;
+    color: inherit;
+    font-size: 15px;
+}
+
+.fin-warning p:last-child {
+    margin-bottom: 0;
+}
+
+.fin-warning a {
+    color: var(--gold-color);
+}
+
+/* Feeder price list */
+
+.feeder-price-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.feeder-price-row {
+    display: grid;
+    grid-template-columns: 1fr 90px;
+    gap: 10px;
+    align-items: center;
+    color: var(--text-color);
+    font-size: 15px;
+}
+
+.feeder-price-row input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 2px solid var(--gold-color);
+    border-radius: 6px;
+    background-color: rgb(42, 42, 119);
+    color: var(--gold-color);
+    font-size: 14px;
+}
+
+/* Show cards */
+
+.expo-list {
+    display: grid;
+    gap: 16px;
+    margin-top: 18px;
+}
+
+.expo-card {
+    padding: 16px;
+    border: 1px solid var(--gold-color);
+    border-radius: 8px;
+    background-color: #0d0b07;
+    box-shadow: 4px 4px 2px 1px var(--black-color);
+}
+
+.expo-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.expo-card-head h4 {
+    margin: 0 0 4px;
+    color: var(--gold-color);
+    font-size: 22px;
+}
+
+.expo-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+    margin: 14px 0;
+}
+
+.expo-metrics span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 9px 11px;
+    border-radius: 6px;
+    background-color: #14110a;
+}
+
+.expo-metrics small {
+    color: var(--goldenrod-color);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.expo-metrics strong {
+    color: var(--text-color);
+    font-size: 19px;
+}
+
+.expo-details {
+    border-top: 1px solid #3a3123;
+    padding-top: 10px;
+}
+
+.expo-details summary {
+    color: var(--gold-color);
+    font-size: 15px;
+    cursor: pointer;
+}
+
+.expo-sales-list {
+    list-style: none;
+    margin: 10px 0 0;
+    padding: 0;
+}
+
+.expo-sales-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 6px 0;
+    border-bottom: 1px solid #3a3123;
+    color: var(--text-color);
+    font-size: 15px;
+}
+
+.expo-sales-list li small {
+    color: var(--silver-color);
+}
+
+.expo-sales-list .fin-empty-line {
+    display: block;
+    color: var(--silver-color);
+    font-size: 14px;
+}
+
+.expo-costs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin: 10px 0 0;
+    color: var(--text-color);
+    font-size: 14px;
+}
+
+/* Snake record: Acquisition & Sale */
+
+.parentage-block,
+.sale-block {
+    margin-top: 22px;
+    padding-top: 16px;
+    border-top: 1px solid #4a4128;
+}
+
+.parentage-block h4,
+.sale-block h4 {
+    margin-bottom: 8px;
+}
+
+.money-summary-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    margin-top: 20px;
+    padding: 12px 14px;
+    border: 1px solid var(--goldenrod-color);
+    border-radius: 8px;
+    background-color: #14110a;
+}
+
+.money-summary-item {
+    color: var(--text-color);
+    font-size: 16px;
+}
+
+.money-summary-item strong {
+    color: var(--gold-color);
+}
+
+.money-summary-item.money-profit strong {
+    color: #b6e6b8;
+}
+
+.money-summary-item.money-loss strong {
+    color: #ffb3b3;
+}
+
+@media (max-width: 900px) {
+    .fin-two-column {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 700px) {
+    .finance-page .fin-panel {
+        padding: 15px;
+    }
+
+    .fin-tab {
+        padding: 7px 10px;
+        font-size: 15px;
+    }
+
+    .fin-kpi-grid {
+        grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+    }
+
+    .fin-kpi-value {
+        font-size: 27px;
+    }
+
+    .fin-table {
+        font-size: 13px;
+    }
+
+    .fin-table th,
+    .fin-table td {
+        padding: 6px 7px;
+    }
+
+    .fin-activity-row {
+        grid-template-columns: 76px 1fr auto;
+        gap: 8px;
+    }
+
+    .fin-activity-main strong {
+        font-size: 15px;
+    }
+
+    .fin-toolbar {
+        width: 100%;
+    }
+
+    .fin-inline-field {
+        flex: 1 1 130px;
+    }
+
+    .expo-card-head h4 {
+        font-size: 20px;
+    }
+}
+
+/* Collapsible snake record sections
+   -------------------------------------------------------------------------
+   The record is long; each section folds from its heading. The heading itself
+   is the toggle, so the whole title row is the target. */
+
+.section-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 4px;
+}
+
+.form-section-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    width: 100%;
+    margin: 0 0 18px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.form-section-title {
+    font-family: 'Achafexp', serif;
+    color: var(--goldenrod-color);
+    font-size: 35px;
+    line-height: 1.2;
+}
+
+.form-section-toggle:hover .form-section-title,
+.form-section-toggle:focus-visible .form-section-title {
+    color: var(--gold-color);
+}
+
+.form-section-chevron {
+    flex: 0 0 auto;
+    color: var(--gold-color);
+    font-size: 24px;
+    line-height: 1;
+    transition: transform 0.2s ease;
+}
+
+.form-section.is-collapsed .form-section-toggle {
+    margin-bottom: 0;
+}
+
+.form-section.is-collapsed .form-section-chevron {
+    transform: rotate(-90deg);
+}
+
+.form-section-body[hidden] {
+    display: none;
+}
+
+.form-section.is-collapsed {
+    padding-top: 18px;
+    padding-bottom: 18px;
+}
+
+/* History preview and filters */
+
+.history-controls {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-top: 6px;
+    padding-top: 12px;
+    border-top: 1px solid #4a4128;
+}
+
+.history-count {
+    color: var(--silver-color);
+    font-size: 14px;
+}
+
+.history-toggle {
+    font-size: 18px;
+    padding: 6px 14px;
+}
+
+.history-filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-color);
+    font-size: 14px;
+}
+
+.history-filter select {
+    padding: 7px 10px;
+    border: 2px solid var(--gold-color);
+    border-radius: 8px;
+    background-color: rgb(42, 42, 119);
+    color: var(--gold-color);
+    font-size: 14px;
+}
+
+.feeding-list > .empty-message,
+.dashboard-list > .empty-message {
+    flex-basis: 100%;
+}
+
+@media (max-width: 700px) {
+    .section-controls {
+        justify-content: stretch;
+    }
+
+    .section-controls .main-button,
+    .section-controls .secondary-button {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .form-section-title {
+        font-size: 28px;
+    }
+
+    .form-section-toggle {
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+
+    .history-controls {
+        align-items: stretch;
+    }
+
+    .history-count {
+        flex-basis: 100%;
+    }
+
+    .history-toggle {
+        flex: 1 1 auto;
+    }
+
+    .history-filter {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .history-filter select {
+        flex: 1;
+        min-width: 0;
+    }
+}
+
+/* History rows read as a short ledger, not a row of cards. This also keeps
+   dates on one line and gives the filter row the full width beneath them. */
+
+#weightHistoryList,
+#feedingHistoryList,
+#shedHistoryList {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+#weightHistoryList .dashboard-list-item,
+#feedingHistoryList .feeding-list-item,
+#shedHistoryList .feeding-list-item {
+    grid-template-columns: 120px minmax(0, 1fr) auto;
+    gap: 16px;
+    width: 100%;
+    padding: 11px 14px;
+    font-size: 15px;
+}
+
+#weightHistoryList .dashboard-list-item > span:first-child,
+#feedingHistoryList .feeding-list-item > span:first-child,
+#shedHistoryList .feeding-list-item > span:first-child {
+    color: var(--silver-color);
+    white-space: nowrap;
+}
+
+#weightHistoryList .dashboard-list-item button,
+#feedingHistoryList .feeding-list-item button,
+#shedHistoryList .feeding-list-item button {
+    width: auto;
+    min-width: 80px;
+}
+
+@media (max-width: 700px) {
+    #weightHistoryList .dashboard-list-item,
+    #feedingHistoryList .feeding-list-item,
+    #shedHistoryList .feeding-list-item {
+        grid-template-columns: 88px minmax(0, 1fr) auto;
+        gap: 8px;
+        padding: 10px;
+        font-size: 14px;
+    }
+
+    #weightHistoryList .dashboard-list-item button,
+    #feedingHistoryList .feeding-list-item button,
+    #shedHistoryList .feeding-list-item button {
+        min-width: 0;
+        padding: 6px 10px;
+    }
+}
+
+@media (max-width: 700px) {
+    #weightHistoryList .dashboard-list-item,
+    #feedingHistoryList .feeding-list-item,
+    #shedHistoryList .feeding-list-item {
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+            "date action"
+            "details details";
+        row-gap: 4px;
+        align-items: center;
+    }
+
+    #weightHistoryList .dashboard-list-item > span:first-child,
+    #feedingHistoryList .feeding-list-item > span:first-child,
+    #shedHistoryList .feeding-list-item > span:first-child {
+        grid-area: date;
+    }
+
+    #weightHistoryList .dashboard-list-item > span:nth-child(2),
+    #feedingHistoryList .feeding-list-item > span:nth-child(2),
+    #shedHistoryList .feeding-list-item > span:nth-child(2) {
+        grid-area: details;
+        padding-top: 2px;
+    }
+
+    #weightHistoryList .dashboard-list-item > button,
+    #feedingHistoryList .feeding-list-item > button,
+    #shedHistoryList .feeding-list-item > button {
+        grid-area: action;
+    }
+}
+
+/* A narrow phone must never be widened by a row of buttons or a long filter
+   option. Grid items default to min-width:auto, which lets that happen. */
+
+.snake-form-page {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.snake-form-page > * {
+    min-width: 0;
+}
+
+.section-controls {
+    min-width: 0;
+}
+
+@media (max-width: 700px) {
+    .section-controls .secondary-button {
+        flex: 1 1 0;
+    }
+}

@@ -7,7 +7,8 @@
 //
 // New model, once a session exists:
 //   - Every change to app data (snakes, breedingPairs, clutches, breedingGoals,
-//     customGeneCatalog) marks its storage key "dirty" instantly.
+//     customGeneCatalog, financeSettings, financeExpenses, financeExpos) marks
+//     its storage key "dirty" instantly.
 //   - If online: a debounced push (8s after the last change) saves to the
 //     cloud. Navigating to another page forces an immediate push so nothing
 //     is lost mid-browse.
@@ -30,14 +31,25 @@
     // away — so they stay on this device until you ask for them to be saved.
     // A push always sends the whole snapshot, so plans ride along with the next
     // collection push; the point is that planning alone never forces one.
-    const AUTO_PUSH_KEYS = ["snakes", "breedingPairs", "clutches", "customGeneCatalog"];
+    const AUTO_PUSH_KEYS = [
+        "snakes",
+        "breedingPairs",
+        "clutches",
+        "customGeneCatalog",
+        "financeSettings",
+        "financeExpenses",
+        "financeExpos"
+    ];
 
     const KEY_LABELS = {
         snakes: "collection",
         breedingPairs: "breeding pairs",
         clutches: "clutches",
         breedingGoals: "breeding plans",
-        customGeneCatalog: "custom genes"
+        customGeneCatalog: "custom genes",
+        financeSettings: "money settings",
+        financeExpenses: "costs",
+        financeExpos: "shows"
     };
 
     const state = readState();

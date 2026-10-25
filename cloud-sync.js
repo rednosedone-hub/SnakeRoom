@@ -6,11 +6,21 @@
 // localStorage; this module copies a full snapshot to/from one cloud table.
 //
 // Storage keys that make up a snapshot:
-//   snakes, breedingPairs, clutches, customGeneCatalog, cloudSyncSettings
+//   snakes, breedingPairs, clutches, breedingGoals, customGeneCatalog,
+//   financeSettings, financeExpenses, financeExpos
 // (Gene catalog is starter + custom; only custom genes need backup.)
 
 (function () {
-    const SNAPSHOT_KEYS = ["snakes", "breedingPairs", "clutches", "breedingGoals", "customGeneCatalog"];
+    const SNAPSHOT_KEYS = [
+        "snakes",
+        "breedingPairs",
+        "clutches",
+        "breedingGoals",
+        "customGeneCatalog",
+        "financeSettings",
+        "financeExpenses",
+        "financeExpos"
+    ];
 
     const SETTINGS_KEY = "cloudSyncSettings";
 
