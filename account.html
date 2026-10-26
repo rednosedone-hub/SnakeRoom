@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Account</title>
-    <link rel="stylesheet" href="style.css?v=36">
+    <link rel="stylesheet" href="style.css?v=41">
 </head>
 
 <body data-no-auth-gate>
@@ -39,7 +39,11 @@
 
                 <p class="empty-message">
                     Everything you change saves to the cloud on its own a few seconds after you make
-                    it, and comes back on any device you sign in to. There is nothing to press.
+                    it, and comes back on any device you sign in to. Changes are merged record by
+                    record, so edits to different snakes, pairs, clutches or expenses on two devices
+                    are all kept. If the same field was changed on both, this device's value is kept
+                    and the status below says how many records need a look. There is usually nothing
+                    to press.
                 </p>
 
                 <div class="data-action-grid">
@@ -48,7 +52,7 @@
                     </button>
 
                     <button type="button" class="secondary-button" id="pullButton">
-                        Restore
+                        Pull &amp; Merge
                     </button>
 
                     <button type="button" class="secondary-button" id="signOutButton" style="display: none;">
@@ -232,8 +236,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="data-helpers.js"></script>
-    <script src="cloud-sync.js?v=9"></script>
-    <script src="auto-sync.js?v=5"></script>
+    <script src="cloud-sync.js?v=13"></script>
+    <script src="auto-sync.js?v=8"></script>
     <script src="plans.js?v=2"></script>
     <script src="account.js?v=1"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>

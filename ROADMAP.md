@@ -31,6 +31,19 @@ Everything downstream derives from snake statuses, which already exist in the ap
   and in the private Finances ledger forever for accounting.
 - **Any other status** (Breeder, Holdback, Juvenile, ...) or snake deletion → listing is
   removed from the public side automatically.
+- **Archived** or **Deceased** → removed from the private active collection, feeding
+  lists and new breeding pairings. The record, photos, parentage, clutch links and
+  finance events stay intact, so history is never rewritten. Each carries a retirement
+  date, reason and private note, and Restore returns it to its previous active status.
+  **Sold** works the same way in the private collection unless its status chip is picked.
+- **Converted or closed pair** → a converted pair leaves Active Pairs as soon as it has
+  a clutch record. Any active pair can be closed into Pair History with an optional
+  reason; a retired parent is flagged and fills in the reason automatically. Reopening
+  restores the pair without losing pairings, eggs or clutch links.
+- **Breeding history on the snake record** → each animal's page lists every pair it was
+  part of (active, closed and converted) plus every linked clutch, with partner, dates,
+  close reason, hatch result and offspring on file. It is read-only; changes stay on the
+  Breeding page.
 
 **Foundation truth:** statuses + clean snake records are the entire base. If they stay
 tidy, every future phase is only presentation.
@@ -145,8 +158,18 @@ Accounts are real today, not planned:
   (`auth.uid() = user_id`); photos sit in the `snake-photos` bucket under `auth.uid()/...`.
   Two accounts cannot read each other's rows or folders.
 - **Automatic sync**: `auto-sync.js` marks snapshot keys dirty on every write, pushes ~8s
-  after the last change, flushes on navigation, pulls when the cloud copy is newer, and
-  holds changes locally when offline.
+  after the last change, retries a queued upload when the next page opens or becomes
+  visible, pulls when the cloud copy is newer, and holds changes locally when offline.
+  The Account page reports pending uploads so "last push" is never mistaken for "saved".
+- **Per-record merge**: `cloud-sync.js` keeps this device's last shared cloud copy as a
+  base and merges the local and cloud snapshots record by record (snake, pair, clutch,
+  goal, expense, show, custom gene). Different animals edited on different devices both
+  survive; different fields on the same animal also merge, including weight, feeding,
+  shed, pairing and goal-step lists. A true same-field clash keeps this device's value
+  and is counted; a record edited on one device and deleted on the other is kept rather
+  than silently removed. A conditional cloud write makes a simultaneous push re-read
+  and merge instead of replacing a row it did not see. Pulls merge too; only the
+  explicit *Discard* action replaces this device's local copy with the cloud copy.
 - **Account UI**: `account.html` (sign-in/create/reset/sign-out, plan display, sync status) and
   `account-gate.js`, which asks a signed-out visitor to sign in but still allows
   *Keep this device only* so an offline snake room never locks the keeper out.
@@ -176,8 +199,9 @@ client-side, like the other plan limits.
    Edge Function that checks the plan before saving; a billing webhook sets `profiles.plan`.
    Limits then live where the data lives and no secret leaves the server.
 3. **If it grows**: per-record tables (`snakes`, `pairs`, `clutches`, `photos`) with RLS and
-   triggers that count rows against the plan. This also fixes today's last-write-wins snapshot
-   sync, where two devices editing at once can lose changes.
+   triggers that count rows against the plan. The client already merges per record; moving
+   storage to one row per animal would make that merge server-enforced and remove the
+   single-snapshot row-size limit.
 
 Proposed `profiles` SQL (not applied yet — run it when step 2 begins):
 

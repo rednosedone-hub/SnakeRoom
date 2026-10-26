@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Breeding</title>
-    <link rel="stylesheet" href="style.css?v=36">
+    <link rel="stylesheet" href="style.css?v=41">
 </head>
 
 <body>
@@ -92,6 +92,13 @@
             </section>
 
             <section class="form-section">
+                <h3>Pair History</h3>
+                <div id="pairHistoryList" class="breeding-list">
+                    <p class="empty-message">No closed pairs yet.</p>
+                </div>
+            </section>
+
+            <section class="form-section">
                 <h3>Clutches</h3>
                 <div id="clutchList" class="breeding-list">
                     <p class="empty-message">No clutches yet.</p>
@@ -99,11 +106,39 @@
             </section>
         </main>
     </div>
+
+    <div class="modal" id="closePairModal" role="dialog" aria-modal="true"
+        aria-labelledby="closePairModalTitle">
+        <div class="modal-content">
+            <button type="button" class="close-button" onclick="closeClosePairModal()"
+                aria-label="Cancel">&#215;</button>
+
+            <h3 id="closePairModalTitle">Close Pair</h3>
+            <p class="empty-message" id="closePairModalText"></p>
+
+            <label class="form-field">
+                <span>Reason (optional)</span>
+                <textarea id="closePairReasonInput" rows="3"
+                    placeholder="Didn't take, retired parent, switched male..."></textarea>
+            </label>
+
+            <div class="modal-actions">
+                <button type="button" class="main-button" onclick="confirmClosePair()">
+                    Close Pair
+                </button>
+
+                <button type="button" class="secondary-button" onclick="closeClosePairModal()">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="data-helpers.js"></script>
-    <script src="cloud-sync.js?v=9"></script>
-    <script src="auto-sync.js?v=5"></script>
+    <script src="cloud-sync.js?v=13"></script>
+    <script src="auto-sync.js?v=8"></script>
     <script src="account-gate.js?v=1"></script>
     <script src="breeding.js"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>

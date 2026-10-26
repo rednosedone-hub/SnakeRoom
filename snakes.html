@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Collection</title>
-    <link rel="stylesheet" href="style.css?v=36">
+    <link rel="stylesheet" href="style.css?v=41">
 </head>
 
 <body>
@@ -76,7 +76,7 @@
             <div class="filter-group">
                 <span class="filter-label">Status</span>
                 <span class="chip-row" id="statusChipRow"></span>
-                <span class="filter-hint">Pick none to show every status.</span>
+                <span class="filter-hint">Pick none to show active snakes. Choose Sold for sales, or Retired for archived and deceased records.</span>
             </div>
 
             <div class="filter-group">
@@ -125,15 +125,22 @@
 
         <div class="snake-table-wrapper" id="snakeTableWrapper"></div>
     </div>
+
+    <div class="collection-notice" id="collectionNotice" role="status" aria-live="polite" hidden>
+        <span id="collectionNoticeText"></span>
+        <button type="button" id="collectionNoticeUndo" class="collection-notice-action">Undo</button>
+        <button type="button" id="collectionNoticeClose" class="collection-notice-close"
+            aria-label="Dismiss">&#215;</button>
+    </div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="data-helpers.js"></script>
-    <script src="cloud-sync.js?v=9"></script>
-    <script src="auto-sync.js?v=5"></script>
+    <script src="cloud-sync.js?v=13"></script>
+    <script src="auto-sync.js?v=8"></script>
     <script src="account-gate.js?v=1"></script>
     <script src="geneCatalog.js?v=3"></script>
     <script src="genes.js?v=6"></script>
-    <script src="snakes.js?v=7"></script>
+    <script src="snakes.js?v=10"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

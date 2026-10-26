@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Snake Record</title>
-    <link rel="stylesheet" href="style.css?v=36">
+    <link rel="stylesheet" href="style.css?v=42">
 </head>
 
 <body>
@@ -85,6 +85,8 @@
                             <option value="Available">Available</option>
                             <option value="On Hold">On Hold</option>
                             <option value="Sold">Sold</option>
+                            <option value="Archived">Archived</option>
+                            <option value="Deceased">Deceased</option>
                         </select>
                     </label>
 
@@ -98,6 +100,60 @@
                         <input type="date" id="acquiredDateInput">
                     </label>
                 </div>
+
+                <p class="empty-message">
+                    Archived and Deceased keep the record, parentage, clutches and money
+                    history, but remove the snake from active cards, feeding lists and new
+                    breeding pairings.
+                </p>
+
+                <div class="retirement-block" id="retirementFields" hidden>
+                    <h4>Retirement details</h4>
+                    <p class="empty-message">
+                        Date and reason stay with the record. Notes are private and never
+                        appear on the collection card.
+                    </p>
+
+                    <div class="form-grid">
+                        <label class="form-field">
+                            <span>Archived / deceased on</span>
+                            <input type="date" id="retiredDateInput">
+                        </label>
+
+                        <label class="form-field">
+                            <span>Reason or cause</span>
+                            <input type="text" id="retiredReasonInput" list="retirementReasons"
+                                placeholder="Retired from breeding, unknown cause...">
+                        </label>
+                    </div>
+
+                    <label class="form-field">
+                        <span>Notes</span>
+                        <textarea id="retiredNoteInput" rows="3"
+                            placeholder="Anything worth remembering..."></textarea>
+                    </label>
+
+                    <datalist id="retirementReasons">
+                        <option value="Retired from breeding"></option>
+                        <option value="Pet-only home"></option>
+                        <option value="Age"></option>
+                        <option value="Illness"></option>
+                        <option value="Unknown cause"></option>
+                    </datalist>
+                </div>
+            </section>
+
+            <section class="form-section" id="breedingHistorySection" hidden>
+                <h3>Breeding History</h3>
+
+                <p class="empty-message">
+                    Every pair and clutch this snake is part of, including closed and
+                    converted pairs. This is a read-only view; open Breeding to change a
+                    pair or record a hatch.
+                </p>
+
+                <div class="breeding-history-summary" id="breedingHistorySummary"></div>
+                <div class="breeding-history-list" id="breedingHistoryList"></div>
             </section>
 
             <section class="form-section" id="moneySection">
@@ -448,14 +504,14 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="data-helpers.js"></script>
-    <script src="cloud-sync.js?v=9"></script>
-    <script src="auto-sync.js?v=5"></script>
+    <script src="cloud-sync.js?v=13"></script>
+    <script src="auto-sync.js?v=8"></script>
     <script src="account-gate.js?v=1"></script>
     <script src="geneCatalog.js?v=3"></script>
     <script src="genes.js?v=6"></script>
-    <script src="feed-helpers.js?v=3"></script>
+    <script src="feed-helpers.js?v=4"></script>
     <script src="finance-helpers.js?v=1"></script>
-    <script src="snake-form.js?v=10"></script>
+    <script src="snake-form.js?v=13"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

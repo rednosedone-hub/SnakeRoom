@@ -357,7 +357,8 @@ function renderFeedingHolds() {
 
     const held = snakes
         .map((snake, index) => ({ snake, index }))
-        .filter(item => window.isOnFeedingHold(item.snake));
+        .filter(item => window.isOnFeedingHold(item.snake)
+            && !window.SnakeData.isInactiveSnake(item.snake));
 
     if (held.length === 0) {
         section.style.display = "none";

@@ -249,12 +249,16 @@ p {
 
 .card-buttons {
     display: flex;
-    gap: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
     margin-top: auto;
 }
 
 .edit-button,
-.delete-button {
+.delete-button,
+.archive-button,
+.deceased-button,
+.restore-button {
     flex: 1;
     padding: 8px;
     border: none;
@@ -262,6 +266,13 @@ p {
     cursor: pointer;
     font-family: 'Times New Roman', Times, serif;
     font-size: 15px;
+}
+
+/* Four actions share a narrow card, so they sit two per row. */
+.card-buttons button {
+    flex: 1 1 calc(50% - 8px);
+    padding: 7px 4px;
+    font-size: 13px;
 }
 
 .edit-button {
@@ -274,6 +285,27 @@ p {
 .delete-button {
     background-color: var(--darkred-color);
     color: var(--silver-color);
+    border: 1px solid var(--black-color);
+    box-shadow: 2px 2px 1px 2px var(--black-color);
+}
+
+.archive-button {
+    background-color: #6b5310;
+    color: var(--text-color);
+    border: 1px solid var(--black-color);
+    box-shadow: 2px 2px 1px 2px var(--black-color);
+}
+
+.deceased-button {
+    background-color: #333333;
+    color: var(--text-color);
+    border: 1px solid var(--black-color);
+    box-shadow: 2px 2px 1px 2px var(--black-color);
+}
+
+.restore-button {
+    background-color: #2f5d2f;
+    color: var(--text-color);
     border: 1px solid var(--black-color);
     box-shadow: 2px 2px 1px 2px var(--black-color);
 }
@@ -1402,7 +1434,7 @@ p {
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.92);
-    z-index: 10;
+    z-index: 1000;
 }
 
 .modal-content {
@@ -1420,13 +1452,20 @@ p {
 }
 
 .modal-content input,
-.modal-content select {
+.modal-content select,
+.modal-content textarea {
     padding: 10px;
     border-radius: 5px;
     border: 2px solid var(--gold-color);
     font-size: 16px;
     background-color: var(--black-color);
     color: var(--gold-color);
+    font-family: inherit;
+}
+
+.modal-content textarea {
+    resize: vertical;
+    min-height: 90px;
 }
 
 .form-field {
@@ -1438,7 +1477,8 @@ p {
 }
 
 .form-field input,
-.form-field select {
+.form-field select,
+.form-field textarea {
     width: 100%;
     background-color: rgb(42, 42, 119);
     color: var(--gold-color);
@@ -1446,7 +1486,13 @@ p {
     border-radius: 8px;
     padding: 10px;
     font-size: 12px;
+    font-family: inherit;
     box-shadow: 4px 4px 2px 1px var(--black-color);
+}
+
+.form-field textarea {
+    resize: vertical;
+    min-height: 82px;
 }
 
 .suggestion-row {
@@ -3275,15 +3321,21 @@ body.has-sync-banner .page-container {
 /* Snake record: Acquisition & Sale */
 
 .parentage-block,
-.sale-block {
+.sale-block,
+.retirement-block {
     margin-top: 22px;
     padding-top: 16px;
     border-top: 1px solid #4a4128;
 }
 
 .parentage-block h4,
-.sale-block h4 {
+.sale-block h4,
+.retirement-block h4 {
     margin-bottom: 8px;
+}
+
+.retirement-block[hidden] {
+    display: none;
 }
 
 .money-summary-line {
@@ -3626,4 +3678,246 @@ body.has-sync-banner .page-container {
     .section-controls .secondary-button {
         flex: 1 1 0;
     }
+}
+
+/* Collection retire notice
+   -----------------------
+   Retiring a snake removes its card immediately. A short-lived notice with
+   Undo makes that reversible without a confirmation dialog on every click. */
+
+.collection-notice {
+    position: fixed;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 950;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: max-content;
+    max-width: 92vw;
+    padding: 10px 14px;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    border: 1px solid var(--gold-color);
+    border-radius: 12px;
+    box-shadow: 4px 4px 2px 1px var(--black-color);
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 0.9rem;
+    line-height: 1.35;
+}
+
+.collection-notice[hidden] {
+    display: none;
+}
+
+body.has-sync-banner .collection-notice {
+    bottom: 112px;
+}
+
+.collection-notice-action,
+.collection-notice-close {
+    border: none;
+    background: transparent;
+    color: var(--gold-color);
+    cursor: pointer;
+    font: inherit;
+    font-weight: bold;
+    padding: 2px 4px;
+}
+
+.collection-notice-action:hover,
+.collection-notice-close:hover {
+    text-decoration: underline;
+}
+
+.collection-notice-close {
+    font-size: 1.2rem;
+    line-height: 1;
+    color: var(--silver-color);
+}
+
+@media (max-width: 520px) {
+    .collection-notice {
+        width: calc(100% - 24px);
+        gap: 10px;
+    }
+}
+
+/* Breeding history on a snake record */
+
+.breeding-history-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 4px 0 8px;
+}
+
+.breeding-history-list {
+    display: grid;
+    gap: 24px;
+    margin-top: 8px;
+}
+
+.breeding-history-group {
+    display: grid;
+    gap: 12px;
+}
+
+.breeding-history-group-title {
+    margin: 0;
+    color: var(--gold-color);
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 16px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.breeding-history-card {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    color: var(--text-color);
+    background-color: rgba(0, 0, 0, 0.24);
+    border: 1px solid var(--goldenrod-color);
+    border-radius: 8px;
+}
+
+.breeding-history-card-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.breeding-history-card-header h4 {
+    margin: 0 0 4px;
+    color: var(--text-color);
+    font-size: 20px;
+    overflow-wrap: anywhere;
+}
+
+.breeding-history-role {
+    margin: 0;
+    color: var(--silver-color);
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.breeding-history-status {
+    flex: 0 0 auto;
+    padding: 4px 10px;
+    border: 1px solid var(--goldenrod-color);
+    border-radius: 999px;
+    color: var(--gold-color);
+    background-color: rgba(255, 215, 0, 0.08);
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.breeding-history-status.is-closed {
+    border-color: var(--silver-color);
+    color: var(--silver-color);
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+.breeding-history-status.is-converted {
+    border-color: var(--gold-color);
+    color: var(--black-color);
+    background-color: var(--gold-color);
+}
+
+.breeding-history-facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 8px 18px;
+}
+
+.breeding-history-fact {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.breeding-history-fact span {
+    display: block;
+    color: var(--silver-color);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.breeding-history-fact strong {
+    color: var(--text-color);
+    font-weight: normal;
+    overflow-wrap: anywhere;
+}
+
+.breeding-history-offspring {
+    margin: 0;
+    padding-top: 10px;
+    border-top: 1px solid #4a4128;
+    color: var(--text-color);
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.breeding-history-offspring span {
+    color: var(--silver-color);
+}
+
+.breeding-history-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.breeding-history-links .secondary-button {
+    margin: 0;
+}
+
+@media (max-width: 520px) {
+    .breeding-history-card-header {
+        flex-direction: column;
+    }
+
+    .breeding-history-status {
+        white-space: normal;
+    }
+}
+
+/* Breeding pair warnings and closed-pair history */
+
+.pair-warning {
+    margin: 10px 0 0;
+    padding: 10px 12px;
+    border: 1px solid var(--goldenrod-color);
+    border-radius: 8px;
+    background-color: #2a2108;
+    color: var(--text-color);
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+.pair-warning strong {
+    color: var(--gold-color);
+}
+
+.closed-pair-card {
+    background-color: rgba(0, 0, 0, 0.36);
+}
+
+.closed-pair-card .card-buttons {
+    margin-top: 0;
 }

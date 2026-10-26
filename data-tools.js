@@ -6,6 +6,10 @@ const csvHeaders = [
     "morph",
     "sex",
     "status",
+    "retiredDate",
+    "retiredReason",
+    "retiredNote",
+    "retiredFromStatus",
     "hatchDate",
     "acquiredDate",
     "acquisitionSource",
@@ -141,6 +145,10 @@ function snakeToRow(snake) {
         morph: snake.morph || snake.ID || "",
         sex: snake.sex || "Unknown",
         status: snake.status || "",
+        retiredDate: snake.retiredDate || "",
+        retiredReason: snake.retiredReason || "",
+        retiredNote: snake.retiredNote || "",
+        retiredFromStatus: snake.retiredFromStatus || "",
         hatchDate: snake.hatchDate || "",
         acquiredDate: snake.acquiredDate || "",
         acquisitionSource: snake.acquisitionSource || "",
@@ -273,7 +281,9 @@ function normalizeHeader(header) {
 }
 
 function getCell(rowObject, key) {
-    return rowObject[key] === undefined ? "" : rowObject[key].trim();
+    return rowObject[key] === undefined || rowObject[key] === null
+        ? ""
+        : String(rowObject[key]).trim();
 }
 
 function rowToSnake(rowObject, index) {
@@ -287,6 +297,10 @@ function rowToSnake(rowObject, index) {
         morph: getCell(rowObject, "morph") || identity,
         sex: getCell(rowObject, "sex") || "Unknown",
         status: getCell(rowObject, "status") || "Holdback",
+        retiredDate: getCell(rowObject, "retiredDate"),
+        retiredReason: getCell(rowObject, "retiredReason"),
+        retiredNote: getCell(rowObject, "retiredNote"),
+        retiredFromStatus: getCell(rowObject, "retiredFromStatus"),
         hatchDate: getCell(rowObject, "hatchDate"),
         acquiredDate: getCell(rowObject, "acquiredDate"),
         acquisitionSource: getCell(rowObject, "acquisitionSource"),
@@ -361,9 +375,9 @@ function mergeImportedSnake(existingSnake, importedSnake, rowObject) {
         mergedSnake.shedHistory = existingSnake.shedHistory || [];
     }
 
-    // A CSV exported before the money fields existed has no columns for them.
-    // Treat a blank cell the same way as the history columns above: keep what
-    // this device already knows instead of silently erasing a purchase price.
+    // A CSV exported before the money or retirement fields existed has no
+    // columns for them. Treat a blank cell the same way as the history columns
+    // above: keep what this device already knows instead of silently erasing it.
     [
         "acquisitionSource",
         "purchasedFrom",
@@ -374,7 +388,11 @@ function mergeImportedSnake(existingSnake, importedSnake, rowObject) {
         "salePrice",
         "saleDate",
         "soldTo",
-        "saleExpoId"
+        "saleExpoId",
+        "retiredDate",
+        "retiredReason",
+        "retiredNote",
+        "retiredFromStatus"
     ].forEach(key => {
         if (!getCell(rowObject, key)) {
             mergedSnake[key] = existingSnake[key] || "";

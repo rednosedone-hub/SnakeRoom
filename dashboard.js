@@ -113,9 +113,13 @@ function buildFeedingSummary(dueStatuses, soonStatuses) {
 
 function renderDashboard() {
     const snakes = window.SnakeData.loadSnakesWithIds(window.SnakeData.defaultSnakes);
+    const activeSnakes = snakes.filter(snake => window.SnakeData.isActiveSnake(snake));
+    const inactiveCount = snakes.length - activeSnakes.length;
+    const retiredCount = snakes.filter(snake => window.SnakeData.isRetiredSnake(snake)).length;
+    const soldCount = snakes.filter(snake => String(snake.status || "").trim() === "Sold").length;
     const breedingPairs = window.SnakeData.readStorageArray("breedingPairs", []);
     const clutches = window.SnakeData.readStorageArray("clutches", []);
-    const allStatuses = snakes.map(snake => window.getFeedingStatus(snake));
+    const allStatuses = activeSnakes.map(snake => window.getFeedingStatus(snake));
     const dueStatuses = allStatuses.filter(status => status.state === "due");
     const soonStatuses = allStatuses.filter(status => status.state === "soon");
     const feedingsDue = dueStatuses.map(status => status.snake);
@@ -132,21 +136,28 @@ function renderDashboard() {
         isDue: status.state === "due"
     }));
 
-    const females = countByValue(snakes, "sex", "Female");
-    const males = countByValue(snakes, "sex", "Male");
-    const available = countByValue(snakes, "status", "Available");
+    const females = countByValue(activeSnakes, "sex", "Female");
+    const males = countByValue(activeSnakes, "sex", "Male");
+    const available = countByValue(activeSnakes, "status", "Available");
     const activePlans = breedingPairs.filter(pair => !pair.clutchId).length;
     const activeClutches = clutches.filter(clutch => !clutch.convertedToSnakes).length;
     const convertedClutches = clutches.length - activeClutches;
 
     renderFinanceSummary(snakes);
 
-    setText("totalSnakes", snakes.length);
+    setText("totalSnakes", activeSnakes.length);
     setText("activeBreedingPlans", activePlans);
     setText("activeClutches", activeClutches);
     setText("feedingsDue", feedingsDue.length);
 
-    setText("snakeSummary", `${females} females, ${males} males, ${available} available`);
+    setText(
+        "snakeSummary",
+        activeSnakes.length === 0
+            ? (inactiveCount > 0
+                ? `No active snakes. ${inactiveCount} inactive record${inactiveCount === 1 ? "" : "s"} kept.`
+                : "No snakes entered yet.")
+            : `${females} females, ${males} males, ${available} available${soldCount > 0 ? ` \u00b7 ${soldCount} sold` : ""}${retiredCount > 0 ? ` \u00b7 ${retiredCount} retired` : ""}`
+    );
     setText(
         "breedingSummary",
         activePlans === 1
@@ -160,28 +171,32 @@ function renderDashboard() {
             : `${activeClutches} clutches waiting to hatch, ${convertedClutches} converted`
     );
 
-    const feedingSummary = buildFeedingSummary(dueStatuses, soonStatuses) || window.describeNextDue(snakes);
+    const feedingSummary = buildFeedingSummary(dueStatuses, soonStatuses) || window.describeNextDue(activeSnakes);
 
     setText(
         "feedingSummary",
-        feedingSummary || "No snakes have a feeding date yet."
+        feedingSummary || (activeSnakes.length === 0
+            ? "No active snakes on the feeding schedule."
+            : "No snakes have a feeding date yet.")
     );
 
     const list = document.getElementById("feedingDueList");
 
     if (dueStatuses.length === 0 && soonStatuses.length === 0) {
-        const nextDueText = window.describeNextDue(snakes);
+        const nextDueText = window.describeNextDue(activeSnakes);
 
         list.innerHTML = `
             <p class="empty-message">
-                Nothing due in the next ${window.FEEDING_LEAD_DAYS} days.
+                ${activeSnakes.length === 0
+                    ? "No active snakes on the feeding schedule."
+                    : `Nothing due in the next ${window.FEEDING_LEAD_DAYS} days.`}
             </p>
             ${nextDueText ? `<p class="empty-message feeding-next-due">${nextDueText}</p>` : ""}
         `;
         return;
     }
 
-    list.innerHTML = window.getSnakesDueOrComingUp(snakes).map(status => {
+    list.innerHTML = window.getSnakesDueOrComingUp(activeSnakes).map(status => {
         const snake = status.snake;
         const feederSize = snake.feederSize || "No feeder size";
         const lastFed = status.daysSinceFed === null ? "No feeding record" : describeDaysAgo(status.daysSinceFed);

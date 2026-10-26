@@ -3,12 +3,13 @@ let editingIndex = null;
 let currentGenes = [];
 let collectionView = localStorage.getItem("collectionView") || "cards";
 let selectedSnakeIndexes = new Set();
+let collectionNoticeTimer = null;
 
 const snakeGrid = document.getElementById("snakeGrid");
 const snakeTableWrapper = document.getElementById("snakeTableWrapper");
 
 const SEX_FILTER_OPTIONS = ["All", "Female", "Male", "Unknown"];
-const STATUS_FILTER_OPTIONS = ["Hatchling", "Holdback", "Breeder", "Available", "On Hold", "Sold"];
+const STATUS_FILTER_OPTIONS = [...window.SnakeData.SNAKE_STATUSES, "Retired"];
 let collectionFilters = loadCollectionFilters();
 
 function loadCollectionFilters() {
@@ -401,7 +402,16 @@ function getFilteredAndSortedSnakes() {
     }
 
     if (collectionFilters.statuses.length > 0) {
-        snakeList = snakeList.filter(snake => collectionFilters.statuses.includes(snake.status));
+        const includesRetired = collectionFilters.statuses.includes("Retired");
+
+        snakeList = snakeList.filter(snake =>
+            collectionFilters.statuses.includes(snake.status)
+            || (includesRetired && window.SnakeData.isRetiredSnake(snake))
+        );
+    } else {
+        // The cards are the working collection. Sold, Archived and Deceased
+        // records only appear when their status chip is picked explicitly.
+        snakeList = snakeList.filter(snake => window.SnakeData.isActiveSnake(snake));
     }
 
     const morphSearchText = collectionFilters.morphText.trim().toLowerCase();
@@ -443,10 +453,13 @@ function renderSnakes() {
         const clearFiltersButton = getActiveFilterCount() > 0
             ? `<button type="button" class="main-button" onclick="clearAllFilters()">Clear Filters</button>`
             : "";
+        const emptyText = getActiveFilterCount() === 0
+            ? "No active snakes. Old records are still here \u2014 open Filters and pick Retired or Sold."
+            : "No snakes match the current filter.";
         const emptyMessage = `
             <div class="empty-filter-state">
                 <p class="empty-message">
-                    No snakes match the current filter.
+                    ${emptyText}
                 </p>
                 ${clearFiltersButton}
             </div>
@@ -488,6 +501,32 @@ function renderSnakes() {
         const photoCountBadge = Array.isArray(snake.photos) && snake.photos.length > 1
             ? `<span class="photo-count-badge" title="${snake.photos.length} photos">&#128247; ${snake.photos.length}</span>`
             : "";
+        const retirementDetail = window.SnakeData.isRetiredSnake(snake)
+            ? [
+                snake.retiredDate ? `Retired: ${snake.retiredDate}` : "",
+                snake.retiredReason ? `Reason: ${snake.retiredReason}` : ""
+            ].filter(Boolean).join(" \u00b7 ")
+            : "";
+        const retireButtons = window.SnakeData.isActiveSnake(snake)
+            ? `
+                    <button class="archive-button" type="button"
+                        onclick="retireSnake(${snake.originalIndex}, 'Archived')">
+                        Archive
+                    </button>
+
+                    <button class="deceased-button" type="button"
+                        onclick="retireSnake(${snake.originalIndex}, 'Deceased')">
+                        Deceased
+                    </button>
+            `
+            : window.SnakeData.isRetiredSnake(snake)
+                ? `
+                    <button class="restore-button" type="button"
+                        onclick="restoreSnake(${snake.originalIndex})">
+                        Restore
+                    </button>
+                `
+                : "";
 
         card.innerHTML = `
             <a href="${snake.image}">
@@ -514,6 +553,7 @@ function renderSnakes() {
                     <span>${feedingText}</span>
                     <span>${feederText}</span>
                     <span>${snake.status || "No status"}</span>
+                    ${retirementDetail ? `<span>${retirementDetail}</span>` : ""}
                 </div>
 
                 <div class="snake-genes">
@@ -524,6 +564,8 @@ function renderSnakes() {
                     <button class="edit-button" onclick="goToSnakeForm(${snake.originalIndex})">
                         Edit
                     </button>
+
+                    ${retireButtons}
 
                     <button class="delete-button" onclick="deleteSnake(${snake.originalIndex})">
                         Delete
@@ -683,6 +725,96 @@ function updateSelectedFeederSizes() {
     saveSnakes();
     renderSnakes();
     alert(`${updatedCount} feeder sizes updated.`);
+}
+
+function showCollectionNotice(message, undoAction) {
+    const notice = document.getElementById("collectionNotice");
+    const text = document.getElementById("collectionNoticeText");
+    const undo = document.getElementById("collectionNoticeUndo");
+
+    if (!notice || !text || !undo) {
+        return;
+    }
+
+    clearTimeout(collectionNoticeTimer);
+    text.textContent = message;
+    undo.hidden = typeof undoAction !== "function";
+    undo.onclick = () => {
+        if (typeof undoAction === "function") {
+            undoAction();
+        }
+
+        hideCollectionNotice();
+    };
+    notice.hidden = false;
+    collectionNoticeTimer = setTimeout(hideCollectionNotice, 10000);
+}
+
+function hideCollectionNotice() {
+    const notice = document.getElementById("collectionNotice");
+
+    clearTimeout(collectionNoticeTimer);
+
+    if (notice) {
+        notice.hidden = true;
+    }
+}
+
+function retireSnake(index, status) {
+    const snake = snakes[index];
+
+    if (!snake || !window.SnakeData.isActiveSnake(snake)
+        || (status !== "Archived" && status !== "Deceased")) {
+        return;
+    }
+
+    const before = {
+        status: snake.status || "Holdback",
+        retiredFromStatus: snake.retiredFromStatus || "",
+        retiredDate: snake.retiredDate || "",
+        retiredReason: snake.retiredReason || "",
+        retiredNote: snake.retiredNote || ""
+    };
+    const label = status === "Archived" ? "Archived" : "Marked deceased";
+
+    snake.status = status;
+    snake.retiredFromStatus = before.status;
+    snake.retiredDate = getTodayText();
+    snake.retiredReason = "";
+    snake.retiredNote = "";
+    saveSnakes();
+    renderSnakes();
+
+    showCollectionNotice(`${label}: ${snake.name || "snake"}.`, () => {
+        Object.assign(snake, before);
+        saveSnakes();
+        renderSnakes();
+    });
+}
+
+function restoreSnake(index) {
+    const snake = snakes[index];
+
+    if (!snake || !window.SnakeData.isRetiredSnake(snake)) {
+        return;
+    }
+
+    const before = { ...snake };
+    const restoreStatus = snake.retiredFromStatus || "Holdback";
+
+    snake.status = restoreStatus;
+    snake.retiredFromStatus = "";
+    snake.retiredDate = "";
+    snake.retiredReason = "";
+    snake.retiredNote = "";
+    saveSnakes();
+    renderSnakes();
+
+    showCollectionNotice(`Restored: ${snake.name || "snake"} to ${restoreStatus}.`, () => {
+        Object.assign(snake, before);
+        saveSnakes();
+        renderSnakes();
+    });
 }
 
 function deleteSnake(index) {
@@ -1016,6 +1148,9 @@ function renderFilterControls() {
 }
 
 window.deleteSnake = deleteSnake;
+window.retireSnake = retireSnake;
+window.restoreSnake = restoreSnake;
+window.hideCollectionNotice = hideCollectionNotice;
 window.renderSnakes = renderSnakes;
 window.goToSnakeForm = goToSnakeForm;
 window.setCollectionView = setCollectionView;
@@ -1042,6 +1177,12 @@ window.toggleGeneFilter = toggleGeneFilter;
 window.setGeneMatchMode = setGeneMatchMode;
 window.updateMorphFilter = updateMorphFilter;
 window.clearAllFilters = clearAllFilters;
+
+const collectionNoticeClose = document.getElementById("collectionNoticeClose");
+
+if (collectionNoticeClose) {
+    collectionNoticeClose.addEventListener("click", hideCollectionNotice);
+}
 
 setupGeneOptions();
 renderFilterControls();

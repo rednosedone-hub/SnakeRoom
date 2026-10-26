@@ -3,7 +3,12 @@
 //
 // Provider: Supabase (free tier). The JS library is loaded from a CDN, keeping
 // the app a no-build static site. All app data continues to live in
-// localStorage; this module copies a full snapshot to/from one cloud table.
+// localStorage; this module syncs one cloud table. Pushes and pulls still use
+// the snapshot wrapper, but the data inside is merged record by record against
+// the last copy this device shared with the cloud, so two devices editing
+// different animals do not replace each other's work. A write is only accepted
+// if the cloud row is still the one the merge read; a concurrent write makes
+// the push re-read and merge again instead of overwriting the other device.
 //
 // Storage keys that make up a snapshot:
 //   snakes, breedingPairs, clutches, breedingGoals, customGeneCatalog,
@@ -23,6 +28,14 @@
     ];
 
     const SETTINGS_KEY = "cloudSyncSettings";
+    const MERGE_BASE_KEY = "cloudSyncMergeBase";
+
+    // A push reads the cloud row, merges it, then writes the result back. If
+    // another device writes between those two steps, the write is rejected and
+    // the merge runs again against the newer row. Four tries is far more than
+    // two phones can realistically collide; beyond that, failing and retrying
+    // later is safer than replacing a copy this device never saw.
+    const PUSH_ATTEMPTS = 4;
 
     // The project URL and publishable key are public credentials by design
     // (row level security protects the data), so they are baked in here as a
@@ -201,7 +214,11 @@
     }
 
     function applySnapshot(snapshot) {
-        if (!snapshot || snapshot.app !== "the-snake-room" || typeof snapshot.data !== "object") {
+        if (!snapshot
+            || snapshot.app !== "the-snake-room"
+            || typeof snapshot.data !== "object"
+            || snapshot.data === null
+            || Array.isArray(snapshot.data)) {
             throw new Error("That cloud backup is not a Snake Room snapshot.");
         }
 
@@ -210,6 +227,496 @@
                 localStorage.setItem(key, JSON.stringify(snapshot.data[key]));
             }
         });
+    }
+
+    function isValidSnapshot(snapshot) {
+        return Boolean(snapshot)
+            && snapshot.app === "the-snake-room"
+            && typeof snapshot.data === "object"
+            && snapshot.data !== null
+            && !Array.isArray(snapshot.data);
+    }
+
+    // ---- Per-record merge -------------------------------------------------
+    //
+    // The cloud row still holds one JSON snapshot, but a push is no longer a
+    // blind replacement. Each device stores the last snapshot it shared with
+    // the cloud, then combines that base, its local copy and the current cloud
+    // copy record by record. Two devices editing different snakes keep both
+    // edits. Edits to different fields of the same snake also merge, and so do
+    // nested lists such as weight history. A true same-field clash keeps this
+    // device's value and is counted for reporting; an edited record is kept
+    // rather than deleted when the other device removed it.
+
+    const OMIT = Symbol("omit");
+
+    function isPlainObject(value) {
+        return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+    }
+
+    function stableStringify(value) {
+        if (value === undefined) {
+            return "undefined";
+        }
+
+        if (value === null || typeof value !== "object") {
+            return JSON.stringify(value);
+        }
+
+        if (Array.isArray(value)) {
+            return `[${value.map(stableStringify).join(",")}]`;
+        }
+
+        return `{${Object.keys(value).sort().map(key =>
+            `${JSON.stringify(key)}:${stableStringify(value[key])}`
+        ).join(",")}}`;
+    }
+
+    function valuesEqual(left, right) {
+        return stableStringify(left) === stableStringify(right);
+    }
+
+    function cloneValue(value) {
+        return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+    }
+
+    function recordKey(collection, record) {
+        if (record && record.id !== undefined && record.id !== null && String(record.id) !== "") {
+            return `id:${String(record.id)}`;
+        }
+
+        if (collection === "customGeneCatalog" && record && record.name) {
+            return `name:${String(record.name).trim().toLowerCase()}`;
+        }
+
+        if (record && record.name && (record.ID || record.morph)) {
+            return `name:${String(record.name).trim().toLowerCase()}|${String(record.ID || record.morph).trim().toLowerCase()}`;
+        }
+
+        return `value:${stableStringify(record)}`;
+    }
+
+    function indexRecords(collection, records) {
+        const index = new Map();
+
+        (Array.isArray(records) ? records : []).forEach(record => {
+            if (record !== undefined && record !== null) {
+                index.set(recordKey(collection, record), record);
+            }
+        });
+
+        return index;
+    }
+
+    // Nested lists (weight, feeding and shed history, pairings, goal steps,
+    // genes, photos) are merged by element rather than treated as one value.
+    // Otherwise two devices each adding a weight to the same snake would keep
+    // only one of them, even though the snake record itself merges.
+    function arrayItemKey(item) {
+        if (isPlainObject(item)) {
+            if (item.id !== undefined && item.id !== null && String(item.id) !== "") {
+                return `id:${String(item.id)}`;
+            }
+
+            if (item.name) {
+                return `name:${String(item.name).trim().toLowerCase()}`;
+            }
+        }
+
+        return `value:${stableStringify(item)}`;
+    }
+
+    function indexArrayItems(items) {
+        const index = new Map();
+        const occurrences = new Map();
+
+        (Array.isArray(items) ? items : []).forEach(item => {
+            const key = arrayItemKey(item);
+            const occurrence = occurrences.get(key) || 0;
+
+            occurrences.set(key, occurrence + 1);
+            index.set(`${key}#${occurrence}`, item);
+        });
+
+        return index;
+    }
+
+    function mergeArrays(baseItems, localItems, cloudItems, context, path) {
+        const baseIndex = indexArrayItems(baseItems);
+        const localIndex = indexArrayItems(localItems);
+        const cloudIndex = indexArrayItems(cloudItems);
+        const keys = [...localIndex.keys()];
+        const seen = new Set(keys);
+        const result = [];
+
+        cloudIndex.forEach((item, key) => {
+            if (!seen.has(key)) {
+                keys.push(key);
+                seen.add(key);
+            }
+        });
+
+        keys.forEach(key => {
+            const base = baseIndex.get(key);
+            const local = localIndex.get(key);
+            const cloud = cloudIndex.get(key);
+            const merged = mergeField(
+                base,
+                local,
+                cloud,
+                {
+                    hasBase: baseIndex.has(key),
+                    hasLocal: localIndex.has(key),
+                    hasCloud: cloudIndex.has(key)
+                },
+                context,
+                `${path}[]`
+            );
+
+            if (merged !== OMIT) {
+                result.push(merged);
+            }
+        });
+
+        // History lists display oldest first, so keep that order when every
+        // entry is a dated object. Other lists keep this device's order.
+        const allDated = result.length > 0 && result.every(item =>
+            isPlainObject(item) && typeof item.date === "string" && item.date
+        );
+
+        if (allDated) {
+            result.sort((left, right) => new Date(left.date) - new Date(right.date));
+        }
+
+        return result;
+    }
+
+    function describeMergeRecord(collection, record) {
+        if (!record) {
+            return collection;
+        }
+
+        if (record.name) {
+            return record.name;
+        }
+
+        if (record.id) {
+            return String(record.id);
+        }
+
+        return collection;
+    }
+
+    function noteConflict(context, path) {
+        if (context.trackConflicts) {
+            context.conflicts.push(path);
+        }
+    }
+
+    function mergePlainObjects(base, local, cloud, context, path) {
+        const baseObject = isPlainObject(base) ? base : {};
+        const localObject = isPlainObject(local) ? local : {};
+        const cloudObject = isPlainObject(cloud) ? cloud : {};
+        const keys = new Set([
+            ...Object.keys(baseObject),
+            ...Object.keys(localObject),
+            ...Object.keys(cloudObject)
+        ]);
+        const result = {};
+
+        keys.forEach(key => {
+            const hasBase = Object.prototype.hasOwnProperty.call(baseObject, key);
+            const hasLocal = Object.prototype.hasOwnProperty.call(localObject, key);
+            const hasCloud = Object.prototype.hasOwnProperty.call(cloudObject, key);
+            const merged = mergeField(
+                baseObject[key],
+                localObject[key],
+                cloudObject[key],
+                { hasBase, hasLocal, hasCloud },
+                context,
+                path ? `${path}.${key}` : key
+            );
+
+            if (merged !== OMIT) {
+                result[key] = merged;
+            }
+        });
+
+        return result;
+    }
+
+    function mergeField(base, local, cloud, presence, context, path) {
+        const { hasBase, hasLocal, hasCloud } = presence;
+
+        if (hasLocal && hasCloud) {
+            if (valuesEqual(local, cloud)) {
+                return cloneValue(local);
+            }
+
+            if (hasBase && valuesEqual(local, base)) {
+                return cloneValue(cloud);
+            }
+
+            if (hasBase && valuesEqual(cloud, base)) {
+                return cloneValue(local);
+            }
+
+            if (isPlainObject(local) && isPlainObject(cloud)
+                && (!hasBase || isPlainObject(base))) {
+                return mergePlainObjects(hasBase ? base : {}, local, cloud, context, path);
+            }
+
+            if (Array.isArray(local) && Array.isArray(cloud)
+                && (!hasBase || Array.isArray(base))) {
+                return mergeArrays(hasBase ? base : [], local, cloud, context, path);
+            }
+
+            noteConflict(context, path);
+            return cloneValue(local);
+        }
+
+        if (hasLocal) {
+            if (hasBase && valuesEqual(local, base)) {
+                // The other device removed it and this device did not touch it.
+                return OMIT;
+            }
+
+            if (hasBase) {
+                noteConflict(context, path);
+            }
+
+            return cloneValue(local);
+        }
+
+        if (hasCloud) {
+            if (hasBase && valuesEqual(cloud, base)) {
+                // This device removed it and the other device did not touch it.
+                return OMIT;
+            }
+
+            if (hasBase) {
+                noteConflict(context, path);
+            }
+
+            return cloneValue(cloud);
+        }
+
+        return OMIT;
+    }
+
+    function mergeCollection(collection, baseRecords, localRecords, cloudRecords, stats) {
+        const baseIndex = indexRecords(collection, baseRecords);
+        const localIndex = indexRecords(collection, localRecords);
+        const cloudIndex = indexRecords(collection, cloudRecords);
+        const keys = [...localIndex.keys()];
+        const seen = new Set(keys);
+        const result = [];
+
+        cloudIndex.forEach((record, key) => {
+            if (!seen.has(key)) {
+                keys.push(key);
+                seen.add(key);
+            }
+        });
+
+        keys.forEach(key => {
+            const base = baseIndex.get(key);
+            const local = localIndex.get(key);
+            const cloud = cloudIndex.get(key);
+            const context = {
+                trackConflicts: stats.trackConflicts,
+                conflicts: []
+            };
+            const merged = mergeField(
+                base,
+                local,
+                cloud,
+                {
+                    hasBase: baseIndex.has(key),
+                    hasLocal: localIndex.has(key),
+                    hasCloud: cloudIndex.has(key)
+                },
+                context,
+                collection
+            );
+
+            if (merged !== OMIT) {
+                result.push(merged);
+            }
+
+            if (!valuesEqual(merged === OMIT ? undefined : merged, local)) {
+                stats.remoteRecords += 1;
+            }
+
+            if (context.conflicts.length > 0) {
+                stats.conflicts.push({
+                    collection,
+                    record: describeMergeRecord(collection, local || cloud || base),
+                    fields: context.conflicts
+                });
+            }
+        });
+
+        return result;
+    }
+
+    function mergeSnapshotData(baseSnapshot, localSnapshot, cloudSnapshot) {
+        const baseData = baseSnapshot && isPlainObject(baseSnapshot.data) ? baseSnapshot.data : {};
+        const localData = localSnapshot.data;
+        const cloudData = cloudSnapshot.data;
+        const trackConflicts = Boolean(baseSnapshot);
+        const stats = {
+            remoteRecords: 0,
+            conflicts: [],
+            trackConflicts
+        };
+        const data = {};
+
+        SNAPSHOT_KEYS.forEach(key => {
+            const hasBase = Object.prototype.hasOwnProperty.call(baseData, key);
+            const hasLocal = Object.prototype.hasOwnProperty.call(localData, key);
+            const hasCloud = Object.prototype.hasOwnProperty.call(cloudData, key);
+
+            if (!hasBase && !hasLocal && !hasCloud) {
+                return;
+            }
+
+            const baseValue = baseData[key];
+            const localValue = localData[key];
+            const cloudValue = cloudData[key];
+
+            if (Array.isArray(baseValue) || Array.isArray(localValue) || Array.isArray(cloudValue)) {
+                data[key] = mergeCollection(
+                    key,
+                    Array.isArray(baseValue) ? baseValue : [],
+                    Array.isArray(localValue) ? localValue : [],
+                    Array.isArray(cloudValue) ? cloudValue : [],
+                    stats
+                );
+                return;
+            }
+
+            const context = {
+                trackConflicts,
+                conflicts: []
+            };
+            const merged = mergeField(
+                baseValue,
+                localValue,
+                cloudValue,
+                { hasBase, hasLocal, hasCloud },
+                context,
+                key
+            );
+
+            if (merged !== OMIT) {
+                data[key] = merged;
+            }
+
+            if (!valuesEqual(merged === OMIT ? undefined : merged, localValue)) {
+                stats.remoteRecords += 1;
+            }
+
+            if (context.conflicts.length > 0) {
+                stats.conflicts.push({
+                    collection: key,
+                    record: key,
+                    fields: context.conflicts
+                });
+            }
+        });
+
+        return {
+            snapshot: {
+                app: "the-snake-room",
+                version: 1,
+                savedAt: new Date().toISOString(),
+                data
+            },
+            stats
+        };
+    }
+
+    function mergeSnapshots(baseSnapshot, localSnapshot, cloudSnapshot) {
+        if (!isValidSnapshot(localSnapshot)) {
+            throw new Error("This device's data is not a Snake Room snapshot.");
+        }
+
+        if (!isValidSnapshot(cloudSnapshot)) {
+            throw new Error("That cloud backup is not a Snake Room snapshot.");
+        }
+
+        return mergeSnapshotData(baseSnapshot, localSnapshot, cloudSnapshot);
+    }
+
+    function describeMergeNote(stats) {
+        if (!stats) {
+            return "";
+        }
+
+        const parts = [];
+
+        if (stats.remoteRecords > 0) {
+            parts.push(`merged ${stats.remoteRecords} remote record${stats.remoteRecords === 1 ? "" : "s"}`);
+        }
+
+        if (stats.conflicts.length > 0) {
+            parts.push(
+                `${stats.conflicts.length} record${stats.conflicts.length === 1 ? " was" : "s were"} edited on both devices \u2014 review ${stats.conflicts.length === 1 ? "it" : "them"} if anything looks stale`
+            );
+        }
+
+        return parts.join("; ");
+    }
+
+    // The common ancestor is device-local: it is how this browser remembers
+    // what was in the cloud at its last successful sync. Scoped by user so a
+    // different account on the same browser can never merge against it.
+    function readMergeBase(userId) {
+        try {
+            const saved = JSON.parse(localStorage.getItem(MERGE_BASE_KEY));
+
+            if (!saved || saved.userId !== userId || !isValidSnapshot(saved.snapshot)) {
+                return null;
+            }
+
+            return saved.snapshot;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function writeMergeBase(userId, snapshot) {
+        try {
+            localStorage.setItem(MERGE_BASE_KEY, JSON.stringify({
+                userId,
+                snapshot,
+                storedAt: new Date().toISOString()
+            }));
+        } catch (error) {
+            // Storage pressure should not break the sync that just succeeded.
+            console.warn("Could not store the sync base on this device.", error);
+        }
+    }
+
+    function clearNeedsPullFlag() {
+        try {
+            const state = JSON.parse(localStorage.getItem("autoSyncState")) || {};
+
+            if (state.needsPull) {
+                delete state.needsPull;
+                localStorage.setItem("autoSyncState", JSON.stringify(state));
+            }
+        } catch (error) {
+            // A missing or unreadable queue is not a reason to fail the sync.
+        }
+    }
+
+    function countMergeStats(stats) {
+        return {
+            remoteRecords: stats ? stats.remoteRecords : 0,
+            conflicts: stats ? stats.conflicts.length : 0
+        };
     }
 
     function getCollectionCounts() {
@@ -293,6 +800,22 @@
         showReport("syncReport", message, isError);
     }
 
+    // Auto-sync keeps its queue in localStorage. The Account page hides the
+    // floating banner, so include the queue here; otherwise "last push" can
+    // look current even while edits are still waiting on this device.
+    function getPendingSyncState() {
+        try {
+            const state = JSON.parse(localStorage.getItem("autoSyncState")) || {};
+
+            return {
+                count: Number.isFinite(Number(state.dirtyCount)) ? Number(state.dirtyCount) : 0,
+                needsPull: Boolean(state.needsPull)
+            };
+        } catch (error) {
+            return { count: 0, needsPull: false };
+        }
+    }
+
     // ---- Status -----------------------------------------------------------
 
     async function refreshStatus() {
@@ -321,7 +844,17 @@
                 }
 
                 const stampText = stampParts.length ? ` (${stampParts.join(" | ")})` : "";
-                showStatus(`Connected and signed in as ${session.user.email || session.user.id}. Ready to sync.${stampText}`);
+                const pendingState = getPendingSyncState();
+                const pendingText = pendingState.count > 0
+                    ? ` ${pendingState.count} change${pendingState.count === 1 ? " is" : "s are"} saved on this device but not in the cloud yet.`
+                    : "";
+                const mergeText = Number(statusSettings.lastMergeConflicts) > 0
+                    ? ` The last merge found ${statusSettings.lastMergeConflicts} record${Number(statusSettings.lastMergeConflicts) === 1 ? "" : "s"} edited on both devices; review ${Number(statusSettings.lastMergeConflicts) === 1 ? "it" : "them"} if anything looks stale.`
+                    : "";
+                const pullText = pendingState.needsPull
+                    ? " A merged update from another device is ready; open another page or press Pull & Merge."
+                    : "";
+                showStatus(`Connected and signed in as ${session.user.email || session.user.id}. Ready to sync.${stampText}${pendingText}${mergeText}${pullText}`);
                 updateSignOutVisibility(true);
             } else {
                 showStatus("Connection ready, but not signed in. Enter your email and password below and press Sign In.");
@@ -490,46 +1023,54 @@
         await refreshStatus();
     }
 
-    async function checkCloudIsStale(activeClient, userId, settings) {
-        // "Safe" means: nobody has pushed to the cloud since this device last
-        // saw the cloud state (its last pull or push). Otherwise this device is
-        // about to overwrite changes it has never seen.
-        try {
-            const { data, error } = await activeClient
-                .from("snake_room_backups")
-                .select("updated_at")
-                .eq("user_id", userId)
-                .maybeSingle();
+    // Write only if the cloud row is still the one this push merged against.
+    // Supabase's update returns the changed rows; an empty result means another
+    // device got there first, so the caller re-reads and merges its work too.
+    // Returns true when the row was stored.
+    async function writeRowIfUnchanged(activeClient, row, existingRow) {
+        const table = activeClient.from("snake_room_backups");
 
-            if (error || !data || !data.updated_at) {
-                return { safe: true, cloudUpdatedAt: null };
+        if (existingRow) {
+            const { data, error } = await table
+                .update(row)
+                .eq("user_id", row.user_id)
+                .eq("updated_at", existingRow.updated_at)
+                .select("updated_at");
+
+            if (error) {
+                throw error;
             }
 
-            const lastKnownCloudTime = settings.lastPulledAt || settings.lastPushedAt || null;
-
-            if (!lastKnownCloudTime) {
-                return { safe: false, cloudUpdatedAt: data.updated_at };
-            }
-
-            return {
-                safe: new Date(data.updated_at) <= new Date(lastKnownCloudTime),
-                cloudUpdatedAt: data.updated_at
-            };
-        } catch (error) {
-            console.error(error);
-            return { safe: true, cloudUpdatedAt: null };
+            return Array.isArray(data) ? data.length > 0 : Boolean(data);
         }
+
+        const { error } = await table.insert(row);
+
+        if (!error) {
+            return true;
+        }
+
+        // Someone inserted the first row after our read. Retry as an update.
+        if (String(error.code || "") === "23505") {
+            return false;
+        }
+
+        throw error;
     }
 
     // Core sync used both by the buttons on the login page and by the
     // automatic background sync (auto-sync.js).
     //
     // pushCore({ interactive }):
-    //   interactive = true  -> keeps the old confirm() dialogs and status text.
+    //   interactive = true  -> keeps the old status text.
     //   interactive = false -> never blocks on a dialog; returns a status so
     //                          the caller can show its own banner instead.
-    // Status: "pushed" | "conflict" | "shrink-guard" | "no-session" | "error".
-    async function pushCore({ interactive = true } = {}) {
+    // applyMerged = true puts the combined copy on this device as well. The
+    // background push passes false: it cannot know whether the open page holds
+    // stale in-memory arrays, so it uploads the merge and lets the next page
+    // pull apply it before rendering.
+    // Status: "pushed" | "no-session" | "error".
+    async function pushCore({ interactive = true, applyMerged = true } = {}) {
         try {
             const session = await getSession();
 
@@ -542,91 +1083,102 @@
 
             const activeClient = getClient();
 
-            const pushSettings = readSettings();
-            const staleCheck = await checkCloudIsStale(activeClient, session.user.id, pushSettings);
-
-            if (staleCheck.cloudUpdatedAt && !staleCheck.safe) {
-                if (!interactive) {
-                    return "conflict";
-                }
-
-                const overwrite = confirm(
-                    "The cloud backup is newer than this device's last pull.\n\n" +
-                    `Cloud updated: ${staleCheck.cloudUpdatedAt}\n` +
-                    `This device last pulled: ${pushSettings.lastPulledAt || "never"}\n\n` +
-                    "Another device may have pushed changes that this push would overwrite.\n" +
-                    "Pull first to keep them, or push anyway to overwrite the cloud.\n\n" +
-                    "Overwrite the cloud anyway?"
-                );
-
-                if (!overwrite) {
-                    setSyncReport("Push cancelled. Use the Pull button to bring the other device's changes onto this device.", true);
-                    return "conflict";
-                }
+            if (interactive) {
+                setSyncReport("Merging with the cloud and pushing\u2026");
             }
 
-            // Small-collection guard: a fresh device (or a cleared browser) holds
-            // few or no snakes. Pushing from it would replace the real backup.
-            const existingRow = await activeClient
-                .from("snake_room_backups")
-                .select("snapshot")
-                .eq("user_id", session.user.id)
-                .maybeSingle();
+            const localSnapshot = buildSnapshot();
+            const mergeBase = readMergeBase(session.user.id);
+            let mergedSnapshot = localSnapshot;
+            let stats = { remoteRecords: 0, conflicts: [] };
+            let hadCloudCopy = false;
+            let row = null;
+            let written = false;
 
-            if (!existingRow.error && existingRow.data?.snapshot?.data?.snakes) {
-                const cloudSnakeCount = existingRow.data.snapshot.data.snakes.length;
-                const localSnakeCount = getCollectionCounts().snakes;
+            for (let attempt = 0; attempt < PUSH_ATTEMPTS && !written; attempt += 1) {
+                const existingRow = await activeClient
+                    .from("snake_room_backups")
+                    .select("snapshot, updated_at")
+                    .eq("user_id", session.user.id)
+                    .maybeSingle();
 
-                if (cloudSnakeCount >= 5 && localSnakeCount < cloudSnakeCount / 2) {
-                    if (!interactive) {
-                        return "shrink-guard";
+                if (existingRow.error) {
+                    throw existingRow.error;
+                }
+
+                const cloudSnapshot = existingRow.data && existingRow.data.snapshot
+                    ? existingRow.data.snapshot
+                    : null;
+
+                hadCloudCopy = Boolean(cloudSnapshot);
+                mergedSnapshot = localSnapshot;
+                stats = { remoteRecords: 0, conflicts: [] };
+
+                if (hadCloudCopy) {
+                    if (!isValidSnapshot(cloudSnapshot)) {
+                        throw new Error("That cloud backup is not a Snake Room snapshot.");
                     }
 
-                    const shrink = confirm(
-                        "This device has far fewer snakes than the cloud backup.\n\n" +
-                        `This device: ${localSnakeCount} snake(s)\n` +
-                        `Cloud backup: ${cloudSnakeCount} snake(s)\n\n` +
-                        "If this is a new device, PULL first instead of pushing.\n" +
-                        "Pushing now would replace the cloud collection with this device's smaller one.\n\n" +
-                        "Replace the cloud backup anyway?"
+                    const mergeResult = mergeSnapshots(
+                        mergeBase,
+                        localSnapshot,
+                        cloudSnapshot
                     );
 
-                    if (!shrink) {
-                        setSyncReport("Push cancelled. Use the Pull button to load this device with the full collection.", true);
-                        return "shrink-guard";
-                    }
+                    mergedSnapshot = mergeResult.snapshot;
+                    stats = mergeResult.stats;
                 }
+
+                row = {
+                    user_id: session.user.id,
+                    snapshot: mergedSnapshot,
+                    device: navigator.userAgent.slice(0, 120),
+                    updated_at: new Date().toISOString()
+                };
+
+                written = await writeRowIfUnchanged(activeClient, row, existingRow.data);
             }
 
-            if (interactive) {
-                setSyncReport("Pushing\u2026");
+            if (!written) {
+                throw new Error("The cloud copy kept changing while this device merged. Nothing was overwritten; try again in a moment.");
             }
 
-            const snapshot = buildSnapshot();
-            const row = {
-                user_id: session.user.id,
-                snapshot,
-                device: navigator.userAgent.slice(0, 120),
-                updated_at: new Date().toISOString()
-            };
+            // Put the combined copy on this device only when the caller can
+            // safely replace the open page's data. Background pushes leave the
+            // local copy untouched until the next page pulls.
+            if (applyMerged) {
+                if (window.AutoSync && window.AutoSync.withWritesIgnored) {
+                    window.AutoSync.withWritesIgnored(() => applySnapshot(mergedSnapshot));
+                } else {
+                    applySnapshot(mergedSnapshot);
+                }
 
-            const { error } = await activeClient
-                .from("snake_room_backups")
-                .upsert(row);
-
-            if (error) {
-                throw error;
+                clearNeedsPullFlag();
             }
+
+            // The base is what this device's local data actually contains. A
+            // manual push applies the merge first, so its base is the merged
+            // copy. A background push leaves local data alone, so its base is
+            // the local copy: remote records added during this push then still
+            // look new on the next merge instead of looking deleted here.
+            writeMergeBase(session.user.id, applyMerged ? mergedSnapshot : localSnapshot);
+
+            const mergeStats = countMergeStats(stats);
+            const currentSettings = readSettings();
 
             saveSettings({
-                ...readSettings(),
+                ...currentSettings,
                 lastPushedAt: row.updated_at,
                 lastDevice: row.device,
-                cloudUpdatedAt: row.updated_at
+                cloudUpdatedAt: row.updated_at,
+                lastMergeAt: hadCloudCopy ? new Date().toISOString() : (currentSettings.lastMergeAt || ""),
+                lastMergedRecords: hadCloudCopy ? mergeStats.remoteRecords : 0,
+                lastMergeConflicts: hadCloudCopy ? mergeStats.conflicts : 0
             });
 
             if (interactive) {
-                setSyncReport(`Pushed ${describeCounts(getCollectionCounts())}.`);
+                const note = describeMergeNote(stats);
+                setSyncReport(`Pushed ${describeCounts(getCollectionCounts())}.${note ? ` ${note}.` : ""}`);
             }
 
             return "pushed";
@@ -639,10 +1191,14 @@
         }
     }
 
-    // Core pull. Returns "pulled" | "empty" | "no-session" | "error".
+    // Core pull. Returns "pulled" | "deferred" | "empty" | "no-session" | "error".
     // silent keeps the status text off (the auto-sync engine reloads the page
     // right after a pull, so mid-pull text would never be read anyway).
-    async function pullCore({ silent = false } = {}) {
+    // replace is only for an explicit "use the cloud version" action; a normal
+    // pull merges record by record so local-only work is not destroyed.
+    // shouldApply lets a caller abort just before writing if the page changed
+    // while the network request was in flight.
+    async function pullCore({ silent = false, replace = false, shouldApply = null } = {}) {
         try {
             const session = await getSession();
 
@@ -656,7 +1212,7 @@
             const activeClient = getClient();
 
             if (!silent) {
-                setSyncReport("Pulling\u2026");
+                setSyncReport(replace ? "Restoring the cloud copy\u2026" : "Merging with the cloud\u2026");
             }
 
             const { data, error } = await activeClient
@@ -676,24 +1232,60 @@
                 return "empty";
             }
 
-            // Restoring cloud data is not a local edit, so it must not mark
-            // anything dirty (auto-sync would otherwise queue a push of the
-            // bytes it just downloaded).
-            if (window.AutoSync && window.AutoSync.withWritesIgnored) {
-                window.AutoSync.withWritesIgnored(() => applySnapshot(data.snapshot));
-            } else {
-                applySnapshot(data.snapshot);
+            if (!isValidSnapshot(data.snapshot)) {
+                throw new Error("That cloud backup is not a Snake Room snapshot.");
             }
 
+            let appliedSnapshot = data.snapshot;
+            let stats = { remoteRecords: 0, conflicts: [] };
+
+            if (!replace) {
+                const mergeResult = mergeSnapshots(
+                    readMergeBase(session.user.id),
+                    buildSnapshot(),
+                    data.snapshot
+                );
+
+                appliedSnapshot = mergeResult.snapshot;
+                stats = mergeResult.stats;
+            }
+
+            if (typeof shouldApply === "function" && !shouldApply()) {
+                return "deferred";
+            }
+
+            // Applying a pull is not a local edit, so it must not mark anything
+            // dirty (auto-sync would otherwise queue a push of downloaded bytes).
+            if (window.AutoSync && window.AutoSync.withWritesIgnored) {
+                window.AutoSync.withWritesIgnored(() => applySnapshot(appliedSnapshot));
+            } else {
+                applySnapshot(appliedSnapshot);
+            }
+
+            // The common ancestor is the cloud copy, not the merged result: any
+            // local-only records stay visible as local changes for the next push.
+            writeMergeBase(session.user.id, data.snapshot);
+            clearNeedsPullFlag();
+
+            const mergeStats = countMergeStats(stats);
+            const pulledAt = new Date().toISOString();
+            const currentSettings = readSettings();
+
             saveSettings({
-                ...readSettings(),
-                lastPulledAt: new Date().toISOString(),
+                ...currentSettings,
+                lastPulledAt: pulledAt,
                 cloudUpdatedAt: data.updated_at,
-                cloudDevice: data.device
+                cloudDevice: data.device,
+                lastMergeAt: replace ? (currentSettings.lastMergeAt || "") : pulledAt,
+                lastMergedRecords: replace ? 0 : mergeStats.remoteRecords,
+                lastMergeConflicts: replace ? 0 : mergeStats.conflicts
             });
 
             if (!silent) {
-                setSyncReport(`Pulled backup from ${data.updated_at || "unknown time"}. Reload the other pages to see the restored data.`);
+                const note = replace ? "" : describeMergeNote(stats);
+                setSyncReport(
+                    `Pulled backup from ${data.updated_at || "unknown time"}.${note ? ` ${note}.` : ""} Reload the other pages to see the restored data.`
+                );
             }
 
             return "pulled";
@@ -1440,6 +2032,8 @@
         pushCore,
         pullCore,
         _getClient: getClient,
+        _mergeSnapshots: mergeSnapshots,
+        _readMergeBase: readMergeBase,
         pullSnapshot,
         _setClientForTesting: value => {
             testClient = value;

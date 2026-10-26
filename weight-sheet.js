@@ -34,7 +34,9 @@ function getFilteredSnakes() {
 
     const filteredSnakes = snakes
         .filter(snake => selectedSex === "All" || snake.sex === selectedSex)
-        .filter(snake => selectedStatus === "All" || snake.status === selectedStatus);
+        .filter(snake => selectedStatus === "All"
+            ? window.SnakeData.isActiveSnake(snake)
+            : snake.status === selectedStatus);
 
     filteredSnakes.sort((a, b) => {
         if (selectedSort === "binNumber") {

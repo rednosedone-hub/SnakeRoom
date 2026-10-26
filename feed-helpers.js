@@ -56,7 +56,7 @@ function isOnFeedingHold(snake) {
 const FEEDING_LEAD_DAYS = 3;
 
 function isSnakeDueToFeed(snake) {
-    if (isOnFeedingHold(snake)) {
+    if (window.SnakeData.isInactiveSnake(snake) || isOnFeedingHold(snake)) {
         return false;
     }
 
@@ -80,6 +80,11 @@ function getFeedingStatus(snake) {
     const interval = getFeedingInterval(snake);
     const daysSinceFed = getDaysSince(snake.lastFed);
     const base = { snake, interval, daysSinceFed, daysUntil: null, dueDate: null };
+
+    // A retired record keeps its feeding history but never appears as due.
+    if (window.SnakeData.isInactiveSnake(snake)) {
+        return { ...base, state: "inactive" };
+    }
 
     if (isOnFeedingHold(snake)) {
         return { ...base, state: "hold" };

@@ -46,8 +46,12 @@ function getFilters() {
 }
 
 function matchesFilters(snake, filters) {
+    const statusMatch = filters.status === "All"
+        ? window.SnakeData.isActiveSnake(snake)
+        : snake.status === filters.status;
+
     return (filters.sex === "All" || snake.sex === filters.sex)
-        && (filters.status === "All" || snake.status === filters.status)
+        && statusMatch
         && (filters.clutch === "All" || String(snake.clutchId || "") === filters.clutch);
 }
 

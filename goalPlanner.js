@@ -13,7 +13,10 @@
 // Pairing math reuses the morph calculator engine, so chance percentages are
 // the same ones the Morph Calculator page reports.
 
-function getLiveSnakes() { return window.SnakeData.loadSnakesWithIds([]); }
+function getLiveSnakes() {
+    return window.SnakeData.loadSnakesWithIds([])
+        .filter(snake => window.SnakeData.isActiveSnake(snake));
+}
 
 let goals = window.SnakeData.readStorageArray("breedingGoals", []);
 

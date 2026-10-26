@@ -1,3 +1,39 @@
+// The full lifecycle, in the order the collection filters show it. Sold,
+// Archived and Deceased are terminal: the record and its history stay, but the
+// snake is no longer part of the active collection.
+const SNAKE_STATUSES = [
+    "Hatchling",
+    "Juvenile",
+    "Sub-Adult",
+    "Adult",
+    "Breeder",
+    "Holdback",
+    "Available",
+    "On Hold",
+    "Sold",
+    "Archived",
+    "Deceased"
+];
+
+const INACTIVE_SNAKE_STATUSES = ["Sold", "Archived", "Deceased"];
+const RETIRED_SNAKE_STATUSES = ["Archived", "Deceased"];
+
+function isInactiveSnake(snake) {
+    return Boolean(snake) && INACTIVE_SNAKE_STATUSES.includes(String(snake.status || "").trim());
+}
+
+function isRetiredStatus(status) {
+    return RETIRED_SNAKE_STATUSES.includes(String(status || "").trim());
+}
+
+function isRetiredSnake(snake) {
+    return Boolean(snake) && isRetiredStatus(snake.status);
+}
+
+function isActiveSnake(snake) {
+    return !isInactiveSnake(snake);
+}
+
 const defaultSnakes = [
     {
         name: "Narcissa",
@@ -226,6 +262,13 @@ function getSnakeQrImageUrl(snake, size = 160) {
 
 window.SnakeData = {
     defaultSnakes,
+    SNAKE_STATUSES,
+    INACTIVE_SNAKE_STATUSES,
+    RETIRED_SNAKE_STATUSES,
+    isInactiveSnake,
+    isRetiredStatus,
+    isRetiredSnake,
+    isActiveSnake,
     readStorageArray,
     saveStorageArray,
     getSnakeIdentityText,

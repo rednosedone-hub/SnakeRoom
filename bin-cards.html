@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Bin Cards</title>
-    <link rel="stylesheet" href="style.css?v=36">
+    <link rel="stylesheet" href="style.css?v=41">
 </head>
 
 <body>
@@ -55,13 +55,18 @@
                 <label class="form-field">
                     <span>Status</span>
                     <select id="statusFilter">
-                        <option value="All">All Statuses</option>
+                        <option value="All">All Active Statuses</option>
                         <option value="Hatchling">Hatchling</option>
-                        <option value="Holdback">Holdback</option>
+                        <option value="Juvenile">Juvenile</option>
+                        <option value="Sub-Adult">Sub-Adult</option>
+                        <option value="Adult">Adult</option>
                         <option value="Breeder">Breeder</option>
+                        <option value="Holdback">Holdback</option>
                         <option value="Available">Available</option>
                         <option value="On Hold">On Hold</option>
                         <option value="Sold">Sold</option>
+                        <option value="Archived">Archived</option>
+                        <option value="Deceased">Deceased</option>
                     </select>
                 </label>
 
@@ -111,8 +116,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="data-helpers.js"></script>
-    <script src="cloud-sync.js?v=9"></script>
-    <script src="auto-sync.js?v=5"></script>
+    <script src="cloud-sync.js?v=13"></script>
+    <script src="auto-sync.js?v=8"></script>
     <script src="account-gate.js?v=1"></script>
     <script src="geneCatalog.js?v=3"></script>
     <script src="genes.js?v=6"></script>

@@ -10,10 +10,14 @@
 //     customGeneCatalog, financeSettings, financeExpenses, financeExpos) marks
 //     its storage key "dirty" instantly.
 //   - If online: a debounced push (8s after the last change) saves to the
-//     cloud. Navigating to another page forces an immediate push so nothing
-//     is lost mid-browse.
+//     cloud. Navigating to another page attempts an immediate push, and any
+//     queue left behind is retried when the next page opens or becomes visible
+//     (navigation can cancel the in-flight request).
 //   - On page load: if the cloud backup is newer than what this device pulled,
 //     and this device has no unsaved local changes, pull and reload.
+//   - Pushes and pulls merge record by record in cloud-sync.js. A background
+//     push defers applying remote changes to local storage until the next page,
+//     so an open page with stale in-memory arrays can never write them back.
 //   - If offline: changes keep saving locally. A panel on every page shows
 //     "N changes not pushed yet" and, once back online, asks to commit them
 //     (one confirm, then they push).
@@ -29,7 +33,7 @@
     // Collection facts (who you own, what they ate) push themselves. Breeding
     // plans are experiments — you try combinations, most of which you throw
     // away — so they stay on this device until you ask for them to be saved.
-    // A push always sends the whole snapshot, so plans ride along with the next
+    // A push uploads the merged snapshot, so plans ride along with the next
     // collection push; the point is that planning alone never forces one.
     const AUTO_PUSH_KEYS = [
         "snakes",
@@ -53,6 +57,15 @@
     };
 
     const state = readState();
+
+    // Older versions could leave a whole-snapshot conflict flag behind. The
+    // merge engine resolves those safely now, so a stale flag must not block
+    // the queued upload forever.
+    if (state.conflict) {
+        delete state.conflict;
+        delete state.conflictAt;
+        saveState();
+    }
 
     function readState() {
         try {
@@ -123,7 +136,10 @@
 
     // ---- Auto push ----------------------------------------------------------
 
+    const RETRY_MS = 30000;
     let pushTimer = null;
+    let retryTimer = null;
+    let pushInFlight = null;
 
     function pendingKeys() {
         return Object.keys(state.dirtyKeys || {});
@@ -161,36 +177,98 @@
         }, DEBOUNCE_MS);
     }
 
-    async function runAutoPush() {
+    function runAutoPush() {
+        if (pushInFlight) {
+            return pushInFlight;
+        }
+
         if (!isOnline() || !state.dirtyKeys || Object.keys(state.dirtyKeys).length === 0) {
-            return;
+            return Promise.resolve("idle");
         }
 
         clearPushTimer();
 
-        const result = await window.CloudSync.pushCore({ interactive: false });
+        // Only one upload at a time. A timer, a page becoming visible, and a
+        // pagehide can all ask at once; overlapping pushes would make the
+        // second one look like a conflict with the first.
+        pushInFlight = (async () => {
+            const changeAtStart = state.lastChangeAt;
+            const result = await window.CloudSync.pushCore({
+                interactive: false,
+                applyMerged: false
+            });
 
-        if (result === "pushed") {
-            state.dirtyKeys = {};
-            state.dirtyCount = 0;
-            state.lastPushAt = new Date().toISOString();
-            saveState();
-            updateBanner();
-        } else if (result === "conflict") {
-            // Cloud is newer than this device's last seen state. Local changes
-            // stay queued locally; the reconnect flow will ask the user.
-            state.conflict = true;
-            state.conflictAt = new Date().toISOString();
-            saveState();
-            updateBanner();
+            if (result === "pushed") {
+                const mergeSettings = window.CloudSync.readSettings();
+                const mergedRecords = Number(mergeSettings.lastMergedRecords) || 0;
+
+                // Background pushes leave local data untouched. If the merge
+                // brought in anything from another device, the next page pulls
+                // it before rendering.
+                if (mergedRecords > 0) {
+                    state.needsPull = true;
+                }
+
+                if (state.lastChangeAt !== changeAtStart) {
+                    // A write landed while the upload was in flight. Its bytes
+                    // are not in that request, so keep the queue and send again.
+                    saveState();
+                    updateBanner();
+                    scheduleAutoPush();
+                    return result;
+                }
+
+                state.dirtyKeys = {};
+                state.dirtyCount = 0;
+                state.lastPushAt = new Date().toISOString();
+                saveState();
+                clearRetryTimer();
+                updateBanner();
+            } else if (result === "error" && isOnline() && hasCollectionChanges()) {
+                // A dropped connection or a temporary server error is not a
+                // reason to wait for the next edit. Try again shortly.
+                scheduleRetry();
+            }
+
+            return result;
+        })().finally(() => {
+            pushInFlight = null;
+        });
+
+        return pushInFlight;
+    }
+
+    // A save on the snake form navigates to the collection immediately, which
+    // cancels the debounce timer and can abort the pagehide request. The queue
+    // survives in localStorage, so every later page must retry it instead of
+    // leaving the change stranded until the next edit.
+    function resumePendingPush() {
+        if (!isOnline() || !hasCollectionChanges()) {
+            return Promise.resolve("skipped");
         }
-        // other results ("no-session", "error"): stay dirty, try again later.
+
+        return runAutoPush();
+    }
+
+    function scheduleRetry() {
+        clearRetryTimer();
+        retryTimer = setTimeout(() => {
+            retryTimer = null;
+            runAutoPush();
+        }, RETRY_MS);
     }
 
     function clearPushTimer() {
         if (pushTimer) {
             clearTimeout(pushTimer);
             pushTimer = null;
+        }
+    }
+
+    function clearRetryTimer() {
+        if (retryTimer) {
+            clearTimeout(retryTimer);
+            retryTimer = null;
         }
     }
 
@@ -236,13 +314,21 @@
                 return;
             }
 
-            const lastKnown = settings.lastPulledAt || settings.lastPushedAt || null;
+            const lastKnown = [settings.lastPulledAt, settings.lastPushedAt]
+                .filter(Boolean)
+                .sort((left, right) => new Date(right) - new Date(left))[0] || null;
+            const needsPull = Boolean(state.needsPull);
 
-            if (!lastKnown || new Date(data.updated_at) > new Date(lastKnown)) {
-                // Pull, then reload so every page picks up the fresh data.
-                const result = await window.CloudSync.pullCore({ silent: true });
+            if (needsPull || !lastKnown || new Date(data.updated_at) > new Date(lastKnown)) {
+                const changeAtStart = state.lastChangeAt;
+                const result = await window.CloudSync.pullCore({
+                    silent: true,
+                    shouldApply: () => state.dirtyCount === 0 && state.lastChangeAt === changeAtStart
+                });
 
                 if (result === "pulled") {
+                    state.needsPull = false;
+                    saveState();
                     window.location.reload();
                 }
             }
@@ -292,16 +378,11 @@
         const online = isOnline();
         let message;
 
-        if (state.conflict) {
-            // No verb agreement to get wrong: "your breeding plans is" was the
-            // kind of sentence this avoids.
-            message = `<span>The cloud backup changed on another device since this one last synced. ` +
-                `Changes to your ${what} are still only on this device.</span>`;
-        } else if (!online) {
+        if (!online) {
             message = `<span>${pending} change${pending === 1 ? "" : "s"} saved locally (${what}). ` +
                 `You're offline \u2014 ${pending === 1 ? "it'll" : "they'll"} be saved when you're back online.</span>`;
         } else if (hasCollectionChanges()) {
-            message = `<span>${pending} change${pending === 1 ? "" : "s"} saved locally (${what}).</span>`;
+            message = `<span>${pending} change${pending === 1 ? "" : "s"} saved on this device but not in the cloud yet (${what}).</span>`;
         } else {
             // Plans only: nothing automatic is going to happen, and that is the
             // point — experimenting should not nag or upload half-finished ideas.
@@ -311,8 +392,8 @@
 
         banner.innerHTML = `${message}
             <span class="auto-sync-actions">
-                <a href="#" id="autoSyncCommitLink">${state.conflict ? "Keep this device's changes" : "Save to cloud"}</a>
-                <a href="#" id="autoSyncDiscardLink">${state.conflict ? "Use cloud version" : "Discard"}</a>
+                <a href="#" id="autoSyncCommitLink">Save to cloud now</a>
+                <a href="#" id="autoSyncDiscardLink">Discard</a>
             </span>`;
 
         const commitLink = document.getElementById("autoSyncCommitLink");
@@ -342,7 +423,6 @@
     function clearPending() {
         state.dirtyKeys = {};
         state.dirtyCount = 0;
-        state.conflict = false;
         saveState();
         updateBanner();
     }
@@ -362,7 +442,7 @@
             return;
         }
 
-        const result = await window.CloudSync.pullCore({ silent: true });
+        const result = await window.CloudSync.pullCore({ silent: true, replace: true });
 
         if (result === "pulled") {
             clearPending();
@@ -393,21 +473,18 @@
     }
 
     async function commitPendingChanges() {
-        if (state.conflict) {
-            const reallyPush = confirm(
-                "The cloud backup changed on another device since this device last synced.\n\n" +
-                "Committing your local changes will overwrite the cloud backup (the other device's changes are not merged).\n\n" +
-                "Overwrite the cloud with this device's changes?"
-            );
-
-            if (!reallyPush) {
-                return;
-            }
-        }
-
-        const result = await window.CloudSync.pushCore({ interactive: false });
+        const result = await window.CloudSync.pushCore({
+            interactive: false,
+            applyMerged: false
+        });
 
         if (result === "pushed") {
+            const mergeSettings = window.CloudSync.readSettings();
+
+            if (Number(mergeSettings.lastMergedRecords) > 0) {
+                state.needsPull = true;
+            }
+
             state.lastPushAt = new Date().toISOString();
             clearPending();
             return;
@@ -415,7 +492,7 @@
 
         if (result === "no-session") {
             alert("Sign in on the Account page to save to the cloud. For now the changes stay on this device.");
-        } else if (result !== "conflict") {
+        } else if (result !== "pushed") {
             alert("Could not save to the cloud right now. Your changes are still on this device; try again from the Account page.");
         }
     }
@@ -440,11 +517,20 @@
 
     function handleGoingOffline() {
         clearPushTimer();
+        clearRetryTimer();
         updateBanner();
     }
 
     window.addEventListener("online", handleBackOnline);
     window.addEventListener("offline", handleGoingOffline);
+
+    // Returning to the app is another chance to upload a queued collection
+    // change without making the keeper press anything.
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+            resumePendingPush();
+        }
+    });
 
     // Flush on navigate so no change is lost when you browse away.
     window.addEventListener("pagehide", () => {
@@ -459,7 +545,10 @@
     window.addEventListener("DOMContentLoaded", () => {
         buildBanner();
         updateBanner();
-        setTimeout(maybeAutoPull, 1500);
+        setTimeout(() => {
+            maybeAutoPull();
+            resumePendingPush();
+        }, 1500);
     });
 
     // ---- Exposed for testing ------------------------------------------------
@@ -468,6 +557,7 @@
         _state: state,
         markDirty,
         runAutoPush,
+        resumePendingPush,
         commitPendingChanges,
         discardPendingChanges,
         maybeAutoPull,

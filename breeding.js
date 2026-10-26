@@ -1,6 +1,7 @@
 const snakes = window.SnakeData.loadSnakesWithIds([]);
 let breedingPairs = window.SnakeData.readStorageArray("breedingPairs", []);
 let clutches = window.SnakeData.readStorageArray("clutches", []);
+let pendingClosePairId = "";
 
 function migrateBreedingReferences() {
     let changedPairs = false;
@@ -103,6 +104,7 @@ function getSnakeOptions(sex, selectId) {
     const previousValue = select ? select.value : "";
     const options = snakes
         .map((snake, index) => ({ snake, index }))
+        .filter(item => window.SnakeData.isActiveSnake(item.snake))
         .filter(item => item.snake.sex === sex || item.snake.sex === "Unknown")
         .map(item => `
             <option value="${item.snake.id}">
@@ -249,10 +251,94 @@ function removePairingDate(pairId, pairingIndex) {
 
 function getNextClutchId(laidDate) {
     const year = (laidDate || getTodayText()).slice(0, 4);
-    const clutchCountForYear = clutches.filter(clutch => clutch.year === year).length;
-    const clutchNumber = String(clutchCountForYear + 1).padStart(2, "0");
+    const usedIds = new Set([
+        ...clutches.map(clutch => String(clutch.id || "")),
+        ...breedingPairs.map(pair => String(pair.clutchId || ""))
+    ]);
+    let clutchNumber = 1;
+    let clutchId = `${year}-${String(clutchNumber).padStart(2, "0")}`;
 
-    return `${year}-${clutchNumber}`;
+    // Count-based numbering can collide when an older clutch has no year field
+    // (or a record was imported). Advance to the first unused id instead.
+    while (usedIds.has(clutchId)) {
+        clutchNumber += 1;
+        clutchId = `${year}-${String(clutchNumber).padStart(2, "0")}`;
+    }
+
+    return clutchId;
+}
+
+function openClosePairModal(pairId) {
+    const pair = breedingPairs.find(item => item.id === pairId);
+    const modal = document.getElementById("closePairModal");
+    const text = document.getElementById("closePairModalText");
+    const reason = document.getElementById("closePairReasonInput");
+
+    if (!pair || !modal || !text || !reason) {
+        return;
+    }
+
+    const retiredParentText = describeRetiredParents(pair);
+
+    pendingClosePairId = pairId;
+    text.textContent = `${getSnakeLabel(pair.femaleSnakeId || pair.femaleIndex)} x ${getSnakeLabel(pair.maleSnakeId || pair.maleIndex)}${retiredParentText ? ` \u2014 retired parent: ${retiredParentText}.` : ""}`;
+    reason.value = "";
+    modal.style.display = "block";
+    reason.focus();
+}
+
+function closeClosePairModal() {
+    const modal = document.getElementById("closePairModal");
+
+    pendingClosePairId = "";
+
+    if (modal) {
+        modal.style.display = "none";
+    }
+}
+
+function confirmClosePair() {
+    const pairId = pendingClosePairId;
+    const reason = document.getElementById("closePairReasonInput");
+    const reasonText = reason ? reason.value.trim() : "";
+
+    closeClosePairModal();
+
+    if (pairId) {
+        closePair(pairId, reasonText);
+    }
+}
+
+function closePair(pairId, reason = "") {
+    const pair = breedingPairs.find(item => item.id === pairId);
+
+    if (!pair || pair.clutchId || pair.closedAt) {
+        return;
+    }
+
+    const retiredParentText = describeRetiredParents(pair);
+    const typedReason = String(reason || "").trim();
+
+    pair.closedAt = getTodayText();
+    pair.closedReason = typedReason
+        || (retiredParentText ? `Retired parent: ${retiredParentText}` : "Closed manually");
+    saveStorageArray("breedingPairs", breedingPairs);
+    renderBreedingPairs();
+    renderPairHistory();
+}
+
+function reopenPair(pairId) {
+    const pair = breedingPairs.find(item => item.id === pairId);
+
+    if (!pair || pair.clutchId) {
+        return;
+    }
+
+    pair.closedAt = "";
+    pair.closedReason = "";
+    saveStorageArray("breedingPairs", breedingPairs);
+    renderBreedingPairs();
+    renderPairHistory();
 }
 
 function convertPairToClutch(pairId) {
@@ -296,6 +382,7 @@ function convertPairToClutch(pairId) {
     saveStorageArray("clutches", clutches);
     saveStorageArray("breedingPairs", breedingPairs);
     renderBreedingPairs();
+    renderPairHistory();
     renderClutches();
 }
 
@@ -303,21 +390,59 @@ function goToBreedingOutcomes(clutchId) {
     window.location.href = `breedingOutcomes.html#clutch-${encodeURIComponent(clutchId)}`;
 }
 
+function getRetiredParents(pair) {
+    return [
+        window.SnakeData.getSnakeByReference(snakes, pair.femaleSnakeId || pair.femaleIndex),
+        window.SnakeData.getSnakeByReference(snakes, pair.maleSnakeId || pair.maleIndex)
+    ].filter(snake => snake && window.SnakeData.isRetiredSnake(snake));
+}
+
+function describeRetiredParents(pair) {
+    return getRetiredParents(pair)
+        .map(snake => `${snake.name || "Unnamed"} (${snake.status})`)
+        .join(" and ");
+}
+
 function renderBreedingPairs() {
     const list = document.getElementById("breedingPairsList");
+    const activePairs = breedingPairs.filter(pair => !pair.clutchId && !pair.closedAt);
+    const convertedCount = breedingPairs.filter(pair => pair.clutchId).length;
+    const closedCount = breedingPairs.filter(pair => !pair.clutchId && pair.closedAt).length;
+    const historyNote = [
+        convertedCount > 0
+            ? `${convertedCount} converted pair${convertedCount === 1 ? "" : "s"} kept under Clutches`
+            : "",
+        closedCount > 0
+            ? `${closedCount} closed pair${closedCount === 1 ? "" : "s"} kept under Pair History`
+            : ""
+    ].filter(Boolean).join(" \u00b7 ");
 
-    if (breedingPairs.length === 0) {
-        list.innerHTML = `<p class="empty-message">No breeding pairs yet.</p>`;
+    if (activePairs.length === 0) {
+        list.innerHTML = `<p class="empty-message">No active breeding pairs.${historyNote ? ` ${historyNote}.` : ""}</p>`;
         return;
     }
 
-    list.innerHTML = breedingPairs.map(pair => `
+    const historyHtml = historyNote
+        ? `<p class="empty-message">${historyNote}.</p>`
+        : "";
+
+    list.innerHTML = historyHtml + activePairs.map(pair => {
+        const retiredParentText = describeRetiredParents(pair);
+
+        return `
         <div class="breeding-card">
             <div>
                 <h4>${getSnakeLabel(pair.femaleSnakeId || pair.femaleIndex)} x ${getSnakeLabel(pair.maleSnakeId || pair.maleIndex)}</h4>
                 <p>Status: ${getPairStatus(pair)}</p>
                 <p>Pairings: ${getPairings(pair).length || "None recorded"}</p>
             </div>
+
+            ${retiredParentText ? `
+                <p class="pair-warning">
+                    <strong>Retired parent:</strong> ${retiredParentText}. This pair is still
+                    active; close it when it should leave the breeding list.
+                </p>
+            ` : ""}
 
             <div class="breeding-event-list">
                 ${getPairings(pair).length
@@ -379,12 +504,63 @@ function renderBreedingPairs() {
             </div>
 
             <div class="card-buttons">
+                <button type="button" class="archive-button" onclick="openClosePairModal('${pair.id}')">
+                    Close Pair
+                </button>
+
                 <button type="button" class="edit-button" onclick="convertPairToClutch('${pair.id}')">
                     Convert To Clutch
                 </button>
             </div>
         </div>
-    `).join("");
+    `;
+    }).join("");
+}
+
+function renderPairHistory() {
+    const list = document.getElementById("pairHistoryList");
+
+    if (!list) {
+        return;
+    }
+
+    const closedPairs = breedingPairs.filter(pair => !pair.clutchId && pair.closedAt);
+
+    if (closedPairs.length === 0) {
+        list.innerHTML = `<p class="empty-message">No closed pairs yet.</p>`;
+        return;
+    }
+
+    list.innerHTML = closedPairs.map(pair => {
+        const retiredParentText = describeRetiredParents(pair);
+
+        return `
+            <div class="breeding-card closed-pair-card">
+                <div>
+                    <h4>${getSnakeLabel(pair.femaleSnakeId || pair.femaleIndex)} x ${getSnakeLabel(pair.maleSnakeId || pair.maleIndex)}</h4>
+                    <p>Status: Closed${pair.closedAt ? ` on ${pair.closedAt}` : ""}</p>
+                    <p>Reason: ${pair.closedReason || "Not recorded"}</p>
+                    <p>Pairings: ${getPairings(pair).length || "None recorded"}</p>
+
+                    ${retiredParentText ? `
+                        <p class="pair-warning"><strong>Retired parent:</strong> ${retiredParentText}.</p>
+                    ` : ""}
+                </div>
+
+                <div class="card-buttons">
+                    <button type="button" class="edit-button" onclick="reopenPair('${pair.id}')">
+                        Reopen Pair
+                    </button>
+
+                    ${pair.eggsLaidDate ? `
+                        <button type="button" class="archive-button" onclick="convertPairToClutch('${pair.id}')">
+                            Convert To Clutch
+                        </button>
+                    ` : ""}
+                </div>
+            </div>
+        `;
+    }).join("");
 }
 
 function renderClutches() {
@@ -440,10 +616,32 @@ window.updatePairField = updatePairField;
 window.addPairingDate = addPairingDate;
 window.removePairingDate = removePairingDate;
 window.convertPairToClutch = convertPairToClutch;
+window.closePair = closePair;
+window.openClosePairModal = openClosePairModal;
+window.closeClosePairModal = closeClosePairModal;
+window.confirmClosePair = confirmClosePair;
+window.reopenPair = reopenPair;
 window.goToBreedingOutcomes = goToBreedingOutcomes;
+
+const closePairModal = document.getElementById("closePairModal");
+
+if (closePairModal) {
+    closePairModal.addEventListener("click", event => {
+        if (event.target === closePairModal) {
+            closeClosePairModal();
+        }
+    });
+}
+
+document.addEventListener("keydown", event => {
+    if (event.key === "Escape") {
+        closeClosePairModal();
+    }
+});
 
 setupSnakeSelects();
 migrateBreedingReferences();
 ensureClutchTokens();
 renderBreedingPairs();
+renderPairHistory();
 renderClutches();

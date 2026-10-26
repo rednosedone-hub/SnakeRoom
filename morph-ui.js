@@ -23,7 +23,8 @@
     };
 
     function readSnakes() {
-        return window.SnakeData.loadSnakesWithIds([]);
+        return window.SnakeData.loadSnakesWithIds([])
+            .filter(snake => window.SnakeData.isActiveSnake(snake));
     }
 
     function searchGenes(text) {

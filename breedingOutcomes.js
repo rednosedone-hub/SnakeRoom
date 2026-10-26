@@ -396,7 +396,7 @@ function renderHatchlingEditorRow(clutch, row) {
             <label class="form-field">
                 <span>Status</span>
                 <select id="hatchStatus-${token}">
-                    ${["Hatchling", "Holdback", "Breeder", "Available", "On Hold"]
+                    ${["Hatchling", "Holdback", "Breeder", "Available", "On Hold", "Sold", "Archived", "Deceased"]
                         .map(status => `<option value="${status}" ${status === row.status ? "selected" : ""}>${status}</option>`)
                         .join("")}
                 </select>

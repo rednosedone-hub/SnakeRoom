@@ -747,6 +747,29 @@ window.collapseAllSnakeSections = function () {
     setAllSnakeSectionsCollapsed(true);
 };
 
+// The retirement block only exists for the two retired statuses. Filling the
+// date on the first selection saves a step without inventing a date for records
+// that were already archived before this field existed.
+function updateRetirementFields(fillDate = false) {
+    const statusInput = document.getElementById("statusInput");
+    const block = document.getElementById("retirementFields");
+
+    if (!statusInput || !block) {
+        return;
+    }
+
+    const isRetired = window.SnakeData.isRetiredStatus(statusInput.value);
+    block.hidden = !isRetired;
+
+    if (isRetired && fillDate) {
+        const dateInput = document.getElementById("retiredDateInput");
+
+        if (dateInput && !dateInput.value) {
+            dateInput.value = window.getTodayText();
+        }
+    }
+}
+
 function fillFormForEdit() {
     const photoFileInput = document.getElementById("photoFileInput");
 
@@ -766,6 +789,9 @@ function fillFormForEdit() {
 
         document.getElementById("feedingIntervalInput").value = "14";
         document.getElementById("binNumberInput").value = "";
+        document.getElementById("retiredDateInput").value = "";
+        document.getElementById("retiredReasonInput").value = "";
+        document.getElementById("retiredNoteInput").value = "";
         currentGenes = [];
         currentWeightHistory = [];
         currentFeedingHistory = [];
@@ -779,6 +805,7 @@ function fillFormForEdit() {
         renderFeedingHistory({ feedingHistory: [] });
         renderShedHistory({ shedHistory: [] });
         renderFeedingHoldNotice();
+        renderBreedingHistory(null);
         updateFeedingReasonVisibility(document.getElementById("feedingResultInput").value);
         return;
     }
@@ -798,6 +825,9 @@ function fillFormForEdit() {
     document.getElementById("feedingIntervalInput").value = snake.feedingIntervalDays || "7";
     document.getElementById("feederSizeInput").value = snake.feederSize || "";
     document.getElementById("imageInput").value = snake.image || "";
+    document.getElementById("retiredDateInput").value = snake.retiredDate || "";
+    document.getElementById("retiredReasonInput").value = snake.retiredReason || "";
+    document.getElementById("retiredNoteInput").value = snake.retiredNote || "";
 
     currentGenes = Array.isArray(snake.genes) ? [...snake.genes] : [];
     currentWeightHistory = Array.isArray(snake.weightHistory) ? [...snake.weightHistory] : [];
@@ -813,7 +843,337 @@ function fillFormForEdit() {
     renderWeightHistory({ weight: snake.weight, weightHistory: currentWeightHistory });
     renderShedHistory({ shedHistory: currentShedHistory });
     renderFeedingHoldNotice();
+    renderBreedingHistory(snake);
     updateFeedingReasonVisibility(document.getElementById("feedingResultInput").value);
+}
+
+// ---- Breeding history -----------------------------------------------------
+//
+// A record page is where the keeper looks at one animal, so show every pair it
+// has been part of, including closed pairs and pairs already converted to a
+// clutch. A converted pair is still a pair record: it holds the pairing dates,
+// while the clutch owns the egg count and hatch results. Both are listed.
+
+function getBreedingSnake(referenceId, fallbackIndex) {
+    const directMatch = referenceId
+        ? window.SnakeData.getSnakeByReference(snakes, referenceId)
+        : null;
+
+    if (directMatch) {
+        return directMatch;
+    }
+
+    const index = Number(fallbackIndex);
+
+    return Number.isInteger(index) && index >= 0 ? snakes[index] || null : null;
+}
+
+function getBreedingSnakeId(referenceId, fallbackIndex) {
+    const directId = String(referenceId || "").trim();
+    const directMatch = directId
+        ? window.SnakeData.getSnakeByReference(snakes, directId)
+        : null;
+
+    if (directMatch && directMatch.id) {
+        return directMatch.id;
+    }
+
+    const fallbackSnake = getBreedingSnake("", fallbackIndex);
+
+    return fallbackSnake && fallbackSnake.id ? fallbackSnake.id : directId;
+}
+
+function recordIncludesSnake(record, snakeId) {
+    return getBreedingSnakeId(record.femaleSnakeId, record.femaleIndex) === snakeId
+        || getBreedingSnakeId(record.maleSnakeId, record.maleIndex) === snakeId;
+}
+
+function getBreedingPairingDates(record) {
+    const entries = Array.isArray(record.pairings) ? record.pairings : [];
+    const dates = entries
+        .map(entry => typeof entry === "string" ? entry : entry && entry.date)
+        .filter(Boolean);
+
+    if (dates.length === 0 && record.pairingDate) {
+        dates.push(record.pairingDate);
+    }
+
+    return [...new Set(dates)].sort();
+}
+
+function getBreedingPartnerInfo(record, snakeId) {
+    const femaleId = getBreedingSnakeId(record.femaleSnakeId, record.femaleIndex);
+    const isDam = femaleId === snakeId;
+
+    return {
+        role: isDam ? "Dam" : "Sire",
+        partner: isDam
+            ? getBreedingSnake(record.maleSnakeId, record.maleIndex)
+            : getBreedingSnake(record.femaleSnakeId, record.femaleIndex)
+    };
+}
+
+function getBreedingPairStatus(pair) {
+    if (pair.clutchId) {
+        return { key: "converted", label: `Converted to ${pair.clutchId}` };
+    }
+
+    if (pair.closedAt) {
+        return { key: "closed", label: `Closed ${pair.closedAt}` };
+    }
+
+    if (pair.eggsLaidDate) {
+        return { key: "active", label: "Active \u00b7 eggs laid" };
+    }
+
+    if (pair.ovulationObserved || pair.ovulationDate) {
+        return { key: "active", label: "Active \u00b7 ovulated" };
+    }
+
+    return { key: "active", label: "Active" };
+}
+
+function getBreedingPairSortDate(pair) {
+    const pairingDates = getBreedingPairingDates(pair);
+
+    return pair.closedAt
+        || pair.eggsLaidDate
+        || pair.ovulationDate
+        || pair.preLayShedDate
+        || pairingDates[pairingDates.length - 1]
+        || "";
+}
+
+function getClutchSortDate(clutch) {
+    return clutch.hatchedDate || clutch.laidDate || "";
+}
+
+function breedingHistoryFact(label, value) {
+    return `
+        <p class="breeding-history-fact">
+            <span>${escapeMoneyText(label)}</span>
+            <strong>${escapeMoneyText(value || "Not recorded")}</strong>
+        </p>
+    `;
+}
+
+function breedingHistoryPartnerText(info) {
+    const partner = info.partner;
+
+    if (!partner) {
+        return "Unknown snake (no longer in the collection)";
+    }
+
+    return `${partner.name || "Unnamed"} - ${window.SnakeData.getSnakeIdentityText(partner)}`;
+}
+
+function breedingHistoryPairCard(pair, snakeId) {
+    const partnerInfo = getBreedingPartnerInfo(pair, snakeId);
+    const status = getBreedingPairStatus(pair);
+    const pairingDates = getBreedingPairingDates(pair);
+    const partnerRetired = partnerInfo.partner && window.SnakeData.isRetiredSnake(partnerInfo.partner);
+    const facts = [
+        breedingHistoryFact(
+            "Pairings",
+            pairingDates.length > 0
+                ? `${pairingDates.length} (${pairingDates.join(", ")})`
+                : "None recorded"
+        )
+    ];
+
+    if (pair.ovulationObserved || pair.ovulationDate) {
+        facts.push(breedingHistoryFact(
+            "Ovulation",
+            pair.ovulationDate
+                ? `${pair.ovulationObserved ? "Observed \u00b7 " : ""}${pair.ovulationDate}`
+                : "Observed (date not recorded)"
+        ));
+    }
+
+    if (pair.preLayShedDate) {
+        facts.push(breedingHistoryFact("Pre-lay shed", pair.preLayShedDate));
+    }
+
+    if (pair.eggsLaidDate) {
+        facts.push(breedingHistoryFact("Eggs laid", pair.eggsLaidDate));
+    }
+
+    if (pair.eggCount) {
+        facts.push(breedingHistoryFact("Egg count", pair.eggCount));
+    }
+
+    if (pair.closedAt) {
+        facts.push(breedingHistoryFact("Closed on", pair.closedAt));
+        facts.push(breedingHistoryFact("Reason", pair.closedReason || "Not recorded"));
+    }
+
+    const warning = status.key === "active" && partnerRetired
+        ? `
+            <p class="pair-warning">
+                <strong>Partner retired:</strong> ${escapeMoneyText(breedingHistoryPartnerText(partnerInfo))}
+                is ${escapeMoneyText(partnerInfo.partner.status)}. This pair is still marked active.
+            </p>
+        `
+        : "";
+
+    const clutchLink = pair.clutchId
+        ? `
+            <div class="breeding-history-links">
+                <a class="secondary-button small-action-button"
+                    href="breedingOutcomes.html#clutch-${encodeURIComponent(pair.clutchId)}">
+                    View Clutch ${escapeMoneyText(pair.clutchId)}
+                </a>
+            </div>
+        `
+        : "";
+
+    return `
+        <article class="breeding-history-card">
+            <div class="breeding-history-card-header">
+                <div>
+                    <h4>${escapeMoneyText(breedingHistoryPartnerText(partnerInfo))}</h4>
+                    <p class="breeding-history-role">This snake is the ${partnerInfo.role.toLowerCase()}</p>
+                </div>
+                <span class="breeding-history-status is-${status.key}">${escapeMoneyText(status.label)}</span>
+            </div>
+
+            <div class="breeding-history-facts">
+                ${facts.join("")}
+            </div>
+
+            ${warning}
+            ${clutchLink}
+        </article>
+    `;
+}
+
+function breedingHistoryClutchCard(clutch, snakeId) {
+    const partnerInfo = getBreedingPartnerInfo(clutch, snakeId);
+    const isHatched = Boolean(clutch.convertedToSnakes);
+    const statusKey = isHatched ? "converted" : "active";
+    const statusLabel = isHatched ? "Hatched" : "Waiting to hatch";
+    const pairingDates = getBreedingPairingDates(clutch);
+    const offspring = snakes.filter(snake => snake && snake.clutchId === clutch.id);
+    const facts = [
+        breedingHistoryFact("Laid", clutch.laidDate || "Not recorded"),
+        breedingHistoryFact("Egg count", clutch.eggCount || "Not recorded")
+    ];
+
+    if (pairingDates.length > 0) {
+        facts.push(breedingHistoryFact(
+            "Pairings",
+            `${pairingDates.length} (${pairingDates.join(", ")})`
+        ));
+    }
+
+    facts.push(isHatched
+        ? breedingHistoryFact(
+            "Hatched",
+            `${clutch.hatchlingCount || 0} on ${clutch.hatchedDate || "date not recorded"}`
+        )
+        : breedingHistoryFact("Hatched", "Not yet"));
+
+    const offspringText = offspring.length > 0
+        ? `
+            <p class="breeding-history-offspring">
+                <span>Offspring on file:</span>
+                ${offspring.map(snake => escapeMoneyText(
+                    `${snake.name || "Unnamed"} (${window.SnakeData.getSnakeIdentityText(snake)})`
+                )).join(", ")}
+            </p>
+        `
+        : "";
+
+    return `
+        <article class="breeding-history-card">
+            <div class="breeding-history-card-header">
+                <div>
+                    <h4>${escapeMoneyText(clutch.id || "Clutch without an ID")}</h4>
+                    <p class="breeding-history-role">
+                        With ${escapeMoneyText(breedingHistoryPartnerText(partnerInfo))} \u00b7
+                        this snake is the ${partnerInfo.role.toLowerCase()}
+                    </p>
+                </div>
+                <span class="breeding-history-status is-${statusKey}">${statusLabel}</span>
+            </div>
+
+            <div class="breeding-history-facts">
+                ${facts.join("")}
+            </div>
+
+            ${offspringText}
+
+            ${clutch.id ? `
+                <div class="breeding-history-links">
+                    <a class="secondary-button small-action-button"
+                        href="breedingOutcomes.html#clutch-${encodeURIComponent(clutch.id)}">
+                        View Clutch Outcomes
+                    </a>
+                </div>
+            ` : ""}
+        </article>
+    `;
+}
+
+function renderBreedingHistory(snake) {
+    const section = document.getElementById("breedingHistorySection");
+    const summary = document.getElementById("breedingHistorySummary");
+    const list = document.getElementById("breedingHistoryList");
+
+    if (!section || !summary || !list) {
+        return;
+    }
+
+    if (!snake || !snake.id) {
+        section.hidden = true;
+        return;
+    }
+
+    section.hidden = false;
+
+    const pairs = window.SnakeData.readStorageArray("breedingPairs", [])
+        .filter(pair => pair && recordIncludesSnake(pair, snake.id))
+        .sort((a, b) => getBreedingPairSortDate(b).localeCompare(getBreedingPairSortDate(a)));
+    const clutches = window.SnakeData.readStorageArray("clutches", [])
+        .filter(clutch => clutch && recordIncludesSnake(clutch, snake.id))
+        .sort((a, b) => getClutchSortDate(b).localeCompare(getClutchSortDate(a)));
+
+    summary.innerHTML = `
+        <span class="history-count">
+            ${pairs.length} pair record${pairs.length === 1 ? "" : "s"} \u00b7
+            ${clutches.length} clutch${clutches.length === 1 ? "" : "es"}
+        </span>
+        <a class="secondary-button small-action-button" href="breeding.html">Open Breeding</a>
+    `;
+
+    if (pairs.length === 0 && clutches.length === 0) {
+        list.innerHTML = `
+            <p class="empty-message">
+                No breeding pairs or clutches are linked to this snake yet. Pairs and
+                clutches recorded on the <a href="breeding.html">Breeding page</a> will
+                appear here.
+            </p>
+        `;
+        return;
+    }
+
+    const pairsHtml = pairs.length > 0
+        ? pairs.map(pair => breedingHistoryPairCard(pair, snake.id)).join("")
+        : `<p class="empty-message">No pair records on file for this snake.</p>`;
+    const clutchesHtml = clutches.length > 0
+        ? clutches.map(clutch => breedingHistoryClutchCard(clutch, snake.id)).join("")
+        : `<p class="empty-message">No clutches on file for this snake.</p>`;
+
+    list.innerHTML = `
+        <div class="breeding-history-group">
+            <h4 class="breeding-history-group-title">Pairs</h4>
+            ${pairsHtml}
+        </div>
+        <div class="breeding-history-group">
+            <h4 class="breeding-history-group-title">Clutches</h4>
+            ${clutchesHtml}
+        </div>
+    `;
 }
 
 function getCurrentWeightHistory() {
@@ -1707,9 +2067,12 @@ function initMoneySection() {
                 saleDate.value = `${today.getFullYear()}-${month}-${day}`;
             }
 
+            updateRetirementFields(true);
             updateMoneySummary();
         });
     }
+
+    updateRetirementFields(false);
 }
 
 function saveSnakeFromPage() {
@@ -1733,6 +2096,8 @@ function saveSnakeFromPage() {
     const existingSnake = editingIndex !== null && snakes[editingIndex]
         ? snakes[editingIndex]
         : {};
+    const status = document.getElementById("statusInput").value;
+    const isRetired = window.SnakeData.isRetiredStatus(status);
 
     const source = document.getElementById("acquisitionSourceInput").value;
     const sireId = document.getElementById("sireInput").value;
@@ -1757,7 +2122,14 @@ function saveSnakeFromPage() {
         shedHistory: [...getCurrentShedHistory()],
         hatchDate: document.getElementById("hatchDateInput").value,
         acquiredDate: document.getElementById("acquiredDateInput").value,
-        status: document.getElementById("statusInput").value,
+        status,
+        retiredDate: isRetired ? document.getElementById("retiredDateInput").value : "",
+        retiredReason: isRetired ? document.getElementById("retiredReasonInput").value.trim() : "",
+        retiredNote: isRetired ? document.getElementById("retiredNoteInput").value.trim() : "",
+        retiredFromStatus: isRetired
+            ? (existingSnake.retiredFromStatus
+                || (existingSnake.status && existingSnake.status !== status ? existingSnake.status : ""))
+            : "",
         genes: currentGenes,
         acquisitionSource: source,
         purchasedFrom: source === "produced"
@@ -1820,6 +2192,7 @@ window.removeGene = removeGene;
 window.updateImagePreview = updateImagePreview;
 window.updateAcquisitionFields = updateAcquisitionFields;
 window.updateMoneySummary = updateMoneySummary;
+window.updateRetirementFields = updateRetirementFields;
 window.addWeightHistoryEntry = addWeightHistoryEntry;
 window.addFeedingHistoryEntry = addFeedingHistoryEntry;
 window.updateFeedingReasonVisibility = updateFeedingReasonVisibility;
