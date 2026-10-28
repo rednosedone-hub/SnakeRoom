@@ -12,6 +12,7 @@
     let expenses = [];
     let forecast = null;
     let linesInitialized = false;
+    let printCleanupTimer = null;
 
     function $(id) {
         return document.getElementById(id);
@@ -375,7 +376,7 @@
         $("feederKpiFeedings").textContent = String(totals.feedings);
         $("feederKpiFeedingsNote").textContent = totals.feedings === 0
             ? "Nothing scheduled in this window."
-            : `Across ${totals.sizes} feeder size${totals.sizes === 1 ? "" : "s"} in ${forecast.horizonDays} days.`;
+            : `From ${totals.snakes} scheduled snake${totals.snakes === 1 ? "" : "s"} and ${totals.sizes} size${totals.sizes === 1 ? "" : "s"} in ${forecast.horizonDays} days. Each snake is counted once per feeding interval.`;
 
         if (next) {
             const sizesThatDay = [...new Set(forecast.events
@@ -506,9 +507,17 @@
         const empty = $("feederPlanEmpty");
         const events = forecast.events;
 
-        $("feederPlanLead").textContent = forecast.mode === "live"
-            ? "Every live meal inside the forecast window, grouped by feeding day. Buy the quantity shown for that day."
-            : "Every meal inside the forecast window, grouped by feeding day. These are the meals that count down freezer stock.";
+        const mealCount = forecast.totals.feedings;
+        const snakeCount = forecast.totals.snakes;
+
+        $("feederPlanLead").textContent = mealCount === 0
+            ? (forecast.mode === "live"
+                ? "Every live meal inside the forecast window will be grouped here by feeding day."
+                : "Every meal inside the forecast window will be grouped here by feeding day.")
+            : `${mealCount} meal${mealCount === 1 ? "" : "s"} across ${snakeCount} scheduled snake${snakeCount === 1 ? "" : "s"} in this window, grouped by feeding day. `
+                + (forecast.mode === "live"
+                    ? "Buy the quantity shown for that day."
+                    : "These are the meals that count down freezer stock.");
 
         if (events.length === 0) {
             container.innerHTML = "";
@@ -560,6 +569,285 @@
         }).join("") + (dayList.length > visible.length
             ? `<p class="empty-message">Showing the first ${visible.length} of ${dayList.length} feeding days in this window.</p>`
             : "");
+    }
+
+    // ---- Shopping list -----------------------------------------------------
+
+    function getFeederPrice(size) {
+        if (!F || typeof F.getSettings !== "function") {
+            return 0;
+        }
+
+        const prices = F.getSettings().feederPrices || {};
+        const clean = String(size || "").toLowerCase();
+        const key = Object.keys(prices).find(name => name.toLowerCase() === clean);
+
+        return key ? F.toMoney(prices[key]) : 0;
+    }
+
+    function getShoppingItems() {
+        return forecast.sizes
+            .filter(size => size.suggestedOrder > 0
+                && (forecast.mode === "live" ? size.status === "order" : size.status !== "ok"))
+            .sort((a, b) => a.size.localeCompare(b.size))
+            .map(size => {
+                const price = getFeederPrice(size.size);
+                let when = "";
+
+                if (forecast.mode === "live") {
+                    when = `For ${formatShortDate(size.nextDate)}`;
+                } else if (size.status === "order") {
+                    when = "Order now";
+                } else if (size.orderByDate) {
+                    when = `Order by ${formatShortDate(size.orderByDate)}`;
+                } else {
+                    when = `Keep at least ${size.keepAtLeast}`;
+                }
+
+                return {
+                    size: size.size,
+                    quantity: size.suggestedOrder,
+                    when,
+                    cost: Math.round(price * size.suggestedOrder * 100) / 100
+                };
+            });
+    }
+
+    function renderShoppingList() {
+        const list = $("feederShoppingList");
+        const empty = $("feederShoppingEmpty");
+        const note = $("feederShoppingNote");
+        const totalLine = $("feederShoppingTotal");
+        const copyButton = $("copyFeederShoppingListButton");
+        const printButton = $("printFeederShoppingListButton");
+
+        if (!list || !empty || !note || !copyButton) {
+            return;
+        }
+
+        const items = getShoppingItems();
+        const pricedItems = items.filter(item => item.cost > 0);
+        const total = pricedItems.reduce((sum, item) => sum + item.cost, 0);
+
+        note.textContent = forecast.mode === "live"
+            ? "Live feeders are bought for the feeding day. Copy the quantities below and take the list with you."
+            : "Quantities cover the forecast window plus your keep-at-least buffer. Copy the list for a supplier.";
+
+        copyButton.disabled = items.length === 0;
+        copyButton.title = forecast.mode === "live" ? "Copy live feeding list" : "Copy feeder shopping list";
+
+        if (printButton) {
+            printButton.disabled = items.length === 0;
+            printButton.title = forecast.mode === "live" ? "Print live feeding list" : "Print feeder shopping list";
+        }
+
+        renderPrintSheet(items);
+
+        if (items.length === 0) {
+            list.innerHTML = "";
+            empty.style.display = "";
+            empty.textContent = forecast.mode === "live"
+                ? "No live feeders are needed for the next feeding day."
+                : "Nothing to buy right now. Freezer stock covers the forecast window.";
+            totalLine.textContent = "";
+            totalLine.style.display = "none";
+            return;
+        }
+
+        empty.style.display = "none";
+        list.innerHTML = items.map(item => `
+            <li class="feeder-shopping-item">
+                <span class="feeder-shopping-qty">${item.quantity}&times;</span>
+                <span class="feeder-shopping-size">${escapeHtml(item.size)}</span>
+                <span class="feeder-shopping-when">${escapeHtml(item.when)}</span>
+                <span class="feeder-shopping-cost">${item.cost > 0 ? formatMoney(item.cost) : ""}</span>
+            </li>
+        `).join("");
+
+        if (pricedItems.length > 0) {
+            totalLine.textContent = `Estimated cost${pricedItems.length < items.length ? " for priced sizes" : ""}: ${formatMoney(total)}`;
+            totalLine.style.display = "";
+        } else {
+            totalLine.textContent = "";
+            totalLine.style.display = "none";
+        }
+    }
+
+    // The print sheet is a separate body child, so printing the list never
+    // depends on the dark app layout. It is hidden on screen and only the
+    // Print button reveals it through the body class below.
+    function renderPrintSheet(items) {
+        const sheet = $("feederPrintSheet");
+
+        if (!sheet) {
+            return;
+        }
+
+        if (items.length === 0) {
+            sheet.innerHTML = "";
+            return;
+        }
+
+        const isLive = forecast.mode === "live";
+        const pricedItems = items.filter(item => item.cost > 0);
+        const hasPrices = pricedItems.length > 0;
+        const pricedTotal = pricedItems.reduce((sum, item) => sum + item.cost, 0);
+        const title = isLive ? "Live Feeding List" : "Feeder Shopping List";
+        const priceNote = hasPrices && pricedItems.length < items.length
+            ? " Estimated cost covers priced sizes only."
+            : "";
+
+        sheet.innerHTML = `
+            <header class="feeder-print-head">
+                <h1>${title}</h1>
+                <p>${formatDate(forecast.today)} \u00b7 The Snake Room</p>
+            </header>
+
+            <table class="feeder-print-table">
+                <thead>
+                    <tr>
+                        <th class="feeder-print-checkcol"></th>
+                        <th>Qty</th>
+                        <th>Feeder size</th>
+                        <th>${isLive ? "Feed day" : "Order by"}</th>
+                        ${hasPrices ? "<th class=\"feeder-print-cost\">Est.</th>" : ""}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${items.map(item => `
+                        <tr>
+                            <td class="feeder-print-checkcell"><span class="feeder-print-check"></span></td>
+                            <td class="feeder-print-qty">${item.quantity}&times;</td>
+                            <td>${escapeHtml(item.size)}</td>
+                            <td>${escapeHtml(item.when)}</td>
+                            ${hasPrices ? `<td class="feeder-print-cost">${item.cost > 0 ? formatMoney(item.cost) : ""}</td>` : ""}
+                        </tr>
+                    `).join("")}
+                </tbody>
+                ${hasPrices ? `
+                    <tfoot>
+                        <tr class="feeder-print-total">
+                            <td></td>
+                            <td colspan="3">Estimated cost</td>
+                            <td class="feeder-print-cost">${formatMoney(pricedTotal)}</td>
+                        </tr>
+                    </tfoot>
+                ` : ""}
+            </table>
+
+            <p class="feeder-print-note">
+                ${isLive
+                    ? "Buy fresh; live feeders are not stocked."
+                    : "Quantities cover the forecast window and your keep-at-least buffer."}
+                ${priceNote}
+            </p>
+
+            <div class="feeder-print-lines">
+                <p><span>Supplier:</span><span class="feeder-print-blank"></span></p>
+                <p><span>Order date:</span><span class="feeder-print-blank"></span></p>
+                <p><span>Notes:</span><span class="feeder-print-blank"></span></p>
+            </div>
+        `;
+    }
+
+    function printShoppingList() {
+        const items = getShoppingItems();
+
+        if (items.length === 0) {
+            return;
+        }
+
+        renderPrintSheet(items);
+        document.body.classList.add("printing-feeder-list");
+
+        const cleanup = () => {
+            document.body.classList.remove("printing-feeder-list");
+            window.clearTimeout(printCleanupTimer);
+        };
+
+        window.addEventListener("afterprint", cleanup, { once: true });
+
+        try {
+            window.print();
+        } finally {
+            printCleanupTimer = window.setTimeout(cleanup, 2000);
+        }
+    }
+
+    function buildShoppingListText() {
+        const items = getShoppingItems();
+
+        if (items.length === 0) {
+            return "";
+        }
+
+        const lines = [
+            `${forecast.mode === "live" ? "Live feeding list" : "Feeder shopping list"} — ${formatDate(forecast.today)}`
+        ];
+        let hasCost = false;
+
+        items.forEach(item => {
+            const costPart = item.cost > 0 ? ` — ${formatMoney(item.cost)}` : "";
+
+            if (item.cost > 0) {
+                hasCost = true;
+            }
+
+            lines.push(`${item.quantity} × ${item.size} — ${item.when}${costPart}`);
+        });
+
+        if (hasCost) {
+            const total = items.reduce((sum, item) => sum + item.cost, 0);
+
+            lines.push(`Estimated cost: ${formatMoney(total)}`);
+        }
+
+        return lines.join("\n");
+    }
+
+    async function copyTextToClipboard(value) {
+        try {
+            if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+                await navigator.clipboard.writeText(value);
+                return true;
+            }
+        } catch (error) {
+            // Fall through to the textarea copy below.
+        }
+
+        try {
+            const area = document.createElement("textarea");
+
+            area.value = value;
+            area.setAttribute("readonly", "");
+            area.style.position = "fixed";
+            area.style.opacity = "0";
+            document.body.appendChild(area);
+            area.select();
+            const copied = document.execCommand("copy");
+
+            area.remove();
+
+            return copied;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    async function copyShoppingList() {
+        const text = buildShoppingListText();
+
+        if (!text) {
+            return;
+        }
+
+        const copied = await copyTextToClipboard(text);
+
+        setStatus(
+            "feederShoppingStatus",
+            copied ? "List copied to the clipboard." : "Could not copy automatically. Select the list text and copy it.",
+            !copied
+        );
     }
 
     // ---- Orders ------------------------------------------------------------
@@ -747,6 +1035,7 @@
         renderSettings();
         renderMode();
         renderForecast();
+        renderShoppingList();
         renderStock();
         renderPlan();
         renderSizeOptions();
@@ -789,6 +1078,8 @@
         });
 
         $("saveFeederStockButton").addEventListener("click", saveStock);
+        $("copyFeederShoppingListButton").addEventListener("click", copyShoppingList);
+        $("printFeederShoppingListButton").addEventListener("click", printShoppingList);
 
         $("addFeederOrderLineButton").addEventListener("click", () => addOrderLine());
 

@@ -55,6 +55,49 @@ function renderFinanceSummary(snakes) {
     );
 }
 
+let feederWatchMessage = "";
+let feederWatchMessageTimer = null;
+
+function bindFeederWatchActions() {
+    const list = document.getElementById("feederWatchList");
+
+    if (!list || list.dataset.stockBound === "true") {
+        return;
+    }
+
+    list.dataset.stockBound = "true";
+    list.addEventListener("click", event => {
+        const button = event.target.closest("[data-stock-size]");
+
+        if (!button) {
+            return;
+        }
+
+        const size = button.getAttribute("data-stock-size");
+        const quantity = parseInt(button.getAttribute("data-stock-quantity"), 10);
+
+        if (!size || !quantity || !window.SnakeFeeders) {
+            return;
+        }
+
+        window.SnakeFeeders.addStock(size, quantity);
+        feederWatchMessage = `Added ${quantity} ${size} to freezer stock.`;
+        renderFeederWatch(window.SnakeData.loadSnakesWithIds(window.SnakeData.defaultSnakes)
+            .filter(snake => window.SnakeData.isActiveSnake(snake)));
+
+        window.clearTimeout(feederWatchMessageTimer);
+        feederWatchMessageTimer = window.setTimeout(() => {
+            feederWatchMessage = "";
+
+            const status = document.getElementById("feederWatchStatus");
+
+            if (status) {
+                status.textContent = "";
+            }
+        }, 6000);
+    });
+}
+
 function getFeederSummary(snakes) {
     const counts = {};
 
@@ -147,6 +190,130 @@ function renderHealthWatch(snakes) {
     }).join("");
 }
 
+// ---- Feeder watch ----------------------------------------------------------
+//
+// The feeding list says who eats next; this says whether there is food for it.
+// Frozen stock is judged against the forecast; live feeding has nothing to
+// count, so the alert is the next feeding day's order instead.
+
+function formatFeederWatchDate(forecast, value) {
+    const days = window.SnakeFeeders.daysBetween(forecast.today, value);
+
+    return days === null ? "" : window.formatFeedDayText(days);
+}
+
+function renderFeederWatch(snakes) {
+    const list = document.getElementById("feederWatchList");
+    const lead = document.getElementById("feederWatchLead");
+    const countBadge = document.getElementById("feederWatchCount");
+    const status = document.getElementById("feederWatchStatus");
+
+    if (!list || !lead || !countBadge) {
+        return;
+    }
+
+    bindFeederWatchActions();
+
+    if (status) {
+        status.textContent = feederWatchMessage;
+    }
+
+    if (!window.SnakeFeeders) {
+        lead.textContent = "Feeder helpers did not load.";
+        list.innerHTML = "";
+        countBadge.textContent = "";
+        countBadge.classList.remove("visible");
+        return;
+    }
+
+    const forecast = window.SnakeFeeders.buildForecast({
+        snakes,
+        settings: window.SnakeFeeders.getSettings(),
+        inventory: window.SnakeFeeders.getInventory()
+    });
+    const isLive = forecast.mode === "live";
+    const attention = forecast.sizes.filter(size => size.suggestedOrder > 0
+        && (isLive ? size.status === "order" : size.status !== "ok"));
+    const urgent = attention.filter(size => size.status === "order");
+    const watch = attention.filter(size => size.status === "watch");
+
+    countBadge.textContent = String(attention.length);
+    countBadge.classList.toggle("visible", attention.length > 0);
+    countBadge.title = attention.length === 1
+        ? "1 feeder size needs attention"
+        : `${attention.length} feeder sizes need attention`;
+
+    if (isLive) {
+        lead.textContent = attention.length > 0
+            ? `Live feeders: buy for the next feeding day (${attention.length} size${attention.length === 1 ? "" : "s"}).`
+            : (forecast.events.length > 0
+                ? `No live order needed yet. Next feeding ${formatFeederWatchDate(forecast, forecast.events[0].date)}.`
+                : "No live feedings scheduled. Give a snake a feeder size and a last-fed date to forecast one.");
+
+        if (attention.length === 0) {
+            list.innerHTML = `<p class="empty-message">Nothing needs buying for the next feeding day.</p>`;
+            return;
+        }
+
+        list.innerHTML = attention.map(size => `
+            <div class="dashboard-list-item feeder-watch-item is-urgent">
+                <strong>${escapeHtml(size.size)}</strong>
+                <span>${size.nextCount} needed</span>
+                <span>Buy fresh</span>
+                <span>For ${escapeHtml(formatFeederWatchDate(forecast, size.nextDate))} \u00b7 ${size.need} meal${size.need === 1 ? "" : "s"} in ${forecast.horizonDays} days</span>
+            </div>
+        `).join("");
+        return;
+    }
+
+    if (urgent.length > 0 && watch.length > 0) {
+        lead.textContent = `Order ${urgent.length} size${urgent.length === 1 ? "" : "s"} now; ${watch.length} more will run low in the next ${forecast.horizonDays} days.`;
+    } else if (urgent.length > 0) {
+        lead.textContent = `Order ${urgent.length} size${urgent.length === 1 ? "" : "s"} now to keep the feeding schedule covered.`;
+    } else if (watch.length > 0) {
+        lead.textContent = `${watch.length} size${watch.length === 1 ? " is" : "s are"} running low in the next ${forecast.horizonDays} days.`;
+    } else if (forecast.totals.onHand > 0) {
+        lead.textContent = `Freezer stock covers the next ${forecast.horizonDays} days of feedings.`;
+    } else {
+        lead.textContent = "No freezer stock recorded yet. Set what is on hand, or log a frozen order, on the Feeders page.";
+    }
+
+    if (attention.length === 0) {
+        list.innerHTML = `<p class="empty-message">Nothing needs ordering right now.</p>`;
+        return;
+    }
+
+    list.innerHTML = attention.map(size => {
+        const isUrgent = size.status === "order";
+        const action = `<span class="feeder-watch-action"><button type="button" class="feeder-stock-in-button" data-stock-size="${escapeHtml(size.size)}" data-stock-quantity="${size.suggestedOrder}" title="Add ${size.suggestedOrder} ${escapeHtml(size.size)} to freezer stock">Stock in ${size.suggestedOrder}</button></span>`;
+        const stockLine = `${size.onHand} on hand${size.keepAtLeast > 0 ? ` \u00b7 keep ${size.keepAtLeast}` : ""}`;
+        const timingParts = [];
+
+        if (isUrgent) {
+            timingParts.push("Order now");
+        } else if (size.orderByDate) {
+            timingParts.push(`Order by ${formatFeederWatchDate(forecast, size.orderByDate)}`);
+        }
+
+        if (size.runsOutDate) {
+            timingParts.push(`runs out ${formatFeederWatchDate(forecast, size.runsOutDate)}`);
+        } else if (!isUrgent) {
+            timingParts.push(`below the ${size.keepAtLeast} buffer`);
+        }
+
+        timingParts.push(`${size.need} needed in ${forecast.horizonDays} days`);
+
+        return `
+            <div class="dashboard-list-item feeder-watch-item${isUrgent ? " is-urgent" : ""}">
+                <strong>${escapeHtml(size.size)}</strong>
+                <span>${escapeHtml(stockLine)}</span>
+                ${action}
+                <span>${escapeHtml(timingParts.join(" \u00b7 "))}</span>
+            </div>
+        `;
+    }).join("");
+}
+
 function renderDashboard() {
     const snakes = window.SnakeData.loadSnakesWithIds(window.SnakeData.defaultSnakes);
     const activeSnakes = snakes.filter(snake => window.SnakeData.isActiveSnake(snake));
@@ -180,6 +347,7 @@ function renderDashboard() {
     const convertedClutches = clutches.length - activeClutches;
 
     renderFinanceSummary(snakes);
+    renderFeederWatch(activeSnakes);
     renderHealthWatch(activeSnakes);
 
     setText("totalSnakes", activeSnakes.length);

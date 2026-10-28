@@ -153,6 +153,7 @@ test("an overdue snake is counted from today, not from a pile of missed meals", 
     assert.equal(sizes.events[0].date, TODAY);
     assert.equal(sizes.events[1].date, "2026-11-03");
     assert.ok(sizes.events.length <= 6);
+    assert.equal(result.endDate, "2026-11-25");
 });
 
 test("animals without a size or a feeding date are reported, not guessed", () => {
@@ -169,6 +170,41 @@ test("animals without a size or a feeding date are reported, not guessed", () =>
     assert.equal(result.skipped.inactive, 1);
     assert.equal(result.events.length, 0);
     assert.equal(result.sizes.length, 0);
+});
+
+test("meal totals also report how many snakes they came from", () => {
+    const result = feeders.buildForecast({
+        snakes: [
+            snake({ id: "a", name: "A" }),
+            snake({ id: "b", name: "B", feederSize: "Rat Pup", lastFed: "2026-10-25" })
+        ],
+        inventory: [],
+        settings: inventory({ horizonDays: 14 }),
+        today: TODAY
+    });
+
+    // A 14-day window is today plus the next 13 days: 27 Oct to 9 Nov.
+    // A gets 27 Oct and 3 Nov; B gets 1 and 8 Nov.
+    assert.equal(result.totals.feedings, 4);
+    assert.equal(result.totals.snakes, 2);
+    assert.equal(result.totals.sizes, 2);
+});
+
+test("a two-week window is fourteen days, not fifteen", () => {
+    const result = forecastFor(
+        [
+            snake({ id: "a", name: "A", lastFed: "2026-10-13", feedingIntervalDays: "14" }),
+            snake({ id: "b", name: "B", feederSize: "Rat Pup", lastFed: "2026-10-13", feedingIntervalDays: "14" })
+        ],
+        [],
+        inventory({ horizonDays: 14 })
+    );
+
+    assert.equal(result.endDate, "2026-11-09");
+    // Both are due today and next on 10 Nov, outside the window, so two snakes
+    // fed every two weeks mean two meals in a two-week window.
+    assert.equal(result.totals.feedings, 2);
+    assert.equal(result.totals.snakes, 2);
 });
 
 test("a missing feeding interval falls back to weekly", () => {

@@ -4596,3 +4596,256 @@ body.has-sync-banner .collection-notice {
         justify-self: start;
     }
 }
+
+/* Home feeder watch
+   -------------------------------------------------------------------------
+   Reuses the dashboard row grid: size, stock, action, then the timing line
+   across the full row. Only the count badge and the urgent border are new. */
+
+.feeder-watch-count {
+    display: none;
+    margin-left: 8px;
+    padding: 1px 9px;
+    border-radius: 999px;
+    background-color: #c0392b;
+    color: var(--gold-color);
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 16px;
+    font-weight: normal;
+    vertical-align: middle;
+}
+
+.feeder-watch-count.visible {
+    display: inline-block;
+}
+
+.feeder-watch-item {
+    flex: 1 1 420px;
+}
+
+.feeder-watch-item.is-urgent {
+    border-color: #c0392b;
+}
+
+@media (max-width: 700px) {
+    .feeder-watch-item {
+        grid-template-columns: 1fr;
+        gap: 4px;
+    }
+
+    .feeder-watch-item > span:last-child {
+        grid-column: auto;
+    }
+}
+
+/* Feeder shopping list
+   -------------------------------------------------------------------------
+   One line per size, with the quantity first for quick reading in a shop. */
+
+.feeder-shopping-list {
+    display: grid;
+    gap: 8px;
+    margin: 16px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.feeder-shopping-item {
+    display: grid;
+    grid-template-columns: 64px minmax(120px, 1fr) minmax(170px, auto) 100px;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 12px;
+    border: 1px solid #4a4128;
+    border-radius: 8px;
+    background-color: #0d0b07;
+}
+
+.feeder-shopping-qty {
+    color: var(--gold-color);
+    font-size: 22px;
+    font-weight: bold;
+}
+
+.feeder-shopping-size {
+    color: var(--text-color);
+    font-size: 16px;
+}
+
+.feeder-shopping-when {
+    color: var(--text-color);
+    font-size: 13px;
+    opacity: 0.8;
+}
+
+.feeder-shopping-cost {
+    color: var(--gold-color);
+    font-size: 15px;
+    text-align: right;
+}
+
+@media (max-width: 700px) {
+    .feeder-shopping-item {
+        grid-template-columns: 54px 1fr;
+        gap: 4px 10px;
+    }
+
+    .feeder-shopping-when {
+        grid-column: 1 / -1;
+    }
+
+    .feeder-shopping-cost {
+        justify-self: start;
+        text-align: left;
+    }
+}
+
+.feeder-watch-action {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.feeder-stock-in-button {
+    padding: 5px 10px;
+    border: 1px solid var(--gold-color);
+    border-radius: 6px;
+    background-color: transparent;
+    color: var(--gold-color);
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.feeder-stock-in-button:hover {
+    background-color: var(--gold-color);
+    color: var(--black-color);
+}
+
+@media (max-width: 700px) {
+    .feeder-watch-action {
+        justify-content: flex-start;
+    }
+}
+
+/* Printable feeder shopping list
+   -------------------------------------------------------------------------
+   A separate body child rather than the dark app page, so the printed sheet
+   is black on white. It is hidden on screen until the Print button adds the
+   printing-feeder-list class and opens the browser print dialog. */
+
+.feeder-print-sheet {
+    display: none;
+    color: #000;
+    background: #fff;
+    font-family: 'Times New Roman', Times, serif;
+}
+
+.feeder-print-head h1 {
+    margin: 0 0 4pt;
+    color: #000;
+    font-family: 'CloisterBlack', serif;
+    font-size: 28pt;
+}
+
+.feeder-print-head p {
+    margin: 0 0 18pt;
+    color: #444;
+    font-size: 11pt;
+}
+
+.feeder-print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12pt;
+}
+
+.feeder-print-table th,
+.feeder-print-table td {
+    padding: 7pt 5pt;
+    border-bottom: 1px solid #999;
+    color: #000;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.feeder-print-table th {
+    border-bottom: 2px solid #000;
+    background: #f0f0f0;
+    font-size: 9pt;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.feeder-print-checkcol,
+.feeder-print-checkcell {
+    width: 26pt;
+}
+
+.feeder-print-check {
+    display: inline-block;
+    width: 16pt;
+    height: 16pt;
+    border: 1.5pt solid #000;
+    vertical-align: middle;
+}
+
+.feeder-print-qty {
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.feeder-print-cost {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.feeder-print-total td {
+    border-top: 2px solid #000;
+    border-bottom: none;
+    font-weight: bold;
+}
+
+.feeder-print-note {
+    margin: 12pt 0 0;
+    color: #333;
+    font-size: 10pt;
+}
+
+.feeder-print-lines {
+    margin-top: 30pt;
+    font-size: 12pt;
+}
+
+.feeder-print-lines p {
+    display: flex;
+    align-items: baseline;
+    gap: 8pt;
+    margin: 12pt 0;
+}
+
+.feeder-print-blank {
+    flex: 1;
+    height: 1em;
+    border-bottom: 1px solid #000;
+}
+
+@media print {
+    @page {
+        size: letter;
+        margin: 0.5in;
+    }
+
+    body.printing-feeder-list {
+        margin: 0;
+        background: #fff;
+    }
+
+    body.printing-feeder-list > *:not(#feederPrintSheet) {
+        display: none !important;
+    }
+
+    body.printing-feeder-list #feederPrintSheet {
+        display: block !important;
+    }
+}

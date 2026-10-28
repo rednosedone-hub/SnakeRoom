@@ -434,7 +434,10 @@
         const today = parseDate(opts.today) ? dateText(parseDate(opts.today)) : todayText();
         const todayDate = parseDate(today);
         const horizonDays = settings.horizonDays;
-        const endDate = addDays(todayDate, horizonDays);
+        // "Next 14 days" means today plus the following 13 days, not 15
+        // calendar dates. Counting the final day twice is what made a
+        // two-week schedule look like more meals than snakes.
+        const endDate = addDays(todayDate, Math.max(0, horizonDays - 1));
         const events = [];
         const skipped = {
             inactive: 0,
@@ -660,6 +663,7 @@
 
         const orderSizes = sizes.filter(size => size.status === "order");
         const watchSizes = sizes.filter(size => size.status === "watch");
+        const scheduledSnakes = new Set(plan.events.map(event => event.snakeId || event.snakeName));
 
         return {
             mode,
@@ -673,6 +677,7 @@
             skipped: plan.skipped,
             totals: {
                 feedings: plan.events.length,
+                snakes: scheduledSnakes.size,
                 sizes: sizes.length,
                 toOrder: orderSizes.length,
                 watch: watchSizes.length,

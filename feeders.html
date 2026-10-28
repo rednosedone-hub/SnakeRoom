@@ -75,7 +75,7 @@
                 </div>
 
                 <div class="fin-kpi">
-                    <span class="fin-kpi-label">Feedings planned</span>
+                    <span class="fin-kpi-label">Meals planned</span>
                     <strong class="fin-kpi-value" id="feederKpiFeedings">0</strong>
                     <span class="fin-kpi-note" id="feederKpiFeedingsNote"></span>
                 </div>
@@ -102,6 +102,24 @@
 
             <p class="empty-message" id="feederForecastEmpty"></p>
             <div class="feeder-notes" id="feederForecastNotes"></div>
+        </section>
+
+        <section class="form-section" id="feederShoppingSection">
+            <div class="section-heading-row">
+                <h3>Shopping list</h3>
+
+                <div class="fin-actions">
+                    <button type="button" class="secondary-button" id="printFeederShoppingListButton" title="Print shopping list">Print</button>
+                    <button type="button" class="secondary-button" id="copyFeederShoppingListButton" title="Copy shopping list">Copy List</button>
+                </div>
+            </div>
+
+            <p class="empty-message" id="feederShoppingNote"></p>
+
+            <ul class="feeder-shopping-list" id="feederShoppingList"></ul>
+            <p class="fin-subtotal" id="feederShoppingTotal"></p>
+            <p class="empty-message" id="feederShoppingEmpty"></p>
+            <p class="fin-status" id="feederShoppingStatus" role="status"></p>
         </section>
 
         <section class="form-section" id="feederStockSection">
@@ -212,6 +230,8 @@
             <p class="empty-message" id="feederOrderEmpty">No feeder orders recorded yet.</p>
         </section>
     </div>
+
+    <section class="feeder-print-sheet" id="feederPrintSheet" aria-hidden="true"></section>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
