@@ -156,7 +156,7 @@ function updateGeneButtons() {
     }
 
     if (gene.type === "recessive") {
-        geneHelp.textContent = `${gene.name} is recessive. Add Het for a proven carrier, 66% Het or 50% Het while it is still unproven, or Visual for two copies.`;
+        geneHelp.textContent = `${gene.name} is recessive. Add Het for a proven carrier, 66% Het or 50% Het while it is still unproven; a plain Add is the visual form.`;
         geneButtonRow.innerHTML = `
             <button type="button" class="gene-action-button" onclick="addGene('het')">
                 Add Het
@@ -168,7 +168,7 @@ function updateGeneButtons() {
                 Add 50% Het
             </button>
             <button type="button" class="gene-action-button" onclick="addGene('visual')">
-                Add Visual
+                Add
             </button>
         `;
         return;

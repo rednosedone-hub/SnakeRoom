@@ -151,8 +151,11 @@ function describeGene(geneRecord) {
     const type = gene ? gene.type : geneRecord.type;
 
     if (type === "recessive") {
+        // A recessive with no het tag is visual: the bare gene name is enough.
+        // Only carriers need the extra label, so "Clown" means a visual and
+        // "100% Het Clown" / "66% Het Clown" mean a carrier.
         if (geneRecord.copies === 2) {
-            return `${geneRecord.name} Visual`;
+            return geneRecord.name;
         }
 
         const possibleHetLabel = getPossibleHetLabel(geneRecord);
