@@ -238,6 +238,7 @@ function markSelectedFed() {
     });
 
     let holdCount = 0;
+    const feedingStockItems = [];
 
     selectedSnakeIndexes.forEach(index => {
         if (snakes[index]) {
@@ -268,6 +269,15 @@ function markSelectedFed() {
 
             snakes[index].feedingHistory.push(entry);
 
+            // A frozen feeder left the freezer. Refusals do not use stock.
+            if (result !== "Refused" && entry.feederSize) {
+                feedingStockItems.push({
+                    size: entry.feederSize,
+                    quantity: 1,
+                    entry
+                });
+            }
+
             // Ovulation takes her off the list on purpose instead of leaving
             // her there refusing every week.
             if (HOLD_REASONS.includes(reason)) {
@@ -276,6 +286,16 @@ function markSelectedFed() {
             }
         }
     });
+
+    if (window.SnakeFeeders && feedingStockItems.length > 0) {
+        const consumed = window.SnakeFeeders.consumeFeeders(feedingStockItems);
+
+        consumed.forEach((didConsume, itemIndex) => {
+            if (didConsume) {
+                feedingStockItems[itemIndex].entry.stockCounted = true;
+            }
+        });
+    }
 
     pendingFeedingResults.clear();
     pendingFeedingReasons.clear();
@@ -417,11 +437,17 @@ function logFedFromHold(index) {
         snake.feedingHistory = [];
     }
 
-    snake.feedingHistory.push({
+    const entry = {
         date: fedDate,
         feederSize: snake.feederSize || "",
         result: "Accepted"
-    });
+    };
+
+    if (entry.feederSize && window.SnakeFeeders && window.SnakeFeeders.consumeFeeder(entry.feederSize)) {
+        entry.stockCounted = true;
+    }
+
+    snake.feedingHistory.push(entry);
     window.SnakeData.saveStorageArray("snakes", snakes);
     refreshFeedingViews();
     showFeedingReport(`${snake.name || "That snake"} logged as fed on ${fedDate} and taken off the feeding hold.`);

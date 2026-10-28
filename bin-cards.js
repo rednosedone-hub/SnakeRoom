@@ -181,7 +181,9 @@ function getMorphLabels(snake) {
 function getCardDetails(snake) {
     return [
         snake.ID ? `ID: ${snake.ID}` : "",
-        snake.hatchDate ? `Hatched: ${snake.hatchDate}` : "",
+        snake.hatchDate
+            ? `Hatched: ${snake.hatchDate}`
+            : snake.hatchYear ? `Hatch year: ${snake.hatchYear}` : "",
         snake.acquiredDate ? `Acquired: ${snake.acquiredDate}` : "",
         snake.clutchId ? `Clutch: ${snake.clutchId}` : ""
     ].filter(Boolean);

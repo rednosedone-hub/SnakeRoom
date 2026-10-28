@@ -11,6 +11,7 @@ const csvHeaders = [
     "retiredNote",
     "retiredFromStatus",
     "hatchDate",
+    "hatchYear",
     "acquiredDate",
     "acquisitionSource",
     "purchasedFrom",
@@ -150,6 +151,7 @@ function snakeToRow(snake) {
         retiredNote: snake.retiredNote || "",
         retiredFromStatus: snake.retiredFromStatus || "",
         hatchDate: snake.hatchDate || "",
+        hatchYear: snake.hatchYear || "",
         acquiredDate: snake.acquiredDate || "",
         acquisitionSource: snake.acquisitionSource || "",
         purchasedFrom: snake.purchasedFrom || "",
@@ -302,6 +304,7 @@ function rowToSnake(rowObject, index) {
         retiredNote: getCell(rowObject, "retiredNote"),
         retiredFromStatus: getCell(rowObject, "retiredFromStatus"),
         hatchDate: getCell(rowObject, "hatchDate"),
+        hatchYear: getCell(rowObject, "hatchYear"),
         acquiredDate: getCell(rowObject, "acquiredDate"),
         acquisitionSource: getCell(rowObject, "acquisitionSource"),
         purchasedFrom: getCell(rowObject, "purchasedFrom"),
@@ -392,7 +395,8 @@ function mergeImportedSnake(existingSnake, importedSnake, rowObject) {
         "retiredDate",
         "retiredReason",
         "retiredNote",
-        "retiredFromStatus"
+        "retiredFromStatus",
+        "hatchYear"
     ].forEach(key => {
         if (!getCell(rowObject, key)) {
             mergedSnake[key] = existingSnake[key] || "";

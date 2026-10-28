@@ -841,6 +841,7 @@ function fillFormForEdit() {
     document.getElementById("statusInput").value = snake.status || "Holdback";
     document.getElementById("weightInput").value = snake.weight || "";
     document.getElementById("hatchDateInput").value = snake.hatchDate || "";
+    document.getElementById("hatchYearInput").value = snake.hatchYear || "";
     document.getElementById("acquiredDateInput").value = snake.acquiredDate || "";
     document.getElementById("lastFedInput").value = snake.lastFed || "";
     document.getElementById("feedingIntervalInput").value = snake.feedingIntervalDays || "7";
@@ -1241,8 +1242,184 @@ function getQuarantineFormValues() {
     };
 }
 
+// ---- Pairing readiness panel ---------------------------------------------
+//
+// The readiness check is only useful while the keeper is editing the record.
+// This panel reads the form, not just the saved snake, so a new weight or hatch
+// date changes the answer immediately. Every failed check points at the field
+// or section that fixes it.
+
+const READINESS_ACTIONS = {
+    sex: { label: "Set sex", target: "sexInput" },
+    active: { label: "Change status", target: "statusInput" },
+    status: { label: "Update status", target: "statusInput" },
+    age: { label: "Add hatch date/year", target: "hatchYearInput" },
+    weight: { label: "Update weight", target: "weightInput" },
+    "post-lay-hold": { label: "Review clutches", target: "breedingHistorySection" },
+    quarantine: { label: "Review health", target: "healthSection" },
+    "follow-up": { label: "Review health", target: "healthSection" },
+    severe: { label: "Review health", target: "healthSection" },
+    regurgitation: { label: "Review health", target: "healthSection" },
+    "weight-loss": { label: "Review weight", target: "weightSection" },
+    refusals: { label: "Review feeding", target: "feedingSection" },
+    "feeding-hold": { label: "Review feeding", target: "feedingSection" }
+};
+
+let readinessRenderTimer = null;
+
+function getFormReadinessContext() {
+    return {
+        snakes,
+        breedingPairs: window.SnakeData.readStorageArray("breedingPairs", []),
+        clutches: window.SnakeData.readStorageArray("clutches", [])
+    };
+}
+
+function getFormReadinessSnake() {
+    const existing = editingIndex !== null && snakes[editingIndex] ? snakes[editingIndex] : {};
+    const weightInput = document.getElementById("weightInput");
+    const hatchDateInput = document.getElementById("hatchDateInput");
+    const hatchYearInput = document.getElementById("hatchYearInput");
+
+    return {
+        ...existing,
+        name: document.getElementById("nameInput")?.value.trim() || existing.name || "This snake",
+        sex: document.getElementById("sexInput")?.value || existing.sex || "Unknown",
+        status: document.getElementById("statusInput")?.value || existing.status || "",
+        weight: weightInput ? weightInput.value : existing.weight,
+        hatchDate: hatchDateInput ? hatchDateInput.value : existing.hatchDate,
+        hatchYear: hatchYearInput ? hatchYearInput.value : existing.hatchYear,
+        weightHistory: [...getCurrentWeightHistory()],
+        feedingHistory: [...getCurrentFeedingHistory()],
+        healthHistory: [...getCurrentHealthHistory()],
+        feedingHold: pendingFeedingHold || existing.feedingHold || null,
+        ...getQuarantineFormValues()
+    };
+}
+
+function getFormReadinessCheckHtml(check) {
+    const detail = check.detail
+        ? `<span class="readiness-check-detail">${escapeMoneyText(check.detail)}</span>`
+        : "";
+
+    return `
+        <li class="readiness-check is-${escapeMoneyText(check.state)}">
+            <span class="readiness-check-label">${escapeMoneyText(check.label)}</span>
+            ${detail}
+        </li>
+    `;
+}
+
+function getFormReadinessActionsHtml(readiness) {
+    const seenTargets = new Set();
+    const buttons = [];
+
+    [...readiness.blockers, ...readiness.warnings].some(check => {
+        const action = READINESS_ACTIONS[check.code];
+
+        if (!action || seenTargets.has(action.target)) {
+            return false;
+        }
+
+        const target = document.getElementById(action.target);
+
+        if (!target || target.hidden) {
+            return false;
+        }
+
+        seenTargets.add(action.target);
+        buttons.push(`
+            <button type="button" class="gene-action-button"
+                onclick="focusReadinessTarget('${action.target}')">
+                ${escapeMoneyText(action.label)}
+            </button>
+        `);
+
+        return buttons.length >= 3;
+    });
+
+    return buttons.join("");
+}
+
+function renderPairingReadiness() {
+    const panel = document.getElementById("snakeReadinessPanel");
+    const summary = document.getElementById("snakeReadinessSummary");
+    const badge = document.getElementById("snakeReadinessBadge");
+    const checks = document.getElementById("snakeReadinessChecks");
+    const actions = document.getElementById("snakeReadinessActions");
+    const allChecks = document.getElementById("snakeReadinessAllChecks");
+
+    if (!panel || !summary || !badge || !checks || !actions || !allChecks) {
+        return;
+    }
+
+    if (!window.SnakeReadiness) {
+        panel.hidden = true;
+        return;
+    }
+
+    const readiness = window.SnakeReadiness.getPairingReadiness(
+        getFormReadinessSnake(),
+        getFormReadinessContext()
+    );
+    const attention = readiness.checks.filter(check => check.state !== "pass");
+    const warningCount = readiness.warnings.length;
+    const warningText = warningCount > 0
+        ? ` ${warningCount} note${warningCount === 1 ? "" : "s"} to review.`
+        : "";
+
+    panel.hidden = false;
+    summary.textContent = readiness.ready
+        ? `This snake meets the core pairing checks.${warningText} Readiness is guidance; the breeding page still allows an override.`
+        : `${readiness.summary}. Fix the items below before pairing, or review them with your own judgment.`;
+    badge.textContent = readiness.ready ? "Ready to pair" : "Not ready";
+    badge.className = `readiness-badge ${readiness.ready ? "readiness-badge-ready" : "readiness-badge-not"}`;
+    badge.title = [...readiness.blockers, ...readiness.warnings]
+        .map(check => [check.label, check.detail].filter(Boolean).join(": "))
+        .join(" · ") || readiness.summary;
+    checks.innerHTML = attention.length > 0
+        ? `<ul class="readiness-attention-list">${attention.map(getFormReadinessCheckHtml).join("")}</ul>`
+        : `<p class="readiness-clear">All readiness checks pass.</p>`;
+    actions.innerHTML = getFormReadinessActionsHtml(readiness);
+    allChecks.innerHTML = readiness.checks.map(getFormReadinessCheckHtml).join("");
+}
+
+function schedulePairingReadinessRender() {
+    clearTimeout(readinessRenderTimer);
+    readinessRenderTimer = setTimeout(renderPairingReadiness, 80);
+}
+
+function setupPairingReadinessPanel() {
+    const page = document.querySelector(".snake-form-page");
+
+    if (page) {
+        page.addEventListener("input", schedulePairingReadinessRender);
+        page.addEventListener("change", schedulePairingReadinessRender);
+    }
+
+    renderPairingReadiness();
+}
+
+function focusReadinessTarget(targetId) {
+    const target = document.getElementById(targetId);
+
+    if (!target) {
+        return;
+    }
+
+    expandSectionContaining(target);
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    if (target.matches("input, select, textarea")) {
+        setTimeout(() => target.focus({ preventScroll: true }), 250);
+    }
+}
+
+window.focusReadinessTarget = focusReadinessTarget;
+
 function persistCurrentHistories() {
     if (editingIndex === null || !snakes[editingIndex]) {
+        renderPairingReadiness();
         return;
     }
 
@@ -1260,6 +1437,7 @@ function persistCurrentHistories() {
     }
 
     saveSnakes();
+    renderPairingReadiness();
 }
 
 function addWeightHistoryEntry() {
@@ -1337,6 +1515,7 @@ function endFeedingHoldFromForm() {
     }
 
     renderFeedingHoldNotice();
+    renderPairingReadiness();
     alert("Feeding hold ended. The snake is back on the normal feeding schedule.");
 }
 
@@ -1361,6 +1540,13 @@ function addFeedingHistoryEntry() {
 
     if (reason) {
         entry.reason = reason;
+    }
+
+    // Frozen stock is a real count: a meal that came out of the freezer takes
+    // one away. The flag on the entry lets deleting the record put it back.
+    if (result !== "Refused" && feederSize && editingIndex !== null && window.SnakeFeeders
+        && window.SnakeFeeders.consumeFeeder(feederSize)) {
+        entry.stockCounted = true;
     }
 
     currentFeedingHistory.push(entry);
@@ -1956,6 +2142,12 @@ function removeFeedingHistoryEntry(index) {
         return;
     }
 
+    const removedEntry = history[index];
+
+    if (removedEntry && removedEntry.stockCounted && window.SnakeFeeders) {
+        window.SnakeFeeders.restoreFeeder(removedEntry.feederSize, 1);
+    }
+
     history.splice(index, 1);
     renderFeedingHistory({ feedingHistory: getCurrentFeedingHistory() });
     persistCurrentHistories();
@@ -2337,6 +2529,7 @@ function saveSnakeFromPage() {
         healthHistory: [...getCurrentHealthHistory()],
         ...getQuarantineFormValues(),
         hatchDate: document.getElementById("hatchDateInput").value,
+        hatchYear: document.getElementById("hatchYearInput").value,
         acquiredDate: document.getElementById("acquiredDateInput").value,
         status,
         retiredDate: isRetired ? document.getElementById("retiredDateInput").value : "",
@@ -2430,6 +2623,7 @@ setupGeneOptions();
 setupFeedingReasonOptions();
 setupHealthOptions();
 fillFormForEdit();
+setupPairingReadinessPanel();
 initMoneySection();
 expandSnakeSectionFromHash();
 window.addEventListener("hashchange", expandSnakeSectionFromHash);

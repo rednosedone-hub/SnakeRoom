@@ -7,8 +7,8 @@
 //
 // New model, once a session exists:
 //   - Every change to app data (snakes, breedingPairs, clutches, breedingGoals,
-//     customGeneCatalog, financeSettings, financeExpenses, financeExpos) marks
-//     its storage key "dirty" instantly.
+//     customGeneCatalog, financeSettings, financeExpenses, financeExpos,
+//     feederSettings, feederInventory) marks its storage key "dirty" instantly.
 //   - If online: a debounced push (8s after the last change) saves to the
 //     cloud. Navigating to another page attempts an immediate push, and any
 //     queue left behind is retried when the next page opens or becomes visible
@@ -42,7 +42,9 @@
         "customGeneCatalog",
         "financeSettings",
         "financeExpenses",
-        "financeExpos"
+        "financeExpos",
+        "feederSettings",
+        "feederInventory"
     ];
 
     const KEY_LABELS = {
@@ -53,7 +55,9 @@
         customGeneCatalog: "custom genes",
         financeSettings: "money settings",
         financeExpenses: "costs",
-        financeExpos: "shows"
+        financeExpos: "shows",
+        feederSettings: "feeder settings",
+        feederInventory: "feeder stock"
     };
 
     const state = readState();

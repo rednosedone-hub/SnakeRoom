@@ -10,8 +10,8 @@
 
 ## Tests
 
-The gene-label, ordering, health-watch and lineage checks use Node's built-in
-test runner and need no package install:
+The gene-label, ordering, health-watch, pairing-readiness and lineage checks use
+Node's built-in test runner and need no package install:
 
 ```
 npm test

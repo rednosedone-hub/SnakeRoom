@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Snake Record</title>
-    <link rel="stylesheet" href="style.css?v=43">
+    <link rel="stylesheet" href="style.css?v=44">
 </head>
 
 <body>
@@ -27,6 +27,7 @@
             <a href="breeding.html" class="main-button">Breeding</a>
             <a href="morphCalculator.html" class="main-button">Morph Calculator</a>
             <a href="available.html" class="main-button">Available</a>
+            <a href="feeders.html" class="main-button">Feeders</a>
             <a href="finance.html" class="main-button">Finances</a>
             <a href="#feedingSection" class="main-button">Log Feeding</a>
         </div>
@@ -42,6 +43,24 @@
                 <button type="button" class="secondary-button small-action-button"
                     onclick="collapseAllSnakeSections()">Collapse All</button>
             </div>
+
+            <section class="readiness-record-panel" id="snakeReadinessPanel" hidden>
+                <div class="readiness-record-heading">
+                    <div>
+                        <h3>Pairing Readiness</h3>
+                        <p class="readiness-panel-heading" id="snakeReadinessSummary" aria-live="polite"></p>
+                    </div>
+                    <span class="readiness-badge" id="snakeReadinessBadge"></span>
+                </div>
+
+                <div id="snakeReadinessChecks" class="readiness-record-checks"></div>
+                <div id="snakeReadinessActions" class="readiness-record-actions"></div>
+
+                <details class="readiness-details">
+                    <summary>View all checks</summary>
+                    <ul class="readiness-check-list" id="snakeReadinessAllChecks"></ul>
+                </details>
+            </section>
 
             <section class="form-section">
                 <h3>Basic Info</h3>
@@ -96,10 +115,21 @@
                     </label>
 
                     <label class="form-field">
+                        <span>Hatch Year (estimate)</span>
+                        <input type="number" id="hatchYearInput" min="1900" max="2100" step="1"
+                            inputmode="numeric" placeholder="e.g. 2023">
+                    </label>
+
+                    <label class="form-field">
                         <span>Acquired Date</span>
                         <input type="date" id="acquiredDateInput">
                     </label>
                 </div>
+
+                <p class="empty-message">
+                    If the exact hatch date is unknown, enter the Hatch Year instead. Pairing
+                    readiness uses a conservative age estimate from that year.
+                </p>
 
                 <p class="empty-message">
                     Archived and Deceased keep the record, parentage, clutches and money
@@ -261,7 +291,7 @@
                 <datalist id="buyerOptions"></datalist>
             </section>
 
-            <section class="form-section">
+            <section class="form-section" id="weightSection">
                 <h3>Weight</h3>
 
                 <div class="form-grid">
@@ -617,9 +647,11 @@
     <script src="geneCatalog.js?v=3"></script>
     <script src="genes.js?v=8"></script>
     <script src="feed-helpers.js?v=4"></script>
-    <script src="finance-helpers.js?v=1"></script>
+    <script src="finance-helpers.js?v=2"></script>
+    <script src="feeder-inventory.js?v=1"></script>
     <script src="health-helpers.js?v=1"></script>
-    <script src="snake-form.js?v=16"></script>
+    <script src="readiness.js?v=1"></script>
+    <script src="snake-form.js?v=18"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

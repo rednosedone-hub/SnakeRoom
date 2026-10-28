@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Snake Room - Feeders</title>
+    <link rel="stylesheet" href="style.css?v=45">
+</head>
+
+<body>
+    <div class="page-container feeders-page">
+        <div class="hero-section">
+            <img src="Images/TheSnakeRoom.jpg" class="hero-image" alt="The Snake Room logo">
+
+            <div class="container">
+                <h1>The Snake Room</h1>
+                <h2>Feeders &amp; Re-order Forecast</h2>
+            </div>
+        </div>
+
+        <div class="button-row">
+            <a href="index.html" class="main-button">Home</a>
+            <a href="snakes.html" class="main-button">Collection</a>
+            <a href="feeding-session.html" class="main-button">Feeding Session</a>
+            <a href="finance.html" class="main-button">Finances</a>
+            <a href="account.html" class="main-button">Account</a>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="import-report" id="feederReport" role="status"></div>
+
+        <section class="form-section">
+            <h3>How you feed</h3>
+
+            <div class="feeder-mode-row">
+                <div class="segmented" id="feederModeSegmented" role="group" aria-label="Feeder type"></div>
+                <p class="empty-message feeder-mode-note" id="feederModeNote"></p>
+            </div>
+
+            <div class="form-grid feeder-settings-grid">
+                <label class="form-field">
+                    <span>Forecast window</span>
+                    <select id="feederHorizonSelect">
+                        <option value="14">Next 14 days</option>
+                        <option value="30">Next 30 days</option>
+                        <option value="60">Next 60 days</option>
+                        <option value="90">Next 90 days</option>
+                    </select>
+                </label>
+
+                <label class="form-field">
+                    <span>Order lead time (days)</span>
+                    <input type="number" id="feederLeadInput" min="0" max="90" step="1">
+                </label>
+
+                <p class="empty-message fin-span-all" id="feederLeadNote"></p>
+            </div>
+        </section>
+
+        <section class="form-section">
+            <div class="section-heading-row">
+                <h3>Re-order forecast</h3>
+                <span class="feeder-window-label" id="feederWindowLabel"></span>
+            </div>
+
+            <div class="fin-kpi-grid">
+                <div class="fin-kpi">
+                    <span class="fin-kpi-label">Mode</span>
+                    <strong class="fin-kpi-value feeder-kpi-text" id="feederKpiMode">Frozen</strong>
+                    <span class="fin-kpi-note" id="feederKpiModeNote"></span>
+                </div>
+
+                <div class="fin-kpi">
+                    <span class="fin-kpi-label">Feedings planned</span>
+                    <strong class="fin-kpi-value" id="feederKpiFeedings">0</strong>
+                    <span class="fin-kpi-note" id="feederKpiFeedingsNote"></span>
+                </div>
+
+                <div class="fin-kpi">
+                    <span class="fin-kpi-label">Next feeding</span>
+                    <strong class="fin-kpi-value feeder-kpi-text" id="feederKpiNext">&mdash;</strong>
+                    <span class="fin-kpi-note" id="feederKpiNextNote"></span>
+                </div>
+
+                <div class="fin-kpi">
+                    <span class="fin-kpi-label" id="feederKpiOrderLabel">To order</span>
+                    <strong class="fin-kpi-value" id="feederKpiOrder">0</strong>
+                    <span class="fin-kpi-note" id="feederKpiOrderNote"></span>
+                </div>
+            </div>
+
+            <div class="fin-table-wrap">
+                <table class="fin-table feeder-forecast-table">
+                    <thead id="feederForecastHead"></thead>
+                    <tbody id="feederForecastBody"></tbody>
+                </table>
+            </div>
+
+            <p class="empty-message" id="feederForecastEmpty"></p>
+            <div class="feeder-notes" id="feederForecastNotes"></div>
+        </section>
+
+        <section class="form-section" id="feederStockSection">
+            <div class="section-heading-row">
+                <h3>Freezer stock</h3>
+                <span class="feeder-window-label" id="feederStockSummary"></span>
+            </div>
+
+            <p class="empty-message">
+                Count what is actually in the freezer and save it here. Frozen orders add to this
+                count, and logging a meal takes one away. Set <strong>Keep at least</strong> to the
+                buffer you never want to run below.
+            </p>
+
+            <div class="fin-table-wrap">
+                <table class="fin-table feeder-stock-table">
+                    <thead>
+                        <tr>
+                            <th>Feeder size</th>
+                            <th>On hand</th>
+                            <th>Keep at least</th>
+                            <th>Forecast</th>
+                        </tr>
+                    </thead>
+                    <tbody id="feederStockBody"></tbody>
+                </table>
+            </div>
+
+            <p class="empty-message" id="feederStockEmpty"></p>
+
+            <div class="fin-actions">
+                <button type="button" class="main-button" id="saveFeederStockButton">Save Stock</button>
+                <span class="fin-status" id="feederStockStatus"></span>
+            </div>
+        </section>
+
+        <section class="form-section">
+            <div class="section-heading-row">
+                <h3>Feeding plan</h3>
+                <a href="feeding-session.html" class="small-link-button">Feeding Session</a>
+            </div>
+
+            <p class="empty-message" id="feederPlanLead">
+                Every meal inside the forecast window, grouped by feeding day.
+            </p>
+
+            <div class="feeder-plan-list" id="feederPlanList"></div>
+            <p class="empty-message" id="feederPlanEmpty"></p>
+        </section>
+
+        <section class="form-section">
+            <div class="section-heading-row">
+                <h3>Log a feeder order</h3>
+                <a href="finance.html#feeders" class="small-link-button">Feeder Costs</a>
+            </div>
+
+            <p class="empty-message" id="feederOrderModeNote"></p>
+
+            <form class="form-grid fin-form" id="feederOrderForm">
+                <label class="form-field">
+                    <span>Order date</span>
+                    <input type="date" id="feederOrderDate">
+                </label>
+
+                <label class="form-field">
+                    <span>Supplier</span>
+                    <input type="text" id="feederOrderVendor" placeholder="Supplier or shop">
+                </label>
+
+                <label class="form-field">
+                    <span>Amount paid (optional)</span>
+                    <input type="number" id="feederOrderAmount" min="0" step="0.01" placeholder="0.00">
+                </label>
+
+                <label class="form-field">
+                    <span>Note</span>
+                    <input type="text" id="feederOrderNote" placeholder="Optional note">
+                </label>
+
+                <div class="form-field fin-span-all">
+                    <span>What arrived</span>
+                    <div class="feeder-order-lines" id="feederOrderLines"></div>
+                    <div class="fin-actions">
+                        <button type="button" class="secondary-button" id="addFeederOrderLineButton">
+                            + Add Feeder Size
+                        </button>
+                    </div>
+                    <datalist id="feederSizeOptions"></datalist>
+                </div>
+
+                <div class="form-field fin-form-actions fin-span-all">
+                    <span>&nbsp;</span>
+                    <div class="fin-actions">
+                        <button type="submit" class="main-button">Save Order</button>
+                        <span class="fin-status" id="feederOrderStatus"></span>
+                    </div>
+                </div>
+            </form>
+        </section>
+
+        <section class="form-section">
+            <div class="section-heading-row">
+                <h3>Recent feeder orders</h3>
+                <a href="finance.html#feeders" class="small-link-button">All Orders in Finances</a>
+            </div>
+
+            <div class="feeder-order-list" id="feederOrderList"></div>
+            <p class="empty-message" id="feederOrderEmpty">No feeder orders recorded yet.</p>
+        </section>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script src="data-helpers.js"></script>
+    <script src="cloud-sync.js?v=13"></script>
+    <script src="auto-sync.js?v=8"></script>
+    <script src="account-gate.js?v=1"></script>
+    <script src="finance-helpers.js?v=2"></script>
+    <script src="feed-helpers.js?v=4"></script>
+    <script src="feeder-inventory.js?v=1"></script>
+    <script src="feeders.js?v=1"></script>
+    <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () { }); }</script>
+    <script src="nav-scroll.js?v=1"></script>
+</body>
+
+</html>

@@ -193,6 +193,28 @@
 
     // ---- Expenses ----------------------------------------------------------
 
+    // A feeder order can carry what actually arrived, not just a total. The
+    // Feeders page uses these lines to add stock; the money side still treats
+    // the order as one expense.
+    function normalizeFeederLines(value) {
+        return (Array.isArray(value) ? value : [])
+            .map(line => {
+                if (!line || typeof line !== "object") {
+                    return null;
+                }
+
+                const size = String(line.size || "").trim();
+                const quantity = Math.max(0, Math.round(toNumber(line.quantity)));
+
+                return size && quantity > 0 ? { size, quantity } : null;
+            })
+            .filter(Boolean);
+    }
+
+    function normalizeFeederType(value) {
+        return value === "live" || value === "frozen" ? value : "";
+    }
+
     function getExpenses() {
         return readArray(KEYS.expenses)
             .filter(expense => expense && typeof expense === "object")
@@ -204,7 +226,9 @@
                     : "Other",
                 vendor: String(expense.vendor || ""),
                 amount: toMoney(expense.amount),
-                note: String(expense.note || "")
+                note: String(expense.note || ""),
+                feederType: normalizeFeederType(expense.feederType),
+                feederLines: normalizeFeederLines(expense.feederLines)
             }));
     }
 
@@ -220,7 +244,9 @@
             category: expense.category || "Other",
             vendor: String(expense.vendor || "").trim(),
             amount: toMoney(expense.amount),
-            note: String(expense.note || "").trim()
+            note: String(expense.note || "").trim(),
+            feederType: normalizeFeederType(expense.feederType),
+            feederLines: normalizeFeederLines(expense.feederLines)
         };
 
         expenses.push(entry);

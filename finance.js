@@ -792,8 +792,12 @@
         }
 
         const label = expense.vendor || expense.category || "this cost";
+        const stockNote = expense.category === "Feeders"
+            && Array.isArray(expense.feederLines) && expense.feederLines.length > 0
+            ? " The stock this order added stays in the freezer count; adjust it on the Feeders page if the order was a mistake."
+            : "";
 
-        if (!confirm(`Delete ${label} (${formatMoney(expense.amount)})?`)) {
+        if (!confirm(`Delete ${label} (${formatMoney(expense.amount)})?${stockNote}`)) {
             return;
         }
 

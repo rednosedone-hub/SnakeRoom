@@ -10,6 +10,11 @@ const snakeTableWrapper = document.getElementById("snakeTableWrapper");
 
 const SEX_FILTER_OPTIONS = ["All", "Female", "Male", "Unknown"];
 const STATUS_FILTER_OPTIONS = [...window.SnakeData.SNAKE_STATUSES, "Retired"];
+const READINESS_FILTER_OPTIONS = [
+    { key: "any", label: "Any" },
+    { key: "ready", label: "Breedable" },
+    { key: "notReady", label: "Not ready" }
+];
 let collectionFilters = loadCollectionFilters();
 
 function loadCollectionFilters() {
@@ -22,14 +27,24 @@ function loadCollectionFilters() {
                 statuses: Array.isArray(saved.statuses) ? saved.statuses : [],
                 morphText: saved.morphText || "",
                 genes: Array.isArray(saved.genes) ? saved.genes : [],
-                geneMatch: saved.geneMatch === "all" ? "all" : "any"
+                geneMatch: saved.geneMatch === "all" ? "all" : "any",
+                readiness: ["ready", "notReady"].includes(saved.readiness)
+                    ? saved.readiness
+                    : "any"
             };
         }
     } catch (error) {
         // Corrupted value falls through to the defaults.
     }
 
-    return { sex: "All", statuses: [], morphText: "", genes: [], geneMatch: "any" };
+    return {
+        sex: "All",
+        statuses: [],
+        morphText: "",
+        genes: [],
+        geneMatch: "any",
+        readiness: "any"
+    };
 }
 
 function saveCollectionFilters() {
@@ -43,6 +58,7 @@ function getActiveFilterCount() {
     if (collectionFilters.statuses.length > 0) count += 1;
     if (collectionFilters.morphText.trim() !== "") count += 1;
     if (collectionFilters.genes.length > 0) count += 1;
+    if (collectionFilters.readiness !== "any") count += 1;
 
     return count;
 }
@@ -435,6 +451,16 @@ function getFilteredAndSortedSnakes() {
 
     snakeList = snakeList.filter(snake => snakeMatchesGeneFilters(snake));
 
+    if (collectionFilters.readiness !== "any") {
+        snakeList = snakeList.filter(snake => {
+            const readiness = getSnakeReadiness(snake);
+
+            return collectionFilters.readiness === "ready"
+                ? readiness.ready
+                : !readiness.ready;
+        });
+    }
+
     const comparator = SORT_COMPARATORS[currentSortKey];
 
     if (comparator) {
@@ -446,6 +472,8 @@ function getFilteredAndSortedSnakes() {
 
 function renderSnakes() {
     const snakeList = getFilteredAndSortedSnakes();
+
+    updateBreedableButton();
 
     window.collectionDebug = {
         savedSnakes: snakes,
@@ -462,9 +490,14 @@ function renderSnakes() {
         const clearFiltersButton = getActiveFilterCount() > 0
             ? `<button type="button" class="main-button" onclick="clearAllFilters()">Clear Filters</button>`
             : "";
+        const readinessEmptyText = collectionFilters.readiness === "ready"
+            ? "No active snakes are breedable yet. Females need 3 years and 1500 g; males need 18 months and 700 g, with no health blockers and six months of recovery after a female's last clutch. Missing hatch dates and stale statuses are shown as notes on the snake record."
+            : collectionFilters.readiness === "notReady"
+                ? "Every snake meets the pairing readiness criteria."
+                : "No snakes match the current filter.";
         const emptyText = getActiveFilterCount() === 0
             ? "No active snakes. Old records are still here \u2014 open Filters and pick Retired or Sold."
-            : "No snakes match the current filter.";
+            : readinessEmptyText;
         const emptyMessage = `
             <div class="empty-filter-state">
                 <p class="empty-message">
@@ -568,6 +601,7 @@ function renderSnakes() {
                     <span>${feedingText}</span>
                     <span>${feederText}</span>
                     <span>${snake.status || "No status"}</span>
+                    ${getReadinessBadgeHtml(snake)}
                     ${healthBadge ? `<span class="health-badge ${healthBadge.className}" title="${escapeHealthText(healthBadge.title)}">${escapeHealthText(healthBadge.label)}</span>` : ""}
                     ${retirementDetail ? `<span>${retirementDetail}</span>` : ""}
                 </div>
@@ -605,6 +639,7 @@ function renderSnakeTableHeader() {
         { label: "Every", sortKey: "interval" },
         { label: "Feeder", sortKey: "feeder" },
         { label: "Status", sortKey: "status" },
+        { label: "Breeding" },
         { label: "QR" },
         { label: "" }
     ];
@@ -651,6 +686,7 @@ function renderSnakeTable(snakeList) {
                 <td>${feedingInterval}</td>
                 <td>${snake.feederSize || ""}</td>
                 <td>${snake.status || ""}${healthBadgeHtml}</td>
+                <td>${getReadinessBadgeHtml(snake, true)}</td>
                 <td>
                     <a href="${window.SnakeData.getSnakeQrImageUrl(snake, 220)}" target="_blank" rel="noopener">
                         QR
@@ -1065,6 +1101,118 @@ function setSexFilter(sex) {
     renderSnakes();
 }
 
+function getReadinessContext() {
+    return {
+        snakes,
+        breedingPairs: window.SnakeData.readStorageArray("breedingPairs", []),
+        clutches: window.SnakeData.readStorageArray("clutches", [])
+    };
+}
+
+function getSnakeReadiness(snake) {
+    if (!window.SnakeReadiness || typeof window.SnakeReadiness.getPairingReadiness !== "function") {
+        return { ready: false, blockers: [], warnings: [] };
+    }
+
+    return window.SnakeReadiness.getPairingReadiness(snake, getReadinessContext());
+}
+
+function getBreedableSnakes() {
+    if (!window.SnakeReadiness || typeof window.SnakeReadiness.getPairingReadiness !== "function") {
+        return [];
+    }
+
+    const context = getReadinessContext();
+
+    return snakes.filter(snake =>
+        window.SnakeData.isActiveSnake(snake)
+        && window.SnakeReadiness.getPairingReadiness(snake, context).ready
+    );
+}
+
+function updateBreedableButton() {
+    const button = document.getElementById("breedableToggleButton");
+    const count = document.getElementById("breedableCount");
+
+    if (!button || !count) {
+        return;
+    }
+
+    const breedableCount = getBreedableSnakes().length;
+    const active = collectionFilters.readiness === "ready";
+
+    count.textContent = breedableCount;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+    button.title = `${breedableCount} active snake${breedableCount === 1 ? "" : "s"} meet the breeding readiness checks.`;
+}
+
+function toggleBreedableView() {
+    if (collectionFilters.readiness === "ready") {
+        collectionFilters.readiness = "any";
+        saveCollectionFilters();
+        renderReadinessSegmented();
+        updateFilterBadge();
+        renderSnakes();
+        return;
+    }
+
+    collectionFilters = {
+        sex: "All",
+        statuses: [],
+        morphText: "",
+        genes: [],
+        geneMatch: "any",
+        readiness: "ready"
+    };
+    document.getElementById("morphFilterInput").value = "";
+
+    saveCollectionFilters();
+    renderSexSegmented();
+    renderReadinessSegmented();
+    renderStatusChips();
+    renderGeneChips();
+    renderGeneMatchSegmented();
+    updateFilterBadge();
+    updateBreedableButton();
+    renderSnakes();
+    closeFilterPanel();
+}
+
+function getReadinessBadgeHtml(snake, showNotReady = false) {
+    const badge = window.SnakeReadiness && window.SnakeReadiness.getReadinessBadge
+        ? window.SnakeReadiness.getReadinessBadge(snake, {
+            ...getReadinessContext(),
+            showNotReady
+        })
+        : null;
+
+    if (!badge) {
+        return "";
+    }
+
+    return `<span class="readiness-badge ${badge.className}" title="${escapeHealthText(badge.title)}">${escapeHealthText(badge.label)}</span>`;
+}
+
+function renderReadinessSegmented() {
+    document.getElementById("readinessSegmented").innerHTML = READINESS_FILTER_OPTIONS.map(option => `
+        <button type="button" class="${collectionFilters.readiness === option.key ? "active" : ""}"
+            onclick="setReadinessFilter('${option.key}')">
+            ${option.label}
+        </button>
+    `).join("");
+}
+
+function setReadinessFilter(readiness) {
+    collectionFilters.readiness = ["ready", "notReady"].includes(readiness)
+        ? readiness
+        : "any";
+    saveCollectionFilters();
+    renderReadinessSegmented();
+    updateFilterBadge();
+    renderSnakes();
+}
+
 function renderStatusChips() {
     document.getElementById("statusChipRow").innerHTML = STATUS_FILTER_OPTIONS.map(status => `
         <button type="button" class="filter-chip ${collectionFilters.statuses.includes(status) ? "active" : ""}"
@@ -1148,11 +1296,19 @@ function updateMorphFilter(value) {
 }
 
 function clearAllFilters() {
-    collectionFilters = { sex: "All", statuses: [], morphText: "", genes: [], geneMatch: "any" };
+    collectionFilters = {
+        sex: "All",
+        statuses: [],
+        morphText: "",
+        genes: [],
+        geneMatch: "any",
+        readiness: "any"
+    };
     document.getElementById("morphFilterInput").value = "";
 
     saveCollectionFilters();
     renderSexSegmented();
+    renderReadinessSegmented();
     renderStatusChips();
     renderGeneChips();
     renderGeneMatchSegmented();
@@ -1163,6 +1319,7 @@ function clearAllFilters() {
 function renderFilterControls() {
     document.getElementById("morphFilterInput").value = collectionFilters.morphText;
     renderSexSegmented();
+    renderReadinessSegmented();
     renderStatusChips();
     renderGeneChips();
     renderGeneMatchSegmented();
@@ -1194,6 +1351,8 @@ window.toggleTableSort = toggleTableSort;
 window.toggleFilterPanel = toggleFilterPanel;
 window.closeFilterPanel = closeFilterPanel;
 window.setSexFilter = setSexFilter;
+window.setReadinessFilter = setReadinessFilter;
+window.toggleBreedableView = toggleBreedableView;
 window.toggleStatusFilter = toggleStatusFilter;
 window.toggleGeneFilter = toggleGeneFilter;
 window.setGeneMatchMode = setGeneMatchMode;

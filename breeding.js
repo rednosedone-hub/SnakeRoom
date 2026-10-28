@@ -234,8 +234,131 @@ function getPairHealthNotices(female, male) {
         `);
 }
 
+function getReadinessContext() {
+    return { snakes, breedingPairs, clutches };
+}
+
+function getReadinessCheckHtml(check) {
+    const detail = check.detail
+        ? `<span class="readiness-check-detail">${escapePairText(check.detail)}</span>`
+        : "";
+
+    return `
+        <li class="readiness-check is-${escapePairText(check.state)}">
+            <span class="readiness-check-label">${escapePairText(check.label)}</span>
+            ${detail}
+        </li>
+    `;
+}
+
+function getReadinessCardHtml(snake) {
+    if (!snake || !window.SnakeReadiness) {
+        return "";
+    }
+
+    const readiness = window.SnakeReadiness.getPairingReadiness(snake, getReadinessContext());
+    const targetText = readiness.rules
+        ? `${readiness.rules.minAgeLabel} / ${readiness.rules.minWeight}g minimum`
+        : "Set sex to check minimums";
+    const attentionChecks = readiness.checks.filter(check => check.state !== "pass");
+    const attentionHtml = attentionChecks.length > 0
+        ? `<ul class="readiness-attention-list">${attentionChecks.map(getReadinessCheckHtml).join("")}</ul>`
+        : `<p class="readiness-clear">All readiness checks pass.</p>`;
+
+    return `
+        <div class="readiness-card ${readiness.ready ? "is-ready" : "is-not-ready"}">
+            <div class="readiness-card-header">
+                <div>
+                    <strong>${escapePairText(snake.name || "Unnamed snake")}</strong>
+                    <span class="readiness-target">${escapePairText(readiness.sex || "Unknown sex")} \u00b7 ${escapePairText(targetText)}</span>
+                </div>
+                <span class="readiness-badge ${readiness.ready ? "readiness-badge-ready" : "readiness-badge-not"}">
+                    ${escapePairText(readiness.label)}
+                </span>
+            </div>
+
+            ${attentionHtml}
+
+            <details class="readiness-details">
+                <summary>View all checks</summary>
+                <ul class="readiness-check-list">
+                    ${readiness.checks.map(getReadinessCheckHtml).join("")}
+                </ul>
+            </details>
+        </div>
+    `;
+}
+
+function getReadinessPanelHtml(female, male) {
+    const cards = [female, male]
+        .filter(Boolean)
+        .map(getReadinessCardHtml)
+        .filter(Boolean);
+
+    if (cards.length === 0) {
+        return "";
+    }
+
+    const parentReadiness = [female, male]
+        .filter(Boolean)
+        .map(snake => window.SnakeReadiness.getPairingReadiness(snake, getReadinessContext()));
+    const readyCount = parentReadiness.filter(result => result.ready).length;
+    const warningCount = parentReadiness.reduce((total, result) => total + result.warnings.length, 0);
+    const readyWithNotes = readyCount === cards.length && warningCount > 0;
+    const heading = cards.length === 1
+        ? (readyCount === 1
+            ? (readyWithNotes
+                ? "This parent meets the core checks. Review the note below."
+                : "This parent meets the pairing readiness checks.")
+            : "Readiness is a guide, not a block. Review the checks for this parent.")
+        : (readyCount === cards.length
+            ? (readyWithNotes
+                ? "Both parents meet the core checks. Review the notes below."
+                : "Both parents meet the pairing readiness checks.")
+            : "Readiness is a guide, not a block. Review the checks before saving this pair.");
+
+    return `
+        <div class="readiness-panel">
+            <p class="readiness-panel-heading">${escapePairText(heading)}</p>
+            <div class="readiness-card-grid">${cards.join("")}</div>
+        </div>
+    `;
+}
+
+function getReadinessBadgeHtml(snake) {
+    const badge = window.SnakeReadiness && window.SnakeReadiness.getReadinessBadge
+        ? window.SnakeReadiness.getReadinessBadge(snake, {
+            ...getReadinessContext(),
+            showNotReady: true
+        })
+        : null;
+
+    if (!badge) {
+        return "";
+    }
+
+    return `<span class="readiness-badge ${badge.className}" title="${escapePairText(badge.title)}">${escapePairText(badge.label)}</span>`;
+}
+
+function getPairReadinessLine(pair) {
+    const female = getPairParentSnake(pair.femaleSnakeId, pair.femaleIndex);
+    const male = getPairParentSnake(pair.maleSnakeId, pair.maleIndex);
+    const badges = [
+        { snake: female, label: "Female" },
+        { snake: male, label: "Male" }
+    ]
+        .filter(item => item.snake)
+        .map(item => `${escapePairText(item.label)}: ${getReadinessBadgeHtml(item.snake)}`)
+        .filter(Boolean);
+
+    return badges.length > 0
+        ? `<p class="pair-readiness-line">${badges.join(" \u00b7 ")}</p>`
+        : "";
+}
+
 function renderPairCheck() {
     const container = document.getElementById("lineageWarning");
+    const readinessContainer = document.getElementById("pairingReadiness");
 
     if (!container) {
         return;
@@ -243,8 +366,14 @@ function renderPairCheck() {
 
     const female = getPairParentSnake(document.getElementById("femaleSelect").value, null);
     const male = getPairParentSnake(document.getElementById("maleSelect").value, null);
+    const readinessHtml = getReadinessPanelHtml(female, male);
     const notices = [...getPairHealthNotices(female, male)];
     const lineage = getLineageNotice(female, male);
+
+    if (readinessContainer) {
+        readinessContainer.hidden = readinessHtml === "";
+        readinessContainer.innerHTML = readinessHtml;
+    }
 
     if (lineage) {
         notices.unshift(lineage.html);
@@ -549,6 +678,7 @@ function renderBreedingPairs() {
                 <h4>${getSnakeLabel(pair.femaleSnakeId || pair.femaleIndex)} x ${getSnakeLabel(pair.maleSnakeId || pair.maleIndex)}</h4>
                 <p>Status: ${getPairStatus(pair)}</p>
                 <p>Pairings: ${getPairings(pair).length || "None recorded"}</p>
+                ${getPairReadinessLine(pair)}
             </div>
 
             ${retiredParentText ? `
