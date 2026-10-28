@@ -171,7 +171,10 @@
                     type: getGeneDisplayType(gene, record.copies)
                 };
             })
-            .sort((a, b) => a.label.localeCompare(b.label));
+            .sort((left, right) => window.GeneTools.compareGenesForDisplay(
+                { name: left.name, type: left.type },
+                { name: right.name, type: right.type }
+            ));
     }
 
     function getGeneDisplayType(gene, copies) {

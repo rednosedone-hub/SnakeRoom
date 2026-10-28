@@ -192,7 +192,10 @@
             return;
         }
 
-        list.innerHTML = genes.map((gene, index) => `
+        list.innerHTML = genes
+            .map((gene, index) => ({ gene, index }))
+            .sort((left, right) => window.GeneTools.compareGenesForDisplay(left.gene, right.gene))
+            .map(({ gene, index }) => `
             <span class="gene-pill ${getGenePillClass(gene)}">
                 ${window.GeneTools.describeGene(gene)}
                 <button type="button" class="gene-remove-button" data-parent="${parent}" data-index="${index}">

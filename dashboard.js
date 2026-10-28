@@ -111,6 +111,42 @@ function buildFeedingSummary(dueStatuses, soonStatuses) {
     return "";
 }
 
+function renderHealthWatch(snakes) {
+    const list = document.getElementById("healthWatchList");
+
+    if (!list) {
+        return;
+    }
+
+    if (!window.SnakeHealth) {
+        list.innerHTML = `<p class="empty-message">Health helpers did not load.</p>`;
+        return;
+    }
+
+    const items = window.SnakeHealth.getHealthWatchItems(snakes);
+
+    if (items.length === 0) {
+        list.innerHTML = `<p class="empty-message">Nothing needs attention right now.</p>`;
+        return;
+    }
+
+    list.innerHTML = items.map(item => {
+        const reasons = item.reasons;
+        const urgent = reasons[0].priority === 0;
+        const reasonLine = reasons.slice(0, 2).map(reason => reason.label).join(" \u00b7 ");
+        const more = reasons.length > 2 ? ` +${reasons.length - 2} more` : "";
+        const profileUrl = `snake-form.html?uid=${encodeURIComponent(item.snake.id || "")}`;
+
+        return `
+            <div class="dashboard-list-item health-watch-item${urgent ? " is-urgent" : ""}" title="${escapeHtml(reasons.map(reason => reason.label).join(" \u00b7 "))}">
+                <strong><a href="${profileUrl}">${escapeHtml(item.snake.name || "Unnamed")}</a></strong>
+                <span>${escapeHtml(window.SnakeData.getSnakeIdentityText(item.snake))}</span>
+                <span>${escapeHtml(reasonLine)}${more}</span>
+            </div>
+        `;
+    }).join("");
+}
+
 function renderDashboard() {
     const snakes = window.SnakeData.loadSnakesWithIds(window.SnakeData.defaultSnakes);
     const activeSnakes = snakes.filter(snake => window.SnakeData.isActiveSnake(snake));
@@ -144,6 +180,7 @@ function renderDashboard() {
     const convertedClutches = clutches.length - activeClutches;
 
     renderFinanceSummary(snakes);
+    renderHealthWatch(activeSnakes);
 
     setText("totalSnakes", activeSnakes.length);
     setText("activeBreedingPlans", activePlans);

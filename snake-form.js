@@ -3,6 +3,7 @@ let currentGenes = [];
 let currentWeightHistory = [];
 let currentFeedingHistory = [];
 let currentShedHistory = [];
+let currentHealthHistory = [];
 // Set when a refusal reason means the snake should leave the feeding schedule.
 let pendingFeedingHold = null;
 
@@ -297,10 +298,13 @@ function renderGeneList() {
         return;
     }
 
-    geneList.innerHTML = currentGenes.map((gene, index) => {
-        const possibleHet = Boolean(window.GeneTools.getPossibleHetOdds(gene));
+    geneList.innerHTML = currentGenes
+        .map((gene, index) => ({ gene, index }))
+        .sort((left, right) => window.GeneTools.compareGenesForDisplay(left.gene, right.gene))
+        .map(({ gene, index }) => {
+            const possibleHet = Boolean(window.GeneTools.getPossibleHetOdds(gene));
 
-        return `
+            return `
         <span class="gene-pill ${window.GeneTools.getStoredGenePillClass(gene)}">
             ${getGeneDescription(gene)}
             ${possibleHet
@@ -313,7 +317,7 @@ function renderGeneList() {
             </button>
         </span>
     `;
-    }).join("");
+        }).join("");
 }
 
 function updateImagePreview() {
@@ -796,7 +800,22 @@ function fillFormForEdit() {
         currentWeightHistory = [];
         currentFeedingHistory = [];
         currentShedHistory = [];
+        currentHealthHistory = [];
         currentPhotos = [];
+        [
+            "quarantineStartInput",
+            "quarantineEndInput",
+            "quarantineReasonInput",
+            "quarantineNotesInput",
+            "quarantineReleasedDateInput"
+        ].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) input.value = "";
+        });
+        const releasedInput = document.getElementById("quarantineReleasedInput");
+        if (releasedInput) releasedInput.checked = false;
+        const healthDateInput = document.getElementById("healthDateInput");
+        if (healthDateInput && window.SnakeHealth) healthDateInput.value = window.SnakeHealth.todayText();
         renderGeneList();
         updateFeederSuggestion();
         updateImagePreview();
@@ -804,6 +823,8 @@ function fillFormForEdit() {
         renderWeightHistory({ weight: "", weightHistory: [] });
         renderFeedingHistory({ feedingHistory: [] });
         renderShedHistory({ shedHistory: [] });
+        renderHealthHistory({ healthHistory: [] });
+        renderQuarantineStatus();
         renderFeedingHoldNotice();
         renderBreedingHistory(null);
         updateFeedingReasonVisibility(document.getElementById("feedingResultInput").value);
@@ -833,6 +854,16 @@ function fillFormForEdit() {
     currentWeightHistory = Array.isArray(snake.weightHistory) ? [...snake.weightHistory] : [];
     currentFeedingHistory = Array.isArray(snake.feedingHistory) ? [...snake.feedingHistory] : [];
     currentShedHistory = Array.isArray(snake.shedHistory) ? [...snake.shedHistory] : [];
+    currentHealthHistory = Array.isArray(snake.healthHistory) ? [...snake.healthHistory] : [];
+    document.getElementById("quarantineStartInput").value = snake.quarantineStart || "";
+    document.getElementById("quarantineEndInput").value = snake.quarantineEnd || "";
+    document.getElementById("quarantineReasonInput").value = snake.quarantineReason || "";
+    document.getElementById("quarantineNotesInput").value = snake.quarantineNotes || "";
+    document.getElementById("quarantineReleasedInput").checked = Boolean(snake.quarantineReleased);
+    document.getElementById("quarantineReleasedDateInput").value = snake.quarantineReleasedDate || "";
+    if (window.SnakeHealth) {
+        document.getElementById("healthDateInput").value = window.SnakeHealth.todayText();
+    }
     seedPhotosFromSnake(snake);
 
     renderGeneList();
@@ -842,6 +873,8 @@ function fillFormForEdit() {
     renderFeedingHistory({ feedingHistory: currentFeedingHistory });
     renderWeightHistory({ weight: snake.weight, weightHistory: currentWeightHistory });
     renderShedHistory({ shedHistory: currentShedHistory });
+    renderHealthHistory({ healthHistory: currentHealthHistory });
+    renderQuarantineStatus();
     renderFeedingHoldNotice();
     renderBreedingHistory(snake);
     updateFeedingReasonVisibility(document.getElementById("feedingResultInput").value);
@@ -1188,6 +1221,26 @@ function getCurrentShedHistory() {
     return Array.isArray(currentShedHistory) ? currentShedHistory : [];
 }
 
+function getCurrentHealthHistory() {
+    return Array.isArray(currentHealthHistory) ? currentHealthHistory : [];
+}
+
+function getQuarantineFormValues() {
+    const released = Boolean(document.getElementById("quarantineReleasedInput")?.checked);
+    const releasedDateInput = document.getElementById("quarantineReleasedDateInput");
+
+    return {
+        quarantineStart: document.getElementById("quarantineStartInput")?.value || "",
+        quarantineEnd: document.getElementById("quarantineEndInput")?.value || "",
+        quarantineReason: document.getElementById("quarantineReasonInput")?.value.trim() || "",
+        quarantineNotes: document.getElementById("quarantineNotesInput")?.value.trim() || "",
+        quarantineReleased: released,
+        quarantineReleasedDate: released
+            ? releasedDateInput?.value || window.SnakeHealth.todayText()
+            : ""
+    };
+}
+
 function persistCurrentHistories() {
     if (editingIndex === null || !snakes[editingIndex]) {
         return;
@@ -1198,6 +1251,8 @@ function persistCurrentHistories() {
     snakes[editingIndex].lastFed = document.getElementById("lastFedInput").value;
     snakes[editingIndex].feedingHistory = [...getCurrentFeedingHistory()];
     snakes[editingIndex].shedHistory = [...getCurrentShedHistory()];
+    snakes[editingIndex].healthHistory = [...getCurrentHealthHistory()];
+    Object.assign(snakes[editingIndex], getQuarantineFormValues());
 
     if (pendingFeedingHold) {
         snakes[editingIndex].feedingHold = { ...pendingFeedingHold };
@@ -1349,6 +1404,165 @@ function addShedHistoryEntry() {
     document.getElementById("shedDateInput").value = "";
     document.getElementById("shedQualityInput").value = "";
     document.getElementById("shedNotesInput").value = "";
+    persistCurrentHistories();
+}
+
+function setupHealthOptions() {
+    const typeSelect = document.getElementById("healthTypeInput");
+    const severitySelect = document.getElementById("healthSeverityInput");
+
+    if (typeSelect && window.SnakeHealth) {
+        typeSelect.innerHTML = window.SnakeHealth.HEALTH_EVENT_TYPES
+            .map(type => `<option value="${type}">${type}</option>`)
+            .join("");
+    }
+
+    if (severitySelect && window.SnakeHealth) {
+        severitySelect.innerHTML = window.SnakeHealth.HEALTH_SEVERITIES
+            .map(severity => `<option value="${severity}">${severity}</option>`)
+            .join("");
+    }
+}
+
+function updateQuarantineReleaseFields() {
+    const released = Boolean(document.getElementById("quarantineReleasedInput")?.checked);
+    const dateInput = document.getElementById("quarantineReleasedDateInput");
+
+    if (dateInput && released && !dateInput.value && window.SnakeHealth) {
+        dateInput.value = window.SnakeHealth.todayText();
+    }
+
+    if (dateInput && !released) {
+        dateInput.value = "";
+    }
+
+    renderQuarantineStatus();
+}
+
+function renderQuarantineStatus() {
+    const target = document.getElementById("quarantineStatus");
+
+    if (!target || !window.SnakeHealth) {
+        return;
+    }
+
+    const values = getQuarantineFormValues();
+    const status = window.SnakeHealth.getQuarantineStatus(values);
+    const active = status.active;
+
+    target.className = `health-status-line${active ? " is-active" : ""}`;
+    target.textContent = active
+        ? `Quarantine: ${status.label}${status.end ? ` (expected release ${status.end})` : ""}`
+        : status.state === "released"
+            ? `Quarantine released${status.releasedDate ? ` on ${status.releasedDate}` : ""}.`
+            : "No active quarantine.";
+}
+
+function renderHealthHistory(snake) {
+    const list = document.getElementById("healthHistoryList");
+
+    if (!list) {
+        return;
+    }
+
+    const history = Array.isArray(snake.healthHistory) ? snake.healthHistory : getCurrentHealthHistory();
+
+    if (history.length === 0) {
+        list.innerHTML = `<p class="empty-message">No health records yet.</p>`;
+        return;
+    }
+
+    list.innerHTML = history
+        .map((entry, index) => ({ entry, index }))
+        .sort((left, right) => String(right.entry.date || "").localeCompare(String(left.entry.date || "")))
+        .map(({ entry, index }) => {
+            const status = window.SnakeHealth
+                ? window.SnakeHealth.getFollowUpStatus(entry)
+                : { label: entry.resolvedDate ? `Resolved ${entry.resolvedDate}` : "Open" };
+            const statusLabel = entry.resolvedDate
+                ? `Resolved ${entry.resolvedDate}`
+                : entry.followUpDate
+                    ? status.label || "Follow-up"
+                    : "No follow-up";
+            const details = [entry.description, entry.treatment].filter(Boolean).join(" · ");
+            const severity = entry.severity || "Mild";
+
+            return `
+                <div class="health-list-item">
+                    <div class="health-list-main">
+                        <strong>${escapeMoneyText(entry.date || "No date")} · ${escapeMoneyText(entry.type || "Health event")}</strong>
+                        <span class="health-severity health-severity-${severity.toLowerCase().replace(/[^a-z]+/g, "-")}">${escapeMoneyText(severity)}</span>
+                        ${details ? `<p>${escapeMoneyText(details)}</p>` : ""}
+                        <span class="health-follow-up${status.state === "overdue" ? " is-overdue" : ""}">${escapeMoneyText(statusLabel)}</span>
+                    </div>
+                    <div class="health-list-actions">
+                        ${entry.resolvedDate ? "" : `<button type="button" class="gene-action-button" onclick="resolveHealthFollowUp(${index})">Resolve</button>`}
+                        <button type="button" class="gene-action-button" onclick="removeHealthHistoryEntry(${index})">Remove</button>
+                    </div>
+                </div>
+            `;
+        })
+        .join("");
+}
+
+function addHealthHistoryEntry() {
+    const date = document.getElementById("healthDateInput").value;
+    const type = document.getElementById("healthTypeInput").value;
+    const severity = document.getElementById("healthSeverityInput").value;
+    const description = document.getElementById("healthDescriptionInput").value.trim();
+    const treatment = document.getElementById("healthTreatmentInput").value.trim();
+    const followUpDate = document.getElementById("healthFollowUpInput").value;
+
+    if (!date) {
+        alert("Enter a date before adding a health record.");
+        return;
+    }
+
+    if (!description) {
+        alert("Describe the health event before adding it.");
+        return;
+    }
+
+    currentHealthHistory.push({
+        id: `health-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        date,
+        type,
+        severity,
+        description,
+        ...(treatment ? { treatment } : {}),
+        ...(followUpDate ? { followUpDate } : {})
+    });
+    currentHealthHistory.sort((left, right) => String(left.date || "").localeCompare(String(right.date || "")));
+
+    renderHealthHistory({ healthHistory: getCurrentHealthHistory() });
+    document.getElementById("healthDescriptionInput").value = "";
+    document.getElementById("healthTreatmentInput").value = "";
+    document.getElementById("healthFollowUpInput").value = "";
+    persistCurrentHistories();
+}
+
+function removeHealthHistoryEntry(index) {
+    const history = getCurrentHealthHistory();
+
+    if (index < 0 || index >= history.length) {
+        return;
+    }
+
+    history.splice(index, 1);
+    renderHealthHistory({ healthHistory: history });
+    persistCurrentHistories();
+}
+
+function resolveHealthFollowUp(index) {
+    const history = getCurrentHealthHistory();
+    const entry = history[index];
+
+    if (!entry) {
+        return;
+    }
+
+    entry.resolvedDate = window.SnakeHealth.todayText();
+    renderHealthHistory({ healthHistory: history });
     persistCurrentHistories();
 }
 
@@ -2120,6 +2334,8 @@ function saveSnakeFromPage() {
         feederSize: document.getElementById("feederSizeInput").value.trim(),
         feedingHistory: [...getCurrentFeedingHistory()],
         shedHistory: [...getCurrentShedHistory()],
+        healthHistory: [...getCurrentHealthHistory()],
+        ...getQuarantineFormValues(),
         hatchDate: document.getElementById("hatchDateInput").value,
         acquiredDate: document.getElementById("acquiredDateInput").value,
         status,
@@ -2198,6 +2414,10 @@ window.addFeedingHistoryEntry = addFeedingHistoryEntry;
 window.updateFeedingReasonVisibility = updateFeedingReasonVisibility;
 window.endFeedingHoldFromForm = endFeedingHoldFromForm;
 window.addShedHistoryEntry = addShedHistoryEntry;
+window.addHealthHistoryEntry = addHealthHistoryEntry;
+window.removeHealthHistoryEntry = removeHealthHistoryEntry;
+window.resolveHealthFollowUp = resolveHealthFollowUp;
+window.updateQuarantineReleaseFields = updateQuarantineReleaseFields;
 window.removeWeightHistoryEntry = removeWeightHistoryEntry;
 window.removeFeedingHistoryEntry = removeFeedingHistoryEntry;
 window.removeShedHistoryEntry = removeShedHistoryEntry;
@@ -2208,10 +2428,17 @@ window.saveSnakeFromPage = saveSnakeFromPage;
 setupCollapsibleSections();
 setupGeneOptions();
 setupFeedingReasonOptions();
+setupHealthOptions();
 fillFormForEdit();
 initMoneySection();
 expandSnakeSectionFromHash();
 window.addEventListener("hashchange", expandSnakeSectionFromHash);
+
+["quarantineStartInput", "quarantineEndInput", "quarantineReasonInput", "quarantineNotesInput"]
+    .forEach(id => {
+        const input = document.getElementById(id);
+        if (input) input.addEventListener("change", renderQuarantineStatus);
+    });
 
 const photoFileInput = document.getElementById("photoFileInput");
 const cameraFileInput = document.getElementById("cameraFileInput");

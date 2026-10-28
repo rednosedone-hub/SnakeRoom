@@ -154,6 +154,119 @@ function getPairStatus(pair) {
     return "Paired";
 }
 
+function escapePairText(value) {
+    return String(value === undefined || value === null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function getPairParentSnake(reference, fallbackIndex) {
+    const directMatch = window.SnakeData.getSnakeByReference(snakes, reference);
+    const hasFallback = fallbackIndex !== null
+        && fallbackIndex !== undefined
+        && fallbackIndex !== ""
+        && Number.isInteger(Number(fallbackIndex));
+
+    return directMatch || (hasFallback ? snakes[Number(fallbackIndex)] || null : null);
+}
+
+function describeLineageEvent(event) {
+    if (!event) {
+        return "";
+    }
+
+    if (event.type === "proposed") {
+        return `${event.female?.name || "Female"} × ${event.male?.name || "Male"} (${event.label.toLowerCase()})`;
+    }
+
+    const parents = (event.parents || []).map(snake => snake?.name || "Unnamed").join(" × ");
+
+    return `${event.child?.name || "An ancestor"} came from ${parents} (${event.label.toLowerCase()})`;
+}
+
+function getLineageNotice(female, male) {
+    if (!female || !male || !window.SnakeLineage) {
+        return null;
+    }
+
+    const result = window.SnakeLineage.findCloseBreedings(female, male, snakes);
+
+    if (!result.count) {
+        return null;
+    }
+
+    const details = result.events.slice(0, 3).map(describeLineageEvent).filter(Boolean);
+    const heading = result.multiple
+        ? `Multiple close breedings in this pedigree (${result.count})`
+        : "Close breeding in this pedigree";
+
+    return {
+        count: result.count,
+        multiple: result.multiple,
+        html: `
+            <p class="pair-warning">
+                <strong>${escapePairText(heading)}.</strong>
+                ${escapePairText(details.join("; "))}${result.count > 3 ? ` and ${result.count - 3} more` : ""}.
+                This is a notice, not a block: parent-offspring and sibling pairings are
+                still available for proving out recessives.
+            </p>
+        `
+    };
+}
+
+function getPairHealthNotices(female, male) {
+    if (!window.SnakeHealth) {
+        return [];
+    }
+
+    return [female, male]
+        .filter(Boolean)
+        .map(snake => ({ snake, quarantine: window.SnakeHealth.getQuarantineStatus(snake) }))
+        .filter(item => item.quarantine.active)
+        .map(item => `
+            <p class="pair-warning">
+                <strong>${escapePairText(item.snake.name || "A parent")} is in quarantine.</strong>
+                ${escapePairText(item.quarantine.label)}${item.quarantine.end ? ` (expected release ${escapePairText(item.quarantine.end)})` : ""}.
+            </p>
+        `);
+}
+
+function renderPairCheck() {
+    const container = document.getElementById("lineageWarning");
+
+    if (!container) {
+        return;
+    }
+
+    const female = getPairParentSnake(document.getElementById("femaleSelect").value, null);
+    const male = getPairParentSnake(document.getElementById("maleSelect").value, null);
+    const notices = [...getPairHealthNotices(female, male)];
+    const lineage = getLineageNotice(female, male);
+
+    if (lineage) {
+        notices.unshift(lineage.html);
+    }
+
+    container.hidden = notices.length === 0;
+    container.innerHTML = notices.join("");
+}
+
+function getPairNotices(pair) {
+    const female = getPairParentSnake(pair.femaleSnakeId, pair.femaleIndex);
+    const male = getPairParentSnake(pair.maleSnakeId, pair.maleIndex);
+    const notices = [...getPairHealthNotices(female, male)];
+    const lineage = getLineageNotice(female, male);
+
+    if (lineage) {
+        notices.unshift(lineage.html);
+    }
+
+    return notices.join("");
+}
+
 function saveBreedingPair() {
     const femaleSnakeId = document.getElementById("femaleSelect").value;
     const maleSnakeId = document.getElementById("maleSelect").value;
@@ -196,6 +309,7 @@ function clearPairForm() {
     document.getElementById("preLayShedDateInput").value = "";
     document.getElementById("eggsLaidDateInput").value = "";
     document.getElementById("eggCountInput").value = "";
+    renderPairCheck();
 }
 
 function updatePairField(pairId, fieldName, value) {
@@ -444,6 +558,8 @@ function renderBreedingPairs() {
                 </p>
             ` : ""}
 
+            ${getPairNotices(pair)}
+
             <div class="breeding-event-list">
                 ${getPairings(pair).length
                     ? getPairings(pair).map((pairing, index) => `
@@ -642,6 +758,13 @@ document.addEventListener("keydown", event => {
 setupSnakeSelects();
 migrateBreedingReferences();
 ensureClutchTokens();
+
+["femaleSelect", "maleSelect"].forEach(id => {
+    const select = document.getElementById(id);
+    if (select) select.addEventListener("change", renderPairCheck);
+});
+
+renderPairCheck();
 renderBreedingPairs();
 renderPairHistory();
 renderClutches();

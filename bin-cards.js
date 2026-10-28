@@ -168,7 +168,11 @@ function getGeneLabel(gene) {
 
 function getMorphLabels(snake) {
     if (Array.isArray(snake.genes) && snake.genes.length > 0) {
-        return snake.genes.map(getGeneLabel).filter(Boolean);
+        const displayGenes = window.GeneTools?.sortGenesForDisplay
+            ? window.GeneTools.sortGenesForDisplay(snake.genes)
+            : snake.genes;
+
+        return displayGenes.map(getGeneLabel).filter(Boolean);
     }
 
     return [snake.morph || snake.ID || "No morph entered"];

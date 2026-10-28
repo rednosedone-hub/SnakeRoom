@@ -146,6 +146,34 @@ function getStoredGenePillClass(geneRecord) {
     return getPossibleHetOdds(geneRecord) === null ? "" : "probhet";
 }
 
+// Hobby labels put the base morph first and recessives last: "Fire Clown",
+// "Fire Het Clown". Sorting by rank only keeps the keeper's order within each
+// group, so a familiar combination does not get alphabetized into nonsense.
+function getGeneDisplayRank(geneRecord) {
+    if (!geneRecord || !geneRecord.name) {
+        return 0;
+    }
+
+    const gene = findGene(geneRecord.name);
+    const type = gene ? gene.type : geneRecord.type;
+
+    return type === "recessive" ? 1 : 0;
+}
+
+function compareGenesForDisplay(left, right) {
+    return getGeneDisplayRank(left) - getGeneDisplayRank(right);
+}
+
+function sortGenesForDisplay(genes) {
+    return (Array.isArray(genes) ? genes.slice() : []).sort(compareGenesForDisplay);
+}
+
+function describeGenes(genes) {
+    return sortGenesForDisplay(genes)
+        .map(gene => (gene && gene.name ? describeGene(gene) : ""))
+        .filter(Boolean);
+}
+
 function describeGene(geneRecord) {
     const gene = findGene(geneRecord.name);
     const type = gene ? gene.type : geneRecord.type;
@@ -178,6 +206,9 @@ window.GeneTools = {
     findGene: findGene,
     addCustomGeneToCatalog: addCustomGeneToCatalog,
     describeGene: describeGene,
+    describeGenes: describeGenes,
+    compareGenesForDisplay: compareGenesForDisplay,
+    sortGenesForDisplay: sortGenesForDisplay,
     isNonGeneName: isNonGeneName,
     stripNonGenes: stripNonGenes,
     getPossibleHetOdds: getPossibleHetOdds,

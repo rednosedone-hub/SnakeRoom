@@ -8,6 +8,15 @@
 - フロントエンドの詳細は `ROADMAP.md` を参照してください。
 - このリポジトリは Finaltable-Hub / SnakeRoom からフォークして作成しました。
 
+## Tests
+
+The gene-label, ordering, health-watch and lineage checks use Node's built-in
+test runner and need no package install:
+
+```
+npm test
+```
+
 ## HelloDocker
 
 - Java 21 / 17 ベースの Spring Boot 3 アプリです (アプリケーションは `--release` で 21 または 17 を選べます)。

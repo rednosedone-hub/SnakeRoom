@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Breeding</title>
-    <link rel="stylesheet" href="style.css?v=41">
+    <link rel="stylesheet" href="style.css?v=43">
 </head>
 
 <body>
@@ -77,6 +77,8 @@
                     </label>
                 </div>
 
+                <div id="lineageWarning" class="lineage-warning" hidden></div>
+
                 <div class="form-page-actions">
                     <button type="button" class="main-button" onclick="saveBreedingPair()">
                         Save Pair
@@ -140,7 +142,9 @@
     <script src="cloud-sync.js?v=13"></script>
     <script src="auto-sync.js?v=8"></script>
     <script src="account-gate.js?v=1"></script>
-    <script src="breeding.js"></script>
+    <script src="health-helpers.js?v=1"></script>
+    <script src="lineage.js?v=1"></script>
+    <script src="breeding.js?v=2"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

@@ -1,0 +1,12 @@
+{
+  "name": "the-snake-room",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local-first ball python collection manager.",
+  "scripts": {
+    "test": "node --test tests/gene-labels.test.js tests/combo-names.test.js tests/health-helpers.test.js tests/lineage.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Snake Record</title>
-    <link rel="stylesheet" href="style.css?v=42">
+    <link rel="stylesheet" href="style.css?v=43">
 </head>
 
 <body>
@@ -404,6 +404,113 @@
                 </div>
             </section>
 
+            <section class="form-section" id="healthSection">
+                <h3>Health &amp; Quarantine</h3>
+
+                <p class="empty-message">
+                    Keep quarantine dates, treatments and follow-ups with this animal.
+                    A health event can have a follow-up date; it stays on the health
+                    watchlist until marked resolved.
+                </p>
+
+                <div class="health-status-line" id="quarantineStatus"></div>
+
+                <div class="form-grid">
+                    <label class="form-field">
+                        <span>Quarantine Start</span>
+                        <input type="date" id="quarantineStartInput">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Expected Release</span>
+                        <input type="date" id="quarantineEndInput">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Quarantine Reason</span>
+                        <input type="text" id="quarantineReasonInput" list="quarantineReasons"
+                            placeholder="New arrival, mites, illness...">
+                    </label>
+
+                    <label class="form-field checkbox-field">
+                        <span>Released from Quarantine</span>
+                        <input type="checkbox" id="quarantineReleasedInput"
+                            onchange="updateQuarantineReleaseFields()">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Released On</span>
+                        <input type="date" id="quarantineReleasedDateInput">
+                    </label>
+                </div>
+
+                <label class="form-field">
+                    <span>Quarantine Notes</span>
+                    <textarea id="quarantineNotesInput" rows="2"
+                        placeholder="Bin, room, tests, or anything worth remembering..."></textarea>
+                </label>
+
+                <datalist id="quarantineReasons">
+                    <option value="New arrival"></option>
+                    <option value="Illness"></option>
+                    <option value="Mites"></option>
+                    <option value="Preventative"></option>
+                    <option value="Other"></option>
+                </datalist>
+
+                <div class="form-field">
+                    <h4>Health Records</h4>
+                    <p class="empty-message">
+                        Record checkups, illness, injuries, mites, regurgitations and
+                        treatments. Follow-ups that are due or overdue appear on the
+                        home watchlist.
+                    </p>
+
+                    <div class="form-grid">
+                        <label class="form-field">
+                            <span>Date</span>
+                            <input type="date" id="healthDateInput">
+                        </label>
+
+                        <label class="form-field">
+                            <span>Type</span>
+                            <select id="healthTypeInput"></select>
+                        </label>
+
+                        <label class="form-field">
+                            <span>Severity</span>
+                            <select id="healthSeverityInput"></select>
+                        </label>
+
+                        <label class="form-field">
+                            <span>Follow-Up</span>
+                            <input type="date" id="healthFollowUpInput">
+                        </label>
+
+                        <label class="form-field" style="grid-column: 1 / -1;">
+                            <span>Description</span>
+                            <input type="text" id="healthDescriptionInput"
+                                placeholder="What happened?">
+                        </label>
+
+                        <label class="form-field" style="grid-column: 1 / -1;">
+                            <span>Treatment / Notes</span>
+                            <input type="text" id="healthTreatmentInput"
+                                placeholder="Medication, dose, vet advice...">
+                        </label>
+                    </div>
+
+                    <button type="button" onclick="addHealthHistoryEntry()"
+                        class="gene-action-button">
+                        Add Health Record
+                    </button>
+
+                    <div id="healthHistoryList" class="health-list">
+                        <p class="empty-message">No health records yet.</p>
+                    </div>
+                </div>
+            </section>
+
             <section class="form-section">
                 <h3>Photos</h3>
 
@@ -508,10 +615,11 @@
     <script src="auto-sync.js?v=8"></script>
     <script src="account-gate.js?v=1"></script>
     <script src="geneCatalog.js?v=3"></script>
-    <script src="genes.js?v=7"></script>
+    <script src="genes.js?v=8"></script>
     <script src="feed-helpers.js?v=4"></script>
     <script src="finance-helpers.js?v=1"></script>
-    <script src="snake-form.js?v=14"></script>
+    <script src="health-helpers.js?v=1"></script>
+    <script src="snake-form.js?v=16"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

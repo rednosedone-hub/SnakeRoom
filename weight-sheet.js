@@ -58,11 +58,11 @@ function getSnakeGenes(snake) {
         return "";
     }
 
-    return snake.genes.map(gene => {
-        return window.GeneTools 
-            ? window.GeneTools.describeGene(gene) 
-            : gene.name;
-    }).join(", ");
+    if (window.GeneTools?.describeGenes) {
+        return window.GeneTools.describeGenes(snake.genes).join(", ");
+    }
+
+    return snake.genes.map(gene => gene.name).join(", ");
 }
 
 function renderWeightSheet() {

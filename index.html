@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room</title>
-    <link rel="stylesheet" href="style.css?v=41">
+    <link rel="stylesheet" href="style.css?v=43">
 </head>
 
 <body>
@@ -99,6 +99,20 @@
 
                 <div class="dashboard-list" id="feedingDueList"></div>
             </section>
+
+            <section class="dashboard-section" id="healthWatchSection">
+                <div class="section-heading-row">
+                    <h3>Health Watchlist</h3>
+                    <a href="snakes.html" class="small-link-button">Collection</a>
+                </div>
+
+                <p class="empty-message">
+                    Quarantine dates, due follow-ups, recent refusals, regurgitations and
+                    meaningful weight drops. Open a snake record to add or resolve an item.
+                </p>
+
+                <div class="dashboard-list" id="healthWatchList"></div>
+            </section>
         </main>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -109,7 +123,8 @@
     <script src="account-gate.js?v=1"></script>
     <script src="feed-helpers.js?v=4"></script>
     <script src="finance-helpers.js?v=1"></script>
-    <script src="dashboard.js?v=6"></script>
+    <script src="health-helpers.js?v=1"></script>
+    <script src="dashboard.js?v=7"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

@@ -188,6 +188,15 @@ function updateBulkActionBar() {
     "flex" : "none";
 }
 
+function escapeHealthText(value) {
+    return String(value === undefined || value === null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
 function getGeneDescription(geneRecord) {
     if (window.GeneTools) {
         return window.GeneTools.describeGene(geneRecord);
@@ -494,8 +503,14 @@ function renderSnakes() {
         const feedingText = snake.lastFed
             ? `Last fed: ${snake.lastFed}`
             : "No feeding date";
-        const genePills = Array.isArray(snake.genes) && snake.genes.length > 0
-            ? snake.genes.map(gene => `<span class="gene-pill ${getStoredGenePillClass(gene)}">${getGeneDescription(gene)}</span>`).join("")
+        const displayGenes = Array.isArray(snake.genes) && window.GeneTools?.sortGenesForDisplay
+            ? window.GeneTools.sortGenesForDisplay(snake.genes)
+            : snake.genes;
+        const healthBadge = window.SnakeHealth?.getHealthBadge
+            ? window.SnakeHealth.getHealthBadge(snake)
+            : null;
+        const genePills = Array.isArray(displayGenes) && displayGenes.length > 0
+            ? displayGenes.map(gene => `<span class="gene-pill ${getStoredGenePillClass(gene)}">${getGeneDescription(gene)}</span>`).join("")
             : `<span class="gene-pill">No genes entered</span>`;
         const binNumberText = snake.binNumber ? `Bin: ${snake.binNumber}` : "No bin number";
         const photoCountBadge = Array.isArray(snake.photos) && snake.photos.length > 1
@@ -553,6 +568,7 @@ function renderSnakes() {
                     <span>${feedingText}</span>
                     <span>${feederText}</span>
                     <span>${snake.status || "No status"}</span>
+                    ${healthBadge ? `<span class="health-badge ${healthBadge.className}" title="${escapeHealthText(healthBadge.title)}">${escapeHealthText(healthBadge.label)}</span>` : ""}
                     ${retirementDetail ? `<span>${retirementDetail}</span>` : ""}
                 </div>
 
@@ -612,6 +628,12 @@ function renderSnakeTable(snakeList) {
         const weightText = snake.weight ? `${snake.weight}g` : "";
         const identityText = getSnakeIdentityText(snake);
         const feedingInterval = snake.feedingIntervalDays || 7;
+        const healthBadge = window.SnakeHealth?.getHealthBadge
+            ? window.SnakeHealth.getHealthBadge(snake)
+            : null;
+        const healthBadgeHtml = healthBadge
+            ? ` <span class="health-badge ${healthBadge.className}" title="${escapeHealthText(healthBadge.title)}">${escapeHealthText(healthBadge.label)}</span>`
+            : "";
 
         return `
             <tr>
@@ -628,7 +650,7 @@ function renderSnakeTable(snakeList) {
                 <td>${snake.lastFed || ""}</td>
                 <td>${feedingInterval}</td>
                 <td>${snake.feederSize || ""}</td>
-                <td>${snake.status || ""}</td>
+                <td>${snake.status || ""}${healthBadgeHtml}</td>
                 <td>
                     <a href="${window.SnakeData.getSnakeQrImageUrl(snake, 220)}" target="_blank" rel="noopener">
                         QR

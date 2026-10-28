@@ -1695,9 +1695,11 @@ function promoteHoldback(goalId, stepId, holdbackId) {
 // Axanthic read "Red Axanthic" and a proven carrier reads "100% Het ..."
 // instead of a bare name that could mean either.
 function getSnakeLine(snake) {
-    const geneNames = (snake.genes || [])
-        .map(gene => (gene && gene.name ? window.GeneTools.describeGene(gene) : ""))
-        .filter(Boolean);
+    const geneNames = window.GeneTools.describeGenes
+        ? window.GeneTools.describeGenes(snake.genes)
+        : (snake.genes || [])
+            .map(gene => (gene && gene.name ? window.GeneTools.describeGene(gene) : ""))
+            .filter(Boolean);
 
     const geneLine = geneNames.join(", ");
 

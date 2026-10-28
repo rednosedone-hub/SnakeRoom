@@ -3921,3 +3921,156 @@ body.has-sync-banner .collection-notice {
 .closed-pair-card .card-buttons {
     margin-top: 0;
 }
+
+/* Health watch, quarantine and health records */
+
+.health-badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border: 1px solid var(--goldenrod-color);
+    border-radius: 999px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11px;
+    line-height: 1.25;
+    color: var(--text-color);
+    background-color: rgba(0, 0, 0, 0.28);
+}
+
+.health-badge-quarantine {
+    border-color: #c9a227;
+}
+
+.health-badge-alert {
+    border-color: #c0392b;
+    color: #ffb4a8;
+}
+
+.health-badge-watch {
+    border-color: #b8860b;
+    color: #f0d58a;
+}
+
+.health-watch-item.is-urgent {
+    border-color: #c0392b;
+}
+
+.health-watch-item a {
+    color: var(--gold-color);
+    text-decoration: none;
+}
+
+.health-watch-item a:hover {
+    text-decoration: underline;
+}
+
+.health-status-line {
+    margin: 12px 0;
+    padding: 10px 12px;
+    border: 1px solid #4a4128;
+    border-radius: 8px;
+    color: var(--silver-color);
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+}
+
+.health-status-line.is-active {
+    border-color: var(--goldenrod-color);
+    color: var(--text-color);
+    background-color: #2a2108;
+}
+
+.health-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.health-list-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    padding: 12px;
+    border: 1px solid #4a4128;
+    border-radius: 8px;
+    background-color: rgba(0, 0, 0, 0.22);
+    color: var(--text-color);
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.health-list-main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.health-list-main p {
+    flex-basis: 100%;
+    margin: 0;
+    color: var(--silver-color);
+}
+
+.health-list-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.health-list-actions .gene-action-button {
+    padding: 5px 9px;
+    font-size: 12px;
+}
+
+.health-severity {
+    padding: 2px 7px;
+    border: 1px solid #4a4128;
+    border-radius: 999px;
+    font-size: 11px;
+}
+
+.health-severity-severe {
+    border-color: #c0392b;
+    color: #ffb4a8;
+}
+
+.health-severity-moderate {
+    border-color: #b8860b;
+    color: #f0d58a;
+}
+
+.health-follow-up {
+    flex-basis: 100%;
+    color: var(--silver-color);
+    font-size: 12px;
+}
+
+.health-follow-up.is-overdue {
+    color: #ffb4a8;
+}
+
+.lineage-warning {
+    margin-top: 14px;
+}
+
+.lineage-warning .pair-warning:first-child {
+    margin-top: 0;
+}
+
+@media (max-width: 520px) {
+    .health-list-item {
+        flex-direction: column;
+    }
+
+    .health-list-actions {
+        width: 100%;
+    }
+
+    .health-list-actions .gene-action-button {
+        flex: 1;
+    }
+}
