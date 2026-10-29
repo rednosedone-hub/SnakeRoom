@@ -5164,6 +5164,16 @@ body.has-sync-banner .collection-notice {
     font-size: 14px;
     color: #c9c2a6;
     white-space: nowrap;
+    text-align: right;
+}
+
+/* The pickup date is a limit, not an appointment: it sits under the order
+   date so the gap between the two reads as the window. */
+.feeder-weekly-pickup {
+    display: block;
+    margin-top: 2px;
+    font-size: 12px;
+    color: #a89f86;
 }
 
 @media (max-width: 520px) {

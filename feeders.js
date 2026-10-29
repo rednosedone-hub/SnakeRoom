@@ -877,6 +877,28 @@
         return order.lines.reduce((sum, line) => sum + getFeederPrice(line.size) * line.quantity, 0);
     }
 
+    // One trip covers every size, so the dealer only needs the earliest
+    // “last useful day” on the order.
+    function getWeeklyCollectBy(order) {
+        const dates = order.lines
+            .map(line => line.collectBy)
+            .filter(Boolean)
+            .sort();
+
+        return dates[0] || "";
+    }
+
+    function getWeeklyMessageText(order) {
+        const cost = getWeeklyOrderCost(order);
+        const collectBy = getWeeklyCollectBy(order);
+
+        return Feeders.formatWeeklyOrderText(order, {
+            supplier: getWeeklyVendor(),
+            costText: cost > 0 ? formatMoney(Math.round(cost * 100) / 100) : "",
+            collectByText: collectBy ? formatShortDate(collectBy) : ""
+        });
+    }
+
     function renderWeeklyOrder() {
         const order = getWeeklyOrder();
         const list = $("feederWeeklyList");
@@ -892,10 +914,7 @@
         }
 
         const cost = getWeeklyOrderCost(order);
-        const messageText = Feeders.formatWeeklyOrderText(order, {
-            supplier: getWeeklyVendor(),
-            costText: cost > 0 ? formatMoney(Math.round(cost * 100) / 100) : ""
-        });
+        const messageText = getWeeklyMessageText(order);
 
         if (message) {
             message.textContent = messageText;
@@ -921,9 +940,14 @@
             ? ` Amounts cover the full ${forecast.horizonDays}-day forecast, not just this week.`
             : "";
 
+        const collectBy = getWeeklyCollectBy(order);
+        const pickupNote = collectBy
+            ? ` Collection day can move - the last useful day is ${formatShortDate(collectBy)}.`
+            : "";
+
         note.textContent = `${order.sizes} feeder size${order.sizes === 1 ? "" : "s"} `
             + `(${order.totalQuantity} feeders) due by ${formatShortDate(order.endDate)}. `
-            + `One supplier run covers the whole week.${coverage}`;
+            + `One supplier run covers the whole week.${coverage}${pickupNote}`;
 
         list.innerHTML = order.lines.map(line => `
             <li class="feeder-weekly-line">
@@ -933,6 +957,9 @@
                     ${line.status === "order"
                         ? "Order now"
                         : `Order by ${formatShortDate(line.neededBy)}`}
+                    ${line.collectBy
+                        ? `<span class="feeder-weekly-pickup">Pick up by ${formatShortDate(line.collectBy)}</span>`
+                        : ""}
                 </span>
             </li>
         `).join("");
@@ -982,11 +1009,7 @@
             return;
         }
 
-        const cost = getWeeklyOrderCost(order);
-        const text = Feeders.formatWeeklyOrderText(order, {
-            supplier: getWeeklyVendor(),
-            costText: cost > 0 ? formatMoney(Math.round(cost * 100) / 100) : ""
-        });
+        const text = getWeeklyMessageText(order);
         const copied = await copyTextToClipboard(text);
 
         setStatus(

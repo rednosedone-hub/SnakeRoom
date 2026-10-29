@@ -745,15 +745,25 @@
                 // Nothing is scheduled, but the freezer is below its buffer.
                 return size.suggestedOrder > 0;
             })
-            .map(size => ({
-                size: size.size,
-                quantity: quantityFor(size),
-                status: size.status,
-                nextDate: size.nextDate,
-                neededBy: forecast.mode === "live"
-                    ? (size.nextDate || today)
-                    : (size.orderByDate || size.nextDate || today)
-            }))
+            .map(size => {
+                // When stock runs out is the only hard date: a pickup can happen
+                // on any day before it, which is what two busy schedules need.
+                const collectBy = forecast.mode === "live"
+                    ? (size.nextDate || "")
+                    : (size.runsOutDate || "");
+
+                return {
+                    size: size.size,
+                    quantity: quantityFor(size),
+                    status: size.status,
+                    nextDate: size.nextDate,
+                    collectBy,
+                    collectSlackDays: collectBy ? daysBetween(today, collectBy) : null,
+                    neededBy: forecast.mode === "live"
+                        ? (size.nextDate || today)
+                        : (size.orderByDate || size.nextDate || today)
+                };
+            })
             .sort((left, right) =>
                 String(left.neededBy).localeCompare(String(right.neededBy))
                 || left.size.localeCompare(right.size)
@@ -783,14 +793,19 @@
         const supplier = String(opts.supplier || "").trim();
         // Formatted by the caller so the message uses the app's currency.
         const costText = String(opts.costText || "").trim();
+        // The last day the feeders are still useful, if the caller can format
+        // it: a pickup can slide up to this date without a schedule change.
+        const collectByText = String(opts.collectByText || "").trim();
         const lines = order.lines.map(line => `${line.quantity} x ${line.size}`);
         const total = `Total: ${order.totalQuantity} feeder${order.totalQuantity === 1 ? "" : "s"}`
             + (costText ? ` (about ${costText})` : "");
+        const pickup = collectByText ? `Can collect any day up to ${collectByText}.` : "";
 
         return [
             supplier ? `Feeder order for ${supplier}` : "Feeder order",
             ...lines,
-            total
+            total,
+            ...(pickup ? [pickup] : [])
         ].join("\n");
     }
 

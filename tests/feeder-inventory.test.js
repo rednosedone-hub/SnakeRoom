@@ -433,3 +433,47 @@ test("the order-by date keeps three days for agreeing a pickup", () => {
     assert.equal(row.runsOutDate, "2026-11-10");
     assert.equal(row.orderByDate, "2026-11-07");
 });
+
+test("a weekly order line knows the last day its feeders are still useful", () => {
+    const result = forecastFor(
+        [snake({ lastFed: "2026-10-22" })],
+        [{ size: "Small Rat", onHand: 2, reorderAt: 0 }]
+    );
+    const weekly = feeders.buildWeeklyOrder({ forecast: result, days: 7 });
+    const line = weekly.lines[0];
+
+    // The order is due by 29 Oct, but the two on hand still feed 29 Oct and
+    // 5 Nov, so a pickup can slide up to 5 Nov without changing any feeding day.
+    assert.equal(line.size, "Small Rat");
+    assert.equal(line.collectBy, "2026-11-05");
+    assert.equal(line.collectSlackDays, 9);
+});
+
+test("a live order is collected on the feeding day itself", () => {
+    const result = forecastFor(
+        [snake({ lastFed: "2026-10-26", feedingIntervalDays: "7" })],
+        [],
+        inventory({ mode: "live" })
+    );
+    const weekly = feeders.buildWeeklyOrder({ forecast: result, days: 7 });
+
+    assert.equal(weekly.lines[0].collectBy, "2026-11-02");
+    assert.equal(weekly.lines[0].collectSlackDays, 6);
+});
+
+test("the text order can offer a pickup window instead of an appointment", () => {
+    const text = feeders.formatWeeklyOrderText(
+        { lines: [{ size: "Small Rat", quantity: 9 }], totalQuantity: 9 },
+        { supplier: "Rodent Ranch", costText: "$29.25", collectByText: "Tue, Nov 3" }
+    );
+
+    assert.equal(
+        text,
+        [
+            "Feeder order for Rodent Ranch",
+            "9 x Small Rat",
+            "Total: 9 feeders (about $29.25)",
+            "Can collect any day up to Tue, Nov 3."
+        ].join("\n")
+    );
+});
