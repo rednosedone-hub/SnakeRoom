@@ -795,11 +795,14 @@
         const costText = String(opts.costText || "").trim();
         // The last day the feeders are still useful, if the caller can format
         // it: a pickup can slide up to this date without a schedule change.
+        // Once stock is already gone there is no window to offer, only urgency.
         const collectByText = String(opts.collectByText || "").trim();
         const lines = order.lines.map(line => `${line.quantity} x ${line.size}`);
         const total = `Total: ${order.totalQuantity} feeder${order.totalQuantity === 1 ? "" : "s"}`
             + (costText ? ` (about ${costText})` : "");
-        const pickup = collectByText ? `Can collect any day up to ${collectByText}.` : "";
+        const pickup = collectByText
+            ? `Can collect any day up to ${collectByText}.`
+            : opts.urgentPickup ? "Need these as soon as possible." : "";
 
         return [
             supplier ? `Feeder order for ${supplier}` : "Feeder order",

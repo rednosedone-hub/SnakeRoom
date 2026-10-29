@@ -888,14 +888,28 @@
         return dates[0] || "";
     }
 
+    // A pickup window only exists while there is still stock to feed; once a
+    // size has already run out the useful message is urgency, not a date.
+    function getWeeklyPickup(order) {
+        const collectBy = getWeeklyCollectBy(order);
+        const stillCovered = collectBy && collectBy > forecast.today;
+
+        return {
+            collectBy,
+            dateText: stillCovered ? formatShortDate(collectBy) : "",
+            urgent: Boolean(collectBy) && !stillCovered
+        };
+    }
+
     function getWeeklyMessageText(order) {
         const cost = getWeeklyOrderCost(order);
-        const collectBy = getWeeklyCollectBy(order);
+        const pickup = getWeeklyPickup(order);
 
         return Feeders.formatWeeklyOrderText(order, {
             supplier: getWeeklyVendor(),
             costText: cost > 0 ? formatMoney(Math.round(cost * 100) / 100) : "",
-            collectByText: collectBy ? formatShortDate(collectBy) : ""
+            collectByText: pickup.dateText,
+            urgentPickup: pickup.urgent
         });
     }
 
@@ -940,9 +954,11 @@
             ? ` Amounts cover the full ${forecast.horizonDays}-day forecast, not just this week.`
             : "";
 
-        const collectBy = getWeeklyCollectBy(order);
-        const pickupNote = collectBy
-            ? ` Collection day can move - the last useful day is ${formatShortDate(collectBy)}.`
+        const pickup = getWeeklyPickup(order);
+        const pickupNote = pickup.collectBy
+            ? pickup.dateText
+                ? ` Collection day can move - the last useful day is ${pickup.dateText}.`
+                : " Some sizes are already out, so collect as soon as you can."
             : "";
 
         note.textContent = `${order.sizes} feeder size${order.sizes === 1 ? "" : "s"} `
@@ -958,7 +974,9 @@
                         ? "Order now"
                         : `Order by ${formatShortDate(line.neededBy)}`}
                     ${line.collectBy
-                        ? `<span class="feeder-weekly-pickup">Pick up by ${formatShortDate(line.collectBy)}</span>`
+                        ? `<span class="feeder-weekly-pickup">${line.collectBy > forecast.today
+                            ? `Pick up by ${formatShortDate(line.collectBy)}`
+                            : "None left"}</span>`
                         : ""}
                 </span>
             </li>

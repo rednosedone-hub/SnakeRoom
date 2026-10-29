@@ -477,3 +477,15 @@ test("the text order can offer a pickup window instead of an appointment", () =>
         ].join("\n")
     );
 });
+
+test("an order that has already run out asks for the feeders now, not a date", () => {
+    const text = feeders.formatWeeklyOrderText(
+        { lines: [{ size: "Small Rat", quantity: 3 }], totalQuantity: 3 },
+        { collectByText: "", urgentPickup: true }
+    );
+
+    assert.equal(
+        text,
+        "Feeder order\n3 x Small Rat\nTotal: 3 feeders\nNeed these as soon as possible."
+    );
+});
