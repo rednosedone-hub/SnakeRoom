@@ -293,10 +293,10 @@
                     </tr>
                 </thead>
                 <tbody>
-                    ${outcomes.map(outcome => `
+                    ${outcomes.map((outcome, index) => `
                         <tr>
                             <td class="probability-cell">${formatProbability(outcome.probability)}</td>
-                            <td>${outcome.morphName}</td>
+                            <td class="morph-name-cell" data-outcome-index="${index}">${outcome.morphName}</td>
                             <td>
                                 ${outcome.geneDetails.length
                                     ? outcome.geneDetails.map(gene => `
@@ -309,9 +309,62 @@
                     `).join("")}
                 </tbody>
             </table>
+
+            <p class="morph-example-note">
+                Morphs someone has photographed show a photo count &mdash; click the name to open
+                those examples in the <a href="morphGallery.html">Morph Gallery</a>.
+            </p>
         `;
+
+        loadOutcomePhotoCounts(outcomes);
     }
 
+    // The count is text, not a thumbnail: the table stays fast on a slow phone,
+    // and a keeper only sees other people's animals when they ask to.
+    async function loadOutcomePhotoCounts(outcomes) {
+        if (!window.MorphGallery || typeof window.MorphGallery.fetchExamples !== "function") {
+            return;
+        }
+
+        const cells = elements.results.querySelectorAll(".morph-name-cell");
+        let examples;
+
+        try {
+            examples = await window.MorphGallery.fetchExamples(
+                outcomes.map(outcome => window.MorphGallery.morphKeyFromOutcome(outcome))
+            );
+        } catch (error) {
+            return;
+        }
+
+        // The results may have been recalculated while the counts were loading.
+        if (!elements.results.contains(cells[0] || null)) {
+            return;
+        }
+
+        cells.forEach(cell => {
+            const outcome = outcomes[Number(cell.dataset.outcomeIndex)];
+            const photos = outcome
+                ? examples.get(window.MorphGallery.morphKeyFromOutcome(outcome)) || []
+                : [];
+
+            if (!outcome || photos.length === 0) {
+                return;
+            }
+
+            const galleryUrl = `morphGallery.html?q=${encodeURIComponent(outcome.morphName)}&open=1`;
+
+            cell.innerHTML = `
+                <a class="morph-name-link" href="${galleryUrl}"
+                    title="See ${photos.length} real example${photos.length === 1 ? "" : "s"} of ${outcome.morphName}">
+                    ${outcome.morphName}<span class="morph-photo-badge">${photos.length} photo${photos.length === 1 ? "" : "s"}</span>
+                </a>
+            `;
+        });
+    }
+
+    // Pairing math runs on the calculator page and nowhere else, so the gallery
+    // link in the results knows the same names and genotypes the table shows.
     function calculatePairing() {
         const outcomes = window.MorphCalculator.calculatePairing(
             parentGenes.female,

@@ -138,8 +138,8 @@
                 : " A live feeder order can be recorded too; it just does not change the freezer count.");
 
         $("feederLeadNote").textContent = mode === "live"
-            ? "The lead time decides when a live order shows as “buy now” before its feeding day."
-            : "An order placed this many days before stock runs out should arrive in time. Set 0 to order on the day it runs out.";
+            ? "The lead time decides when a live order shows as “buy now” before its feeding day. Three days is the minimum, so there is time to agree a pickup."
+            : "An order is flagged this many days before stock runs out, so there is time to arrange a pickup. Three days is the minimum.";
 
         $("feederKpiMode").textContent = Feeders.MODES[mode].label;
         $("feederKpiModeNote").textContent = mode === "live"
@@ -850,6 +850,154 @@
         );
     }
 
+    // ---- One order this week -----------------------------------------------
+
+    function getWeeklyOrder() {
+        return Feeders.buildWeeklyOrder({ forecast, days: 7 });
+    }
+
+    function getLastFeederVendor() {
+        const last = expenses
+            .filter(expense => expense.category === "Feeders" && String(expense.vendor || "").trim())
+            .sort((left, right) => String(right.date || "").localeCompare(String(left.date || "")))[0];
+
+        return last ? String(last.vendor).trim() : "";
+    }
+
+    // Whoever this week's message is addressed to: a supplier typed into the
+    // order form wins, otherwise the last supplier actually used.
+    function getWeeklyVendor() {
+        const input = $("feederOrderVendor");
+        const typed = input ? String(input.value || "").trim() : "";
+
+        return typed || getLastFeederVendor();
+    }
+
+    function getWeeklyOrderCost(order) {
+        return order.lines.reduce((sum, line) => sum + getFeederPrice(line.size) * line.quantity, 0);
+    }
+
+    function renderWeeklyOrder() {
+        const order = getWeeklyOrder();
+        const list = $("feederWeeklyList");
+        const note = $("feederWeeklyNote");
+        const windowLabel = $("feederWeeklyWindow");
+        const totalLine = $("feederWeeklyTotal");
+        const fillButton = $("fillWeeklyOrderButton");
+        const copyButton = $("copyWeeklyOrderButton");
+        const message = $("feederWeeklyMessage");
+
+        if (!list || !note || !fillButton || !copyButton) {
+            return;
+        }
+
+        const cost = getWeeklyOrderCost(order);
+        const messageText = Feeders.formatWeeklyOrderText(order, {
+            supplier: getWeeklyVendor(),
+            costText: cost > 0 ? formatMoney(Math.round(cost * 100) / 100) : ""
+        });
+
+        if (message) {
+            message.textContent = messageText;
+            message.hidden = !messageText;
+        }
+
+        windowLabel.textContent = order.endDate
+            ? `${formatShortDate(order.today)} \u2013 ${formatShortDate(order.endDate)}`
+            : "";
+
+        if (order.sizes === 0) {
+            list.innerHTML = "";
+            totalLine.textContent = "";
+            note.textContent = "Nothing needs ordering this week. The forecast below will show the next size to re-order.";
+            fillButton.disabled = true;
+            copyButton.disabled = true;
+            return;
+        }
+
+        // Frozen quantities are the whole forecast window plus the buffer, so
+        // say that plainly: 13 feeders for one week of meals would be wrong.
+        const coverage = forecast.mode === "frozen"
+            ? ` Amounts cover the full ${forecast.horizonDays}-day forecast, not just this week.`
+            : "";
+
+        note.textContent = `${order.sizes} feeder size${order.sizes === 1 ? "" : "s"} `
+            + `(${order.totalQuantity} feeders) due by ${formatShortDate(order.endDate)}. `
+            + `One supplier run covers the whole week.${coverage}`;
+
+        list.innerHTML = order.lines.map(line => `
+            <li class="feeder-weekly-line">
+                <span class="feeder-weekly-qty">${line.quantity}</span>
+                <span class="feeder-weekly-size">${escapeHtml(line.size)}</span>
+                <span class="feeder-weekly-when">
+                    ${line.status === "order"
+                        ? "Order now"
+                        : `Order by ${formatShortDate(line.neededBy)}`}
+                </span>
+            </li>
+        `).join("");
+
+        totalLine.textContent = cost > 0
+            ? `Estimated cost: ${formatMoney(Math.round(cost * 100) / 100)} using your saved feeder prices.`
+            : "Add feeder prices in Finances to estimate this order.";
+
+        fillButton.disabled = false;
+        copyButton.disabled = false;
+    }
+
+    function fillWeeklyOrder() {
+        const order = getWeeklyOrder();
+        const container = $("feederOrderLines");
+
+        if (!container || order.sizes === 0) {
+            setStatus("feederWeeklyStatus", "Nothing needs ordering this week.", true);
+            return;
+        }
+
+        container.innerHTML = "";
+        order.lines.forEach(line => addOrderLine({ size: line.size, quantity: line.quantity }));
+        linesInitialized = true;
+
+        $("feederOrderDate").value = Feeders.todayText();
+
+        const vendor = getLastFeederVendor();
+
+        if (vendor && !$("feederOrderVendor").value.trim()) {
+            $("feederOrderVendor").value = vendor;
+        }
+
+        setStatus(
+            "feederWeeklyStatus",
+            `Put ${order.lines.length} size${order.lines.length === 1 ? "" : "s"} into the order log with these amounts. `
+            + "Change them to what actually arrives, then save."
+        );
+
+        $("feederOrderForm").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    async function copyWeeklyOrder() {
+        const order = getWeeklyOrder();
+
+        if (order.sizes === 0) {
+            return;
+        }
+
+        const cost = getWeeklyOrderCost(order);
+        const text = Feeders.formatWeeklyOrderText(order, {
+            supplier: getWeeklyVendor(),
+            costText: cost > 0 ? formatMoney(Math.round(cost * 100) / 100) : ""
+        });
+        const copied = await copyTextToClipboard(text);
+
+        setStatus(
+            "feederWeeklyStatus",
+            copied
+                ? "Text order copied. Paste it into your message to the supplier."
+                : "Could not copy automatically. Select the text order above and copy it.",
+            !copied
+        );
+    }
+
     // ---- Orders ------------------------------------------------------------
 
     function renderSizeOptions() {
@@ -1036,6 +1184,7 @@
         renderMode();
         renderForecast();
         renderShoppingList();
+        renderWeeklyOrder();
         renderStock();
         renderPlan();
         renderSizeOptions();
@@ -1082,6 +1231,16 @@
         $("printFeederShoppingListButton").addEventListener("click", printShoppingList);
 
         $("addFeederOrderLineButton").addEventListener("click", () => addOrderLine());
+        $("fillWeeklyOrderButton").addEventListener("click", fillWeeklyOrder);
+        $("copyWeeklyOrderButton").addEventListener("click", copyWeeklyOrder);
+
+        // The message starts with the supplier's name, so keep it in step with
+        // whatever is typed into the order form.
+        $("feederOrderVendor").addEventListener("input", () => {
+            if (forecast) {
+                renderWeeklyOrder();
+            }
+        });
 
         $("feederOrderLines").addEventListener("click", event => {
             const button = event.target.closest("[data-remove-order-line]");

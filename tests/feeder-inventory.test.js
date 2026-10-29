@@ -308,3 +308,128 @@ test("unknown stored inventory rows are ignored instead of crashing the forecast
         [{ size: "Small Rat", onHand: 4, reorderAt: 2 }]
     );
 });
+
+test("a weekly order gathers every size due inside the week into one order", () => {
+    const result = forecastFor(
+        [
+            snake(),
+            snake({ id: "snake-2", name: "Second snake", feederSize: "Medium Rat", lastFed: "2026-10-25", feedingIntervalDays: "14" })
+        ],
+        [
+            { size: "Small Rat", onHand: 1, reorderAt: 3 },
+            { size: "Medium Rat", onHand: 1, reorderAt: 0 }
+        ]
+    );
+    const weekly = feeders.buildWeeklyOrder({ forecast: result, days: 7 });
+
+    assert.equal(weekly.sizes, 2);
+    assert.equal(weekly.days, 7);
+    assert.equal(weekly.endDate, "2026-11-02");
+    assert.deepEqual(
+        Array.from(weekly.lines, line => [line.size, line.quantity]),
+        [["Small Rat", 7], ["Medium Rat", 1]]
+    );
+    assert.equal(weekly.totalQuantity, 8);
+});
+
+test("a weekly order leaves out a size whose re-order date is later", () => {
+    const result = forecastFor(
+        [snake({ feederSize: "Large Rat", lastFed: "2026-10-06", feedingIntervalDays: "35" })],
+        [{ size: "Large Rat", onHand: 1, reorderAt: 3 }]
+    );
+    const weekly = feeders.buildWeeklyOrder({ forecast: result, days: 7 });
+
+    // The next meal is 10 Nov, so with a week of lead time there is no reason
+    // to put it on this week's order.
+    assert.equal(weekly.sizes, 0);
+});
+
+test("a live weekly order gathers quantities for the feeding days inside the week", () => {
+    const result = forecastFor(
+        [
+            snake({ id: "snake-a", name: "A", feederSize: "Small Rat", lastFed: "2026-10-26", feedingIntervalDays: "7" }),
+            snake({ id: "snake-b", name: "B", feederSize: "Small Rat", lastFed: "2026-10-25", feedingIntervalDays: "7" })
+        ],
+        [],
+        inventory({ mode: "live", leadDays: 7 })
+    );
+    const weekly = feeders.buildWeeklyOrder({ forecast: result, days: 7 });
+
+    // A eats on 2 Nov and B on 1 Nov; both feeding days fall inside the week.
+    assert.equal(weekly.mode, "live");
+    assert.deepEqual(
+        Array.from(weekly.lines, line => [line.size, line.quantity]),
+        [["Small Rat", 2]]
+    );
+});
+
+test("the weekly order has a copy-ready text version", () => {
+    const text = feeders.formatWeeklyOrderText({
+        lines: [
+            { size: "Small Rat", quantity: 7 },
+            { size: "Medium Rat", quantity: 1 }
+        ],
+        totalQuantity: 8
+    });
+
+    assert.equal(
+        text,
+        "Feeder order\n7 x Small Rat\n1 x Medium Rat\nTotal: 8 feeders"
+    );
+    assert.equal(feeders.formatWeeklyOrderText({ lines: [], totalQuantity: 0 }), "");
+});
+
+test("the text order can carry the supplier's name and the estimated cost", () => {
+    const text = feeders.formatWeeklyOrderText(
+        {
+            lines: [
+                { size: "Small Rat", quantity: 7 },
+                { size: "Medium Rat", quantity: 1 }
+            ],
+            totalQuantity: 8
+        },
+        { supplier: "  Rodent Ranch  ", costText: "$29.50" }
+    );
+
+    assert.equal(
+        text,
+        [
+            "Feeder order for Rodent Ranch",
+            "7 x Small Rat",
+            "1 x Medium Rat",
+            "Total: 8 feeders (about $29.50)"
+        ].join("\n")
+    );
+});
+
+test("no supplier and no cost leaves the message short", () => {
+    const text = feeders.formatWeeklyOrderText(
+        { lines: [{ size: "Rat Pup", quantity: 1 }], totalQuantity: 1 },
+        { supplier: "", costText: "" }
+    );
+
+    assert.equal(text, "Feeder order\n1 x Rat Pup\nTotal: 1 feeder");
+});
+
+test("a lead time under three days is raised to three", () => {
+    store.clear();
+
+    assert.equal(feeders.saveSettings({ leadDays: 1 }).leadDays, 3);
+    assert.equal(feeders.saveSettings({ leadDays: 0 }).leadDays, 3);
+    assert.equal(feeders.saveSettings({ leadDays: 10 }).leadDays, 10);
+    assert.equal(feeders.DEFAULT_SETTINGS.leadDays >= feeders.MIN_LEAD_DAYS, true);
+});
+
+test("the order-by date keeps three days for agreeing a pickup", () => {
+    const result = forecastFor(
+        [snake()],
+        [{ size: "Small Rat", onHand: 3, reorderAt: 0 }],
+        inventory({ leadDays: 0 })
+    );
+    const row = sizeRow(result, "Small Rat");
+
+    // Stock covers 27 Oct, 3 and 10 Nov, so it runs out on 10 Nov; with the
+    // three-day floor the order is due on 7 Nov, not on the pickup day.
+    assert.equal(row.runsOutDate, "2026-11-10");
+    assert.equal(row.orderByDate, "2026-11-07");
+});

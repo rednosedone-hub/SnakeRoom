@@ -15,3 +15,7 @@ __pycache__/
 
 # Google Photos metadata sidecars are not used by the app
 Images/**/*.json
+
+# Local scratch files and preview screenshots
+.tmp/
+screenshots/

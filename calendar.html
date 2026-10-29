@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Snake Room - Calendar</title>
+    <link rel="stylesheet" href="style.css?v=50">
+</head>
+
+<body>
+    <div class="page-container">
+        <div class="hero-section">
+            <img src="Images/TheSnakeRoom.jpg" class="hero-image" alt="The Snake Room logo">
+
+            <div class="container">
+                <h1>The Snake Room</h1>
+                <h2>Task Calendar</h2>
+            </div>
+        </div>
+
+        <div class="paragraph-container">
+            <p>
+                Every job the app already knows about, on one calendar: meals coming due, health
+                follow-ups and quarantine releases, clutch hatch windows and feeder orders. Overdue
+                work is pinned to today so it cannot hide in the past.
+            </p>
+        </div>
+
+        <div class="button-row">
+            <a href="index.html" class="main-button">Home</a>
+            <a href="snakes.html" class="main-button">Collection</a>
+            <a href="feeding-session.html" class="main-button">Feeding Session</a>
+            <a href="feeders.html" class="main-button">Feeders</a>
+            <a href="breeding.html" class="main-button">Breeding</a>
+            <a href="breedingOutcomes.html" class="main-button">Outcomes</a>
+        </div>
+
+        <div class="divider"></div>
+
+        <main class="snake-form-page">
+            <section class="form-section">
+                <div class="section-heading-row">
+                    <h3>This month</h3>
+                    <span class="feeder-window-label" id="calendarMonthLabel"></span>
+                </div>
+
+                <div class="fin-kpi-grid">
+                    <div class="fin-kpi">
+                        <span class="fin-kpi-label">Today</span>
+                        <strong class="fin-kpi-value" id="calendarKpiToday">0</strong>
+                        <span class="fin-kpi-note">jobs on today's list</span>
+                    </div>
+
+                    <div class="fin-kpi">
+                        <span class="fin-kpi-label">Next 7 days</span>
+                        <strong class="fin-kpi-value" id="calendarKpiWeek">0</strong>
+                        <span class="fin-kpi-note">including today</span>
+                    </div>
+
+                    <div class="fin-kpi">
+                        <span class="fin-kpi-label">Overdue</span>
+                        <strong class="fin-kpi-value" id="calendarKpiOverdue">0</strong>
+                        <span class="fin-kpi-note">pinned to today</span>
+                    </div>
+                </div>
+
+                <div class="calendar-toolbar">
+                    <button type="button" class="secondary-button" id="calendarPrevButton"
+                        aria-label="Previous month">&larr; Previous</button>
+                    <button type="button" class="main-button" id="calendarTodayButton">Today</button>
+                    <button type="button" class="secondary-button" id="calendarNextButton"
+                        aria-label="Next month">Next &rarr;</button>
+                    <button type="button" class="gene-action-button" id="calendarRefreshButton">Refresh</button>
+                </div>
+
+                <div class="calendar-weekdays" aria-hidden="true">
+                    <span>Sun</span>
+                    <span>Mon</span>
+                    <span>Tue</span>
+                    <span>Wed</span>
+                    <span>Thu</span>
+                    <span>Fri</span>
+                    <span>Sat</span>
+                </div>
+
+                <div class="calendar-grid" id="calendarGrid" role="grid" aria-label="Task calendar"></div>
+
+                <div class="calendar-legend">
+                    <span class="calendar-legend-item is-feeding">Feeding</span>
+                    <span class="calendar-legend-item is-health">Health</span>
+                    <span class="calendar-legend-item is-breeding">Breeding</span>
+                    <span class="calendar-legend-item is-order">Order</span>
+                </div>
+            </section>
+
+            <section class="form-section">
+                <div class="section-heading-row">
+                    <h3 id="calendarDayTitle">Today</h3>
+                </div>
+
+                <p class="empty-message" id="calendarDayEmpty" hidden>
+                    Nothing scheduled for this day.
+                </p>
+
+                <ul class="calendar-task-list" id="calendarDayList"></ul>
+
+                <p class="fin-status" id="calendarStatus" role="status"></p>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script src="data-helpers.js"></script>
+    <script src="cloud-sync.js?v=16"></script>
+    <script src="auto-sync.js?v=8"></script>
+    <script src="account-gate.js?v=1"></script>
+    <script src="feed-helpers.js?v=4"></script>
+    <script src="feeder-inventory.js?v=6"></script>
+    <script src="health-helpers.js?v=1"></script>
+    <script src="calendar-helpers.js?v=1"></script>
+    <script src="calendar.js?v=2"></script>
+
+    <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
+    <script src="nav-scroll.js?v=1"></script>
+</body>
+
+</html>

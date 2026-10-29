@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Feeders</title>
-    <link rel="stylesheet" href="style.css?v=45">
+    <link rel="stylesheet" href="style.css?v=51">
 </head>
 
 <body>
@@ -23,6 +23,7 @@
 
         <div class="button-row">
             <a href="index.html" class="main-button">Home</a>
+            <a href="calendar.html" class="main-button">Calendar</a>
             <a href="snakes.html" class="main-button">Collection</a>
             <a href="feeding-session.html" class="main-button">Feeding Session</a>
             <a href="finance.html" class="main-button">Finances</a>
@@ -54,7 +55,7 @@
 
                 <label class="form-field">
                     <span>Order lead time (days)</span>
-                    <input type="number" id="feederLeadInput" min="0" max="90" step="1">
+                    <input type="number" id="feederLeadInput" min="3" max="90" step="1">
                 </label>
 
                 <p class="empty-message fin-span-all" id="feederLeadNote"></p>
@@ -170,6 +171,37 @@
             <p class="empty-message" id="feederPlanEmpty"></p>
         </section>
 
+        <section class="form-section" id="feederWeeklySection">
+            <div class="section-heading-row">
+                <h3>One order this week</h3>
+                <span class="feeder-window-label" id="feederWeeklyWindow"></span>
+            </div>
+
+            <p class="empty-message" id="feederWeeklyNote">
+                Everything that needs a supplier inside the next seven days, gathered into one
+                order. Ordering twice in a week is only practical if you breed your own feeders.
+            </p>
+
+            <ul class="feeder-weekly-list" id="feederWeeklyList"></ul>
+            <p class="fin-subtotal" id="feederWeeklyTotal"></p>
+
+            <p class="empty-message">
+                Ordering by text? This is the whole week's order as one message. Copy it, send it, then log what
+                actually arrives below - nothing here needs the order form first.
+            </p>
+            <pre class="feeder-order-message" id="feederWeeklyMessage" hidden></pre>
+
+            <div class="fin-actions">
+                <button type="button" class="main-button" id="copyWeeklyOrderButton">
+                    Copy Text Order
+                </button>
+                <button type="button" class="secondary-button" id="fillWeeklyOrderButton">
+                    Use These Amounts to Log It
+                </button>
+                <span class="fin-status" id="feederWeeklyStatus" role="status"></span>
+            </div>
+        </section>
+
         <section class="form-section">
             <div class="section-heading-row">
                 <h3>Log a feeder order</h3>
@@ -241,8 +273,8 @@
     <script src="account-gate.js?v=1"></script>
     <script src="finance-helpers.js?v=2"></script>
     <script src="feed-helpers.js?v=4"></script>
-    <script src="feeder-inventory.js?v=1"></script>
-    <script src="feeders.js?v=1"></script>
+    <script src="feeder-inventory.js?v=6"></script>
+    <script src="feeders.js?v=6"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () { }); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

@@ -283,6 +283,29 @@
             );
     }
 
+    // One stored animal described the same way an outcome is: this is what the
+    // gallery files a photo under, and what a hatchling's genes are read back
+    // as. It is deliberately the same code path as the pairing table, so a snake
+    // labelled "Batman" and an outcome labelled "Batman" agree.
+    function describeGenotype(genes) {
+        const geneCopies = {};
+
+        getParentGeneMap(genes).forEach((record, name) => {
+            geneCopies[name] = { copies: record.copies, hetOdds: record.hetOdds };
+        });
+
+        const geneDetails = getOutcomeGeneDetails(geneCopies);
+        const descriptions = geneDetails.map(gene => gene.label);
+
+        return {
+            morphName: getComboName(descriptions),
+            genes: descriptions,
+            geneDetails,
+            morphCount: geneDetails.length,
+            warnings: getWarnings(geneCopies)
+        };
+    }
+
     function calculatePairing(femaleGenes, maleGenes) {
         const femaleMap = getParentGeneMap(femaleGenes);
         const maleMap = getParentGeneMap(maleGenes);
@@ -305,6 +328,7 @@
     }
 
     window.MorphCalculator = {
-        calculatePairing
+        calculatePairing,
+        describeGenotype
     };
 })();

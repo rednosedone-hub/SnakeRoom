@@ -56,6 +56,11 @@
         leadDays: 7
     };
 
+    // A feeder order is not a same-day errand: the keeper has to agree a
+    // collection time with the supplier, so three days is the floor even if a
+    // shorter number was saved before this rule existed.
+    const MIN_LEAD_DAYS = 3;
+
     const INACTIVE_STATUSES = ["Sold", "Archived", "Deceased"];
 
     function text(value) {
@@ -147,7 +152,9 @@
         return {
             mode: stored.mode === "live" ? "live" : "frozen",
             horizonDays: horizon >= 1 && horizon <= 365 ? horizon : DEFAULT_SETTINGS.horizonDays,
-            leadDays: lead >= 0 && lead <= 90 ? lead : DEFAULT_SETTINGS.leadDays
+            leadDays: lead >= 0 && lead <= 90
+                ? Math.max(MIN_LEAD_DAYS, lead)
+                : DEFAULT_SETTINGS.leadDays
         };
     }
 
@@ -686,10 +693,112 @@
         };
     }
 
+    // One supplier run instead of several. Anything whose re-order window falls
+    // inside the next week is gathered into a single order, because ordering
+    // twice in seven days only makes sense if you breed your own feeders.
+    function buildWeeklyOrder(options) {
+        const opts = options || {};
+        const forecast = opts.forecast;
+        const days = Math.max(1, Math.min(31, parseInt(opts.days, 10) || 7));
+        const empty = { days, endDate: "", today: "", mode: "", lines: [], sizes: 0, totalQuantity: 0, overdue: 0 };
+
+        if (!forecast || !Array.isArray(forecast.sizes)) {
+            return empty;
+        }
+
+        const today = forecast.today || todayText();
+        const endDate = dateText(addDays(parseDate(today), days - 1));
+
+        // Live feeders are bought per feeding day, so the quantity is every
+        // meal inside the week, not just the next day's suggested number.
+        const liveQuantities = new Map();
+
+        if (forecast.mode === "live") {
+            (forecast.events || []).forEach(event => {
+                if (event.date <= endDate) {
+                    liveQuantities.set(event.size, (liveQuantities.get(event.size) || 0) + 1);
+                }
+            });
+        }
+
+        const quantityFor = size => (forecast.mode === "live"
+            ? liveQuantities.get(size.size) || 0
+            : size.suggestedOrder);
+
+        const lines = forecast.sizes
+            .filter(size => quantityFor(size) > 0)
+            .filter(size => {
+                if (size.status === "order") {
+                    return true;
+                }
+
+                // Live feeders are bought for a feeding day, not stocked, so
+                // the feeding date is the only deadline that matters.
+                if (forecast.mode === "live") {
+                    return Boolean(size.nextDate && size.nextDate <= endDate);
+                }
+
+                if (size.orderByDate) {
+                    return size.orderByDate <= endDate;
+                }
+
+                // Nothing is scheduled, but the freezer is below its buffer.
+                return size.suggestedOrder > 0;
+            })
+            .map(size => ({
+                size: size.size,
+                quantity: quantityFor(size),
+                status: size.status,
+                nextDate: size.nextDate,
+                neededBy: forecast.mode === "live"
+                    ? (size.nextDate || today)
+                    : (size.orderByDate || size.nextDate || today)
+            }))
+            .sort((left, right) =>
+                String(left.neededBy).localeCompare(String(right.neededBy))
+                || left.size.localeCompare(right.size)
+            );
+
+        return {
+            days,
+            today,
+            endDate,
+            mode: forecast.mode,
+            lines,
+            sizes: lines.length,
+            totalQuantity: lines.reduce((sum, line) => sum + line.quantity, 0),
+            overdue: lines.filter(line => line.status === "order").length
+        };
+    }
+
+    // A plain-text version of the weekly order, for keepers who order by text
+    // message rather than through a website. It is the whole week in one short
+    // message: what to send, how many, and nothing that needs explaining.
+    function formatWeeklyOrderText(order, options) {
+        if (!order || !Array.isArray(order.lines) || order.lines.length === 0) {
+            return "";
+        }
+
+        const opts = options || {};
+        const supplier = String(opts.supplier || "").trim();
+        // Formatted by the caller so the message uses the app's currency.
+        const costText = String(opts.costText || "").trim();
+        const lines = order.lines.map(line => `${line.quantity} x ${line.size}`);
+        const total = `Total: ${order.totalQuantity} feeder${order.totalQuantity === 1 ? "" : "s"}`
+            + (costText ? ` (about ${costText})` : "");
+
+        return [
+            supplier ? `Feeder order for ${supplier}` : "Feeder order",
+            ...lines,
+            total
+        ].join("\n");
+    }
+
     window.SnakeFeeders = {
         SETTINGS_KEY,
         INVENTORY_KEY,
         DEFAULT_SETTINGS,
+        MIN_LEAD_DAYS,
         DEFAULT_FEEDER_SIZES,
         MODES,
         getSettings,
@@ -708,6 +817,8 @@
         collectSizes,
         buildFeedPlan,
         buildForecast,
+        buildWeeklyOrder,
+        formatWeeklyOrderText,
         parseDate,
         dateText,
         addDays,

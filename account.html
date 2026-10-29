@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Account</title>
-    <link rel="stylesheet" href="style.css?v=45">
+    <link rel="stylesheet" href="style.css?v=49">
 </head>
 
 <body data-no-auth-gate>
@@ -216,6 +216,20 @@
                     </div>
 
                     <div class="form-field" style="margin-top:12px;">
+                        <h4>Morph gallery table</h4>
+                        <p class="empty-message">
+                            Run this once too, before anyone publishes an example photo. It creates
+                            the shared <code>morph_photos</code> table that files every keeper's
+                            photos by genotype. Photos themselves still live in the
+                            <code>snake-photos</code> bucket above.
+                        </p>
+                        <pre class="sql-block" id="morphSqlBlock"></pre>
+                        <button type="button" class="gene-action-button" id="copyMorphSqlButton">
+                            Copy Morph Gallery SQL
+                        </button>
+                    </div>
+
+                    <div class="form-field" style="margin-top:12px;">
                         <h4>Back up the photos that ship with the site (one time, on a computer)</h4>
                         <p class="empty-message">
                             Uploads every photo the snakes currently point at into this account's
@@ -236,7 +250,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="data-helpers.js"></script>
-    <script src="cloud-sync.js?v=13"></script>
+    <script src="cloud-sync.js?v=16"></script>
     <script src="auto-sync.js?v=8"></script>
     <script src="plans.js?v=2"></script>
     <script src="account.js?v=1"></script>

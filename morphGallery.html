@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Snake Room - Morph Gallery</title>
+    <link rel="stylesheet" href="style.css?v=49">
+</head>
+
+<body>
+    <div class="page-container">
+        <div class="hero-section">
+            <img src="Images/TheSnakeRoom.jpg" class="hero-image" alt="The Snake Room logo">
+
+            <div class="container">
+                <h1>The Snake Room</h1>
+                <h2>Morph Gallery</h2>
+            </div>
+        </div>
+
+        <div class="paragraph-container">
+            <p>
+                Real photos of real animals, filed by genotype. A snake you already have in your
+                collection can be published here once, and every keeper's calculator and clutch
+                page will link to it as an example of that morph. Only the morph and the photo are
+                shared \u2014 never a keeper's name or an animal's records. Published photos may be
+                used as examples across the app; publishing is voluntary and you can remove a photo
+                at any time.
+            </p>
+        </div>
+
+        <div class="button-row">
+            <a href="index.html" class="main-button">Home</a>
+            <a href="snakes.html" class="main-button">Collection</a>
+            <a href="morphCalculator.html" class="main-button">Morph Calculator</a>
+            <a href="breeding.html" class="main-button">Breeding</a>
+            <a href="breedingOutcomes.html" class="main-button">Outcomes</a>
+        </div>
+
+        <div class="divider"></div>
+
+        <main class="snake-form-page">
+            <section class="form-section" id="gallerySetupSection" hidden>
+                <h3>One-time setup</h3>
+
+                <p class="gene-help">
+                    The shared library needs one table. Run this once in the Supabase SQL Editor,
+                    then reload this page. Photos keep using the existing <code>snake-photos</code>
+                    bucket, so there is nothing else to create.
+                </p>
+
+                <pre class="sql-block" id="morphGallerySqlBlock"></pre>
+
+                <div class="form-page-actions">
+                    <button type="button" class="main-button" id="copyMorphSqlButton">
+                        Copy Morph Gallery SQL
+                    </button>
+                </div>
+
+                <p class="empty-message" id="gallerySetupStatus" role="status"></p>
+            </section>
+
+            <section class="form-section">
+                <div class="section-heading-row">
+                    <h3>Examples</h3>
+                    <div class="form-page-actions">
+                        <button type="button" class="gene-action-button" id="galleryRefreshButton">Refresh</button>
+                        <a href="#publishSection" class="small-link-button">Add yours</a>
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <label class="form-field">
+                        <span>Search</span>
+                        <input type="search" id="gallerySearchInput"
+                            placeholder="Morph or gene...">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Sort</span>
+                        <select id="gallerySortSelect">
+                            <option value="photos">Most photos first</option>
+                            <option value="name">Morph name (A-Z)</option>
+                            <option value="newest">Newest photo first</option>
+                        </select>
+                    </label>
+                </div>
+
+                <p class="empty-message" id="gallerySummary">Loading examples&hellip;</p>
+
+                <div class="morph-gallery-grid" id="galleryGrid"></div>
+                <p class="empty-message" id="galleryEmpty" hidden></p>
+                <p class="fin-status" id="galleryStatus" role="status"></p>
+            </section>
+
+            <section class="form-section" id="publishSection">
+                <h3>Publish a photo</h3>
+
+                <p class="gene-help">
+                    Pick an animal already in your collection. Its genes decide which morph the
+                    photo belongs to, and its uploaded photos are used as they are &mdash; nothing
+                    is re-uploaded. A publication is just the morph and the photo: keepers stay
+                    anonymous, and the animal's name, sex and records are never shown.
+                </p>
+
+                <div class="form-grid">
+                    <label class="form-field">
+                        <span>Snake</span>
+                        <select id="gallerySnakeSelect"></select>
+                    </label>
+
+                    <label class="form-field">
+                        <span>Photo</span>
+                        <select id="galleryPhotoSelect"></select>
+                    </label>
+                </div>
+
+                <p class="empty-message" id="galleryPublishPreview"></p>
+
+                <label class="consent-field">
+                    <input type="checkbox" id="galleryConsentInput">
+                    <span>
+                        I took this photo, or have permission from the person who did, and I am
+                        happy for every user of the app to see it.
+                    </span>
+                </label>
+
+                <div class="form-page-actions">
+                    <button type="button" class="main-button" id="publishMorphPhotoButton">
+                        Publish Photo
+                    </button>
+                </div>
+
+                <p class="fin-status" id="galleryPublishStatus" role="status"></p>
+            </section>
+
+            <section class="form-section">
+                <h3>Your published photos</h3>
+
+                <p class="empty-message" id="galleryMineNote">
+                    Sign in to see and manage the photos you have published.
+                </p>
+
+                <div class="morph-gallery-grid" id="galleryMineGrid"></div>
+                <p class="fin-status" id="galleryMineStatus" role="status"></p>
+            </section>
+        </main>
+    </div>
+
+    <div class="modal" id="galleryModal" aria-hidden="true">
+        <div class="modal-content morph-gallery-modal">
+            <div class="section-heading-row">
+                <h3 id="galleryModalTitle">Morph</h3>
+                <button type="button" class="gene-remove-button" id="galleryModalClose"
+                    aria-label="Close">&times;</button>
+            </div>
+
+            <p class="empty-message" id="galleryModalGenes"></p>
+            <div class="morph-gallery-modal-photos" id="galleryModalPhotos"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script src="data-helpers.js"></script>
+    <script src="cloud-sync.js?v=16"></script>
+    <script src="auto-sync.js?v=8"></script>
+    <script src="account-gate.js?v=1"></script>
+    <script src="geneCatalog.js?v=3"></script>
+    <script src="genes.js?v=8"></script>
+    <script src="morphCalculator.js?v=8"></script>
+    <script src="morph-gallery.js?v=4"></script>
+    <script src="morphGallery.js?v=7"></script>
+
+    <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
+    <script src="nav-scroll.js?v=1"></script>
+</body>
+
+</html>

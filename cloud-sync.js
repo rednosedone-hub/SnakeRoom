@@ -112,6 +112,84 @@
         "  );"
     ].join("\n");
 
+    // The shared morph gallery: one row per published example. Photos keep using
+    // the snake-photos bucket above, so publishing costs no extra upload.
+    //
+    // Read is open to everyone (the bucket already is, and a morph example is
+    // exactly the kind of thing a visitor came to see). Writes are limited to
+    // the keeper who published the row, by row level security. A row is only a
+    // morph and a photo: no keeper name and no animal records are stored.
+    const MORPH_SETUP_SQL = [
+        "-- The Snake Room: one-time morph gallery setup",
+        "-- Creates the shared morph_photos table and its security rules.",
+        "-- Safe to run more than once. Run it in the Supabase SQL Editor.",
+        "",
+        "create table if not exists morph_photos (",
+        "  id uuid primary key default gen_random_uuid(),",
+        "  user_id uuid not null references auth.users (id) on delete cascade,",
+        "  morph_key text not null,",
+        "  morph_name text not null,",
+        "  genes jsonb not null default '[]'::jsonb,",
+        "  photo_url text not null,",
+        "  created_at timestamptz not null default now()",
+        ");",
+        "",
+        "create index if not exists morph_photos_key_idx",
+        "  on morph_photos (morph_key, created_at desc);",
+        "",
+        "alter table morph_photos enable row level security;",
+        "",
+        "drop policy if exists \"Morph photos are public to read\" on morph_photos;",
+        "create policy \"Morph photos are public to read\"",
+        "  on morph_photos for select",
+        "  using (true);",
+        "",
+        "drop policy if exists \"Users publish their own morph photos\" on morph_photos;",
+        "create policy \"Users publish their own morph photos\"",
+        "  on morph_photos for insert to authenticated",
+        "  with check (auth.uid () = user_id);",
+        "",
+        "drop policy if exists \"Users edit their own morph photos\" on morph_photos;",
+        "create policy \"Users edit their own morph photos\"",
+        "  on morph_photos for update to authenticated",
+        "  using (auth.uid () = user_id)",
+        "  with check (auth.uid () = user_id);",
+        "",
+        "drop policy if exists \"Users remove their own morph photos\" on morph_photos;",
+        "create policy \"Users remove their own morph photos\"",
+        "  on morph_photos for delete to authenticated",
+        "  using (auth.uid () = user_id);",
+        "",
+        "-- Reports are a private note to the keeper who published the photo.",
+        "create table if not exists morph_photo_reports (",
+        "  id uuid primary key default gen_random_uuid(),",
+        "  photo_id uuid not null references morph_photos (id) on delete cascade,",
+        "  reporter_id uuid references auth.users (id) on delete set null,",
+        "  reason text not null,",
+        "  note text,",
+        "  created_at timestamptz not null default now()",
+        ");",
+        "",
+        "create index if not exists morph_photo_reports_photo_idx",
+        "  on morph_photo_reports (photo_id);",
+        "",
+        "alter table morph_photo_reports enable row level security;",
+        "",
+        "drop policy if exists \"Signed-in keepers can report a photo\" on morph_photo_reports;",
+        "create policy \"Signed-in keepers can report a photo\"",
+        "  on morph_photo_reports for insert to authenticated",
+        "  with check (auth.uid () = reporter_id);",
+        "",
+        "drop policy if exists \"Owners see reports on their photos\" on morph_photo_reports;",
+        "create policy \"Owners see reports on their photos\"",
+        "  on morph_photo_reports for select to authenticated",
+        "  using (exists (",
+        "    select 1 from morph_photos",
+        "    where morph_photos.id = morph_photo_reports.photo_id",
+        "      and morph_photos.user_id = auth.uid ()",
+        "  ));"
+    ].join("\n");
+
     function readSettings() {
         let parsed = {};
 
@@ -1786,6 +1864,17 @@
             return false;
         }
 
+        // A photo published in the shared morph gallery is other keepers'
+        // reference too. Removing it from one snake must not blank every example
+        // of that morph, so the file stays in the bucket.
+        if (window.MorphGallery && typeof window.MorphGallery.isPublished === "function") {
+            const published = await window.MorphGallery.isPublished(imageValue);
+
+            if (published) {
+                return false;
+            }
+        }
+
         const { error } = await activeClient.storage.from(PHOTO_BUCKET).remove([path]);
 
         if (error) {
@@ -1958,6 +2047,10 @@
             await navigator.clipboard.writeText(PHOTO_SETUP_SQL);
             setSyncReport("Photo SQL copied to the clipboard.");
         });
+        bind("copyMorphSqlButton", async () => {
+            await navigator.clipboard.writeText(MORPH_SETUP_SQL);
+            setSyncReport("Morph gallery SQL copied to the clipboard.");
+        });
         bind("backupPhotosButton", backupPhotos);
     }
 
@@ -1972,6 +2065,12 @@
 
         if (photoSqlBlock) {
             photoSqlBlock.textContent = PHOTO_SETUP_SQL;
+        }
+
+        const morphSqlBlock = document.getElementById("morphSqlBlock");
+
+        if (morphSqlBlock) {
+            morphSqlBlock.textContent = MORPH_SETUP_SQL;
         }
 
         bindEvents();
@@ -2023,6 +2122,7 @@
         SNAPSHOT_KEYS,
         PHOTO_BUCKET,
         PHOTO_SETUP_SQL,
+        MORPH_SETUP_SQL,
         PHOTO_LIMITS,
         compressImageToJpeg,
         uploadSnakePhotoFile,

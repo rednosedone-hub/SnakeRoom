@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Breeding Outcomes</title>
-    <link rel="stylesheet" href="style.css?v=45">
+    <link rel="stylesheet" href="style.css?v=49">
 </head>
 
 <body>
@@ -25,6 +25,8 @@
             <a href="index.html" class="main-button">Home</a>
             <a href="breeding.html" class="main-button">Breeding</a>
             <a href="snakes.html" class="main-button">Collection</a>
+            <a href="morphCalculator.html" class="main-button">Morph Calculator</a>
+            <a href="morphGallery.html" class="main-button">Morph Gallery</a>
             <a href="bin-cards.html" class="main-button">Bin Cards</a>
         </div>
 
@@ -37,7 +39,9 @@
                 <p class="gene-help">
                     When a clutch hatches, review the hatchlings here and turn them into real
                     animals in your collection. Each hatchling gets a name, bin number, sex, and
-                    status - genes and photos can be added on their profile pages later.
+                    status. Pick the morph it hatched as and its genes are saved with it, so the
+                    calculator, breeding records and the <a href="morphGallery.html">Morph Gallery</a>
+                    all agree on what it is.
                 </p>
 
                 <p id="outcomesStatus" class="outcomes-status"></p>
@@ -64,10 +68,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="data-helpers.js"></script>
-    <script src="cloud-sync.js?v=13"></script>
+    <script src="cloud-sync.js?v=16"></script>
     <script src="auto-sync.js?v=8"></script>
     <script src="account-gate.js?v=1"></script>
-    <script src="breedingOutcomes.js"></script>
+    <script src="geneCatalog.js?v=3"></script>
+    <script src="genes.js?v=8"></script>
+    <script src="morphCalculator.js?v=8"></script>
+    <script src="morph-gallery.js?v=4"></script>
+    <script src="breedingOutcomes.js?v=4"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

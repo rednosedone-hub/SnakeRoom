@@ -136,14 +136,134 @@ function getSnakeByName(name) {
     return snakes.find(snake => String(snake.name || "").trim().toLowerCase() === searchName);
 }
 
+// The pairing's possible outcomes, so a hatchling can be labelled with the one
+// it actually hatched as instead of having its genes typed in again later. The
+// list is the same one the Morph Calculator shows for these two parents.
+const clutchOutcomeCache = {};
+
+function getClutchOutcomes(clutch) {
+    if (!clutch || !window.MorphCalculator) {
+        return [];
+    }
+
+    const token = clutch.clutchToken;
+
+    if (clutchOutcomeCache[token]) {
+        return clutchOutcomeCache[token];
+    }
+
+    const dam = window.SnakeData.getSnakeByReference(snakes, clutch.femaleSnakeId);
+    const sire = window.SnakeData.getSnakeByReference(snakes, clutch.maleSnakeId);
+    const outcomes = window.MorphCalculator.calculatePairing(
+        (dam && dam.genes) || [],
+        (sire && sire.genes) || []
+    );
+
+    clutchOutcomeCache[token] = outcomes;
+
+    return outcomes;
+}
+
+function storeOutcomeGenes(outcome) {
+    if (!outcome) {
+        return [];
+    }
+
+    if (window.MorphGallery && typeof window.MorphGallery.descriptionToStorage === "function") {
+        return window.MorphGallery.descriptionToStorage(outcome.geneDetails);
+    }
+
+    return outcome.geneDetails.map(gene => ({
+        name: gene.name,
+        copies: gene.copies,
+        ...(gene.hetOdds === undefined || gene.hetOdds === null ? {} : { hetOdds: gene.hetOdds })
+    }));
+}
+
+// Selecting an outcome records the genotype on the prepared row immediately, so
+// a later re-render (adding or removing a hatchling) does not lose the choice.
+function applyMorphChoice(clutchToken, row, value) {
+    const clutch = clutches.find(item => item.clutchToken === clutchToken);
+    const outcomes = clutch ? getClutchOutcomes(clutch) : [];
+
+    // "Not recorded" is an empty string, which Number() would read as outcome 0.
+    const index = value === "" || value === null || value === undefined ? -1 : Number(value);
+    const outcome = Number.isInteger(index) && index >= 0 && outcomes[index] ? outcomes[index] : null;
+
+    row.morphChoice = outcome ? String(index) : "";
+    row.genes = storeOutcomeGenes(outcome);
+    row.morphName = outcome ? outcome.morphName : "";
+
+    return outcome;
+}
+
+function rememberHatchlingChoices() {
+    Object.entries(hatchlingPreparation).forEach(([token, rows]) => {
+        rows.forEach(row => {
+            const select = document.getElementById(`hatchMorph-${token}-${row.index}`);
+
+            if (select) {
+                applyMorphChoice(token, row, select.value);
+            }
+        });
+    });
+}
+
+// Shows the chosen morph's tag and, when another keeper has published one, a
+// real photo of it next to the select.
+async function previewHatchlingMorph(clutchToken, index) {
+    const row = (hatchlingPreparation[clutchToken] || []).find(item => item.index === Number(index));
+    const select = document.getElementById(`hatchMorph-${clutchToken}-${index}`);
+    const target = document.getElementById(`hatchMorphExample-${clutchToken}-${index}`);
+
+    if (!row || !select || !target) {
+        return;
+    }
+
+    const outcome = applyMorphChoice(clutchToken, row, select.value);
+    target.innerHTML = "";
+
+    if (!outcome) {
+        return;
+    }
+
+    target.innerHTML = `<span class="gene-pill">${escapeHtml(outcome.morphName)}</span>`;
+
+    if (!window.MorphGallery || typeof window.MorphGallery.fetchExamples !== "function") {
+        return;
+    }
+
+    const key = window.MorphGallery.morphKeyFromGenes(row.genes);
+
+    try {
+        const examples = await window.MorphGallery.fetchExamples([key]);
+        const photo = (examples.get(key) || [])[0];
+
+        if (photo && target.isConnected) {
+            target.innerHTML += `
+                <a href="morphGallery.html?q=${encodeURIComponent(outcome.morphName)}" class="hatchling-morph-photo-link">
+                    <img class="hatchling-morph-photo" src="${escapeHtml(photo.photoUrl)}"
+                        alt="${escapeHtml(outcome.morphName)}" loading="lazy">
+                </a>
+            `;
+        }
+    } catch (error) {
+        // No photo is a fine answer; the morph name still shows.
+    }
+}
+
 function readHatchlingRow(clutch, row) {
     const token = `${clutch.clutchToken}-${row.index}`;
+    const morphSelect = document.getElementById(`hatchMorph-${token}`);
+    const outcome = morphSelect ? applyMorphChoice(clutch.clutchToken, row, morphSelect.value) : null;
 
     return {
         name: String(document.getElementById(`hatchName-${token}`).value || "").trim(),
         binNumber: String(document.getElementById(`hatchBin-${token}`).value || "").trim(),
         sex: document.getElementById(`hatchSex-${token}`).value || "Unknown",
-        status: document.getElementById(`hatchStatus-${token}`).value || OUTCOMES_DEFAULT_STATUS
+        status: document.getElementById(`hatchStatus-${token}`).value || OUTCOMES_DEFAULT_STATUS,
+        genes: Array.isArray(row.genes) ? row.genes : [],
+        morphName: outcome ? outcome.morphName : ""
     };
 }
 
@@ -155,10 +275,10 @@ function createHatchlingRecord(clutch, row, hatchDate) {
     return {
         id: hatchlingId,
         name: row.name,
-        // The morph field doubles as the owner-assigned snake ID, so hatchlings
-        // start with their clutch number there instead of pairing text.
+        // The owner-assigned ID stays the hatchling's name; the morph field only
+        // takes over once the predicted morph was picked for this animal.
         ID: row.name,
-        morph: row.name,
+        morph: row.morphName || row.name,
         sex: row.sex,
         weight: "",
         binNumber: row.binNumber,
@@ -168,7 +288,7 @@ function createHatchlingRecord(clutch, row, hatchDate) {
         feedingIntervalDays: 7,
         feederSize: "",
         status: row.status,
-        genes: [],
+        genes: Array.isArray(row.genes) ? row.genes : [],
         feedingHistory: [],
         weightHistory: [],
         shedHistory: [],
@@ -359,6 +479,7 @@ function renderOutcomeCard(clutch) {
 
 function renderHatchlingEditorRow(clutch, row) {
     const token = `${clutch.clutchToken}-${row.index}`;
+    const outcomes = getClutchOutcomes(clutch);
 
     return `
         <div class="hatchling-editor-row">
@@ -400,6 +521,25 @@ function renderHatchlingEditorRow(clutch, row) {
                         .map(status => `<option value="${status}" ${status === row.status ? "selected" : ""}>${status}</option>`)
                         .join("")}
                 </select>
+            </label>
+
+            <label class="form-field hatchling-morph-field">
+                <span>Predicted morph</span>
+                <select id="hatchMorph-${token}"
+                    onchange="previewHatchlingMorph('${clutch.clutchToken}', ${row.index})">
+                    <option value="">Not recorded</option>
+                    ${outcomes.map((outcome, index) => `
+                        <option value="${index}" ${String(row.morphChoice) === String(index) ? "selected" : ""}>
+                            ${escapeHtml(outcome.morphName)} — ${Math.round(outcome.probability * 1000) / 10}%
+                        </option>
+                    `).join("")}
+                </select>
+                <span class="hatchling-morph-example" id="hatchMorphExample-${token}">
+                    ${row.morphName ? `<span class="gene-pill">${escapeHtml(row.morphName)}</span>` : ""}
+                </span>
+                ${outcomes.length === 0
+                    ? `<small class="empty-message">Add genes to both parents to list this clutch's morphs.</small>`
+                    : ""}
             </label>
         </div>
     `;
@@ -443,6 +583,11 @@ function renderHatchedCard(clutch) {
 function renderBreedingOutcomes() {
     const outcomesList = document.getElementById("outcomesList");
     const hatchedList = document.getElementById("hatchedList");
+
+    // Keep whatever morph each hatchling was labelled with before the lists are
+    // rebuilt; the selects are about to be thrown away.
+    rememberHatchlingChoices();
+
     const outcomes = getBreedingOutcomes();
     const active = outcomes.filter(clutch => !clutch.convertedToSnakes);
     const hatched = outcomes.filter(clutch => clutch.convertedToSnakes);
@@ -463,6 +608,7 @@ const hashClutchId = decodeURIComponent((window.location.hash.match(/^#clutch-(.
 window.saveHatchlings = saveHatchlings;
 window.addHatchling = addHatchling;
 window.removePreparedHatchling = removePreparedHatchling;
+window.previewHatchlingMorph = previewHatchlingMorph;
 
 migrateClutchTokens();
 renderBreedingOutcomes();
