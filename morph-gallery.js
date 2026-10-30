@@ -29,6 +29,9 @@
     const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
     const NORMAL_KEY = "normal";
     const PLACEHOLDER_PHOTO = "Images/TheSnakeRoom.jpg";
+    // Bulk publishing sends this many rows per insert: a whole collection in a
+    // handful of requests instead of one per animal.
+    const PUBLISH_CHUNK_SIZE = 50;
 
     const state = {
         lastError: "",
@@ -150,6 +153,125 @@
 
     function photoIsPlaceholder(url) {
         return !text(url) || text(url) === PLACEHOLDER_PHOTO;
+    }
+
+    // A shared example has to be a photo every other device can fetch. A data:
+    // URL only exists in one browser's storage, so publishing it would hand
+    // every keeper a broken image instead.
+    function isCloudPhotoUrl(url) {
+        return /^https?:\/\//i.test(text(url));
+    }
+
+    function photoUrlSet(rows) {
+        return new Set((Array.isArray(rows) ? rows : [])
+            .map(row => text(row && row.photoUrl))
+            .filter(Boolean));
+    }
+
+    // The row a publication writes: morph + photo, plus the owner id row level
+    // security needs. Nothing else about the keeper or the animal is stored.
+    function photoRowFor({ snake, photoUrl, userId } = {}) {
+        const url = text(photoUrl);
+
+        if (!url) {
+            throw new Error("Choose a photo to publish.");
+        }
+
+        if (!isCloudPhotoUrl(url)) {
+            throw new Error("Only a photo uploaded to your cloud storage can be published. Sign in and add the photo again so it uploads, then publish it.");
+        }
+
+        const described = describeSnake(snake);
+
+        if (described.geneDetails.length === 0) {
+            throw new Error("Add the snake's genes first — the gallery files photos by genotype, so it needs to know the morph.");
+        }
+
+        return {
+            row: {
+                user_id: userId,
+                morph_key: described.key,
+                morph_name: described.morphName,
+                genes: descriptionToStorage(described.geneDetails),
+                photo_url: url
+            },
+            described
+        };
+    }
+
+    // One entry per uploaded photo, for the snake form: what that photo can do
+    // right now — be published, be taken out again, or first be uploaded to the
+    // cloud. Device-only photos are marked rather than silently failing later.
+    function photoPublishStates({ urls, genes, publishedUrls } = {}) {
+        const published = publishedUrls instanceof Set
+            ? publishedUrls
+            : new Set(publishedUrls || []);
+        const hasGenes = describeGenotype(genes).geneDetails.length > 0;
+
+        return (Array.isArray(urls) ? urls : []).map(url => {
+            const photoUrl = text(url);
+            const cloud = isCloudPhotoUrl(photoUrl);
+            const alreadyPublished = cloud && published.has(photoUrl);
+            let reason = "";
+
+            if (!cloud) {
+                reason = "On this device only";
+            } else if (!alreadyPublished && !hasGenes) {
+                reason = "Add genes first";
+            }
+
+            return {
+                url: photoUrl,
+                cloud,
+                published: alreadyPublished,
+                canPublish: cloud && !alreadyPublished && hasGenes,
+                reason
+            };
+        });
+    }
+
+    // One row per animal for the gallery's bulk list. A published photo is
+    // marked rather than hidden, so a keeper can see the whole collection is
+    // covered; `reason` says why an animal cannot be published yet.
+    function bulkPublishRows(snakes, publishedUrls) {
+        const published = publishedUrls instanceof Set
+            ? publishedUrls
+            : new Set(publishedUrls || []);
+
+        const seenPhotos = new Set();
+
+        return (Array.isArray(snakes) ? snakes : [])
+            .filter(snake => snake && typeof snake === "object")
+            .map(snake => {
+                const urls = photoUrlsForSnake(snake);
+                const described = describeSnake(snake);
+                const photoUrl = urls[0] || "";
+                let reason = "";
+
+                if (!photoUrl) {
+                    reason = "No photo yet";
+                } else if (described.geneDetails.length === 0) {
+                    reason = "No genes yet";
+                } else if (!isCloudPhotoUrl(photoUrl)) {
+                    reason = "Photo is on this device only";
+                } else if (seenPhotos.has(photoUrl)) {
+                    // Two records can share a picture; the gallery only needs it once.
+                    reason = "Same photo as another animal";
+                }
+
+                if (photoUrl) {
+                    seenPhotos.add(photoUrl);
+                }
+
+                return {
+                    snake,
+                    photoUrl,
+                    key: described.key,
+                    morphName: described.morphName,
+                    alreadyPublished: Boolean(photoUrl && published.has(photoUrl)),
+                    reason
+                };
+            });
     }
 
     function getClient() {
@@ -456,6 +578,41 @@
 
     // ---- Writes -----------------------------------------------------------
 
+    // Photos this keeper has already published. Asking once for a whole batch
+    // keeps bulk publishing to a couple of requests instead of one per animal,
+    // and it means a second press cannot create duplicates from another device
+    // whose cache knows nothing yet.
+    async function ownPhotoUrls(client, userId, urls) {
+        const wanted = [...new Set((urls || []).map(text).filter(Boolean))];
+        const found = new Set();
+
+        if (!client || !userId || wanted.length === 0) {
+            return found;
+        }
+
+        try {
+            const { data, error } = await client
+                .from(TABLE)
+                .select("photo_url")
+                .eq("user_id", userId)
+                .in("photo_url", wanted);
+
+            if (!error) {
+                (data || []).forEach(row => {
+                    const url = text(row && row.photo_url);
+
+                    if (url) {
+                        found.add(url);
+                    }
+                });
+            }
+        } catch (error) {
+            // Offline: the cache is the only answer, and the insert decides the rest.
+        }
+
+        return found;
+    }
+
     async function publish({ snake, photoUrl } = {}) {
         const client = getClient();
 
@@ -469,27 +626,26 @@
             throw new Error("Sign in to publish a photo to the shared gallery.");
         }
 
-        const url = text(photoUrl);
+        const { row, described } = photoRowFor({
+            snake,
+            photoUrl,
+            userId: session.user.id
+        });
 
-        if (!url) {
-            throw new Error("Choose a photo to publish.");
+        // Publishing the same photo twice would only add a duplicate example,
+        // so a photo the gallery already knows is returned as it is.
+        const already = (cachedPhotos(described.key, null) || [])
+            .find(photo => photo && photo.photoUrl === row.photo_url);
+
+        if (already) {
+            return already;
         }
 
-        const described = describeSnake(snake);
+        const published = await ownPhotoUrls(client, session.user.id, [row.photo_url]);
 
-        if (described.geneDetails.length === 0) {
-            throw new Error("Add the snake's genes first — the gallery files photos by genotype, so it needs to know the morph.");
+        if (published.has(row.photo_url)) {
+            return { ...normalizeRow(row), alreadyPublished: true };
         }
-
-        // Nothing about the keeper or the animal's records is stored beyond the
-        // owner id needed for row level security. The gallery is morph + photo.
-        const row = {
-            user_id: session.user.id,
-            morph_key: described.key,
-            morph_name: described.morphName,
-            genes: descriptionToStorage(described.geneDetails),
-            photo_url: url
-        };
 
         let response;
 
@@ -507,6 +663,118 @@
         cachePhotos(described.key, [saved].concat(cachedPhotos(described.key, null) || []));
 
         return saved;
+    }
+
+    // A whole collection arrives in one go, so bulk publishing inserts in
+    // batches instead of one request per animal. Every target keeps its own
+    // outcome: a snake with no genes is reported, not allowed to sink the rest.
+    async function publishMany({ targets, onProgress } = {}) {
+        const list = Array.isArray(targets) ? targets : [];
+        const results = list.map(target => ({ target, ok: false, saved: null, error: "" }));
+
+        if (list.length === 0) {
+            return results;
+        }
+
+        const client = getClient();
+
+        if (!client) {
+            throw new Error("No Supabase connection is saved.");
+        }
+
+        const session = await getSession();
+
+        if (!session) {
+            throw new Error("Sign in to publish photos to the shared gallery.");
+        }
+
+        const report = done => {
+            if (typeof onProgress === "function") {
+                onProgress({ done, total: list.length });
+            }
+        };
+
+        const prepared = [];
+
+        list.forEach((target, index) => {
+            try {
+                const { row, described } = photoRowFor({
+                    snake: target && target.snake,
+                    photoUrl: target && target.photoUrl,
+                    userId: session.user.id
+                });
+
+                prepared.push({ index, row, described });
+            } catch (error) {
+                results[index].error = text(error && error.message) || "This photo could not be published.";
+            }
+        });
+
+        const known = await ownPhotoUrls(
+            client,
+            session.user.id,
+            prepared.map(item => item.row.photo_url)
+        );
+        const pending = prepared.filter(item => {
+            if (!known.has(item.row.photo_url)) {
+                return true;
+            }
+
+            results[item.index].ok = true;
+            results[item.index].saved = normalizeRow(item.row);
+
+            return false;
+        });
+
+        for (let start = 0; start < pending.length; start += PUBLISH_CHUNK_SIZE) {
+            const chunk = pending.slice(start, start + PUBLISH_CHUNK_SIZE);
+            let response;
+
+            try {
+                response = await client
+                    .from(TABLE)
+                    .insert(chunk.map(item => item.row))
+                    .select("*");
+            } catch (error) {
+                chunk.forEach(item => {
+                    results[item.index].error = describeError(error);
+                });
+                report(Math.min(start + chunk.length, list.length));
+                continue;
+            }
+
+            if (response.error) {
+                const message = describeError(response.error);
+
+                chunk.forEach(item => {
+                    results[item.index].error = message;
+                });
+                report(Math.min(start + chunk.length, list.length));
+                continue;
+            }
+
+            const saved = (response.data || []).map(normalizeRow);
+
+            chunk.forEach(item => {
+                const match = saved.find(row => row.photoUrl === item.row.photo_url);
+                results[item.index].ok = true;
+                results[item.index].saved = match || null;
+
+                // The insert succeeded even if the server did not echo the row
+                // back, so the cache still takes what was sent.
+                if (!match) {
+                    const fallback = normalizeRow(item.row);
+                    cachePhotos(fallback.morphKey, [fallback].concat(cachedPhotos(fallback.morphKey, null) || []));
+                }
+            });
+
+            saved.forEach(row => cachePhotos(row.morphKey, [row].concat(cachedPhotos(row.morphKey, null) || [])));
+            report(Math.min(start + chunk.length, list.length));
+        }
+
+        report(list.length);
+
+        return results;
     }
 
     // A report is a message to the keeper who published the photo, not a public
@@ -673,12 +941,18 @@
         descriptionToStorage,
         photoUrlsForSnake,
         photoIsPlaceholder,
+        isCloudPhotoUrl,
+        photoUrlSet,
+        photoRowFor,
+        photoPublishStates,
+        bulkPublishRows,
         groupPhotos,
         fetchExamples,
         fetchAll,
         fetchMine,
         fetchMyReportCounts,
         publish,
+        publishMany,
         report,
         remove,
         isPublished,

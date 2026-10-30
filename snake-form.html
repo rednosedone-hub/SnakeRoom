@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Snake Record</title>
-    <link rel="stylesheet" href="style.css?v=45">
+    <link rel="stylesheet" href="style.css?v=55">
 </head>
 
 <body>
@@ -570,6 +570,13 @@
                     </div>
                 </div>
 
+                <p class="gene-help" style="margin-top:12px;">
+                    Each photo below can be published to the shared Morph Gallery on its own, and
+                    taken out again the same way. Only the morph and the photo are shared &mdash;
+                    never a name or any record. A photo has to be uploaded to your cloud storage
+                    and the snake needs its genes before it can be published.
+                </p>
+
                 <div class="form-field" style="margin-top:12px;">
                     <h4>Photo Gallery</h4>
                     <div id="photoGallery" class="photo-gallery"></div>
@@ -641,7 +648,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="data-helpers.js"></script>
-    <script src="cloud-sync.js?v=13"></script>
+    <script src="backup-helpers.js?v=1"></script>
+    <script src="cloud-sync.js?v=18"></script>
     <script src="auto-sync.js?v=8"></script>
     <script src="account-gate.js?v=1"></script>
     <script src="geneCatalog.js?v=3"></script>
@@ -651,7 +659,9 @@
     <script src="feeder-inventory.js?v=8"></script>
     <script src="health-helpers.js?v=1"></script>
     <script src="readiness.js?v=1"></script>
-    <script src="snake-form.js?v=18"></script>
+    <script src="morphCalculator.js?v=8"></script>
+    <script src="morph-gallery.js?v=6"></script>
+    <script src="snake-form.js?v=22"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

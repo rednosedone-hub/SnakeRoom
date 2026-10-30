@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Account</title>
-    <link rel="stylesheet" href="style.css?v=49">
+    <link rel="stylesheet" href="style.css?v=57">
 </head>
 
 <body data-no-auth-gate>
@@ -155,6 +155,39 @@
                 <div class="plan-grid" id="planGrid"></div>
             </section>
 
+            <section class="form-section" id="backupHistorySection">
+                <h3>Backup History</h3>
+
+                <p class="gene-help">
+                    Every push keeps the version it replaced, so a bad edit or an accidental
+                    restore can be undone. Versions belong to this account only &mdash; another
+                    keeper can never see them, and neither can the app's owner.
+                </p>
+
+                <div class="form-page-actions">
+                    <button type="button" class="main-button" id="saveCheckpointButton">
+                        Save a Version Now
+                    </button>
+                    <button type="button" class="gene-action-button" id="refreshHistoryButton">
+                        Refresh
+                    </button>
+                </div>
+
+                <p class="empty-message" id="historyCount">Loading saved versions&hellip;</p>
+
+                <div class="backup-history-list" id="historyList"></div>
+
+                <div class="history-undo" id="historyUndo" hidden>
+                    <span id="historyUndoText"></span>
+                    <button type="button" class="gene-action-button" id="historyUndoButton">
+                        Undo Restore
+                    </button>
+                </div>
+
+                <p class="empty-message" id="historyNote"></p>
+                <p class="fin-status" id="historyStatus" role="status"></p>
+            </section>
+
             <section class="form-section">
                 <details class="account-advanced">
                     <summary>Advanced setup (only needed for a brand-new cloud project)</summary>
@@ -250,10 +283,11 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="data-helpers.js"></script>
-    <script src="cloud-sync.js?v=16"></script>
+    <script src="backup-helpers.js?v=1"></script>
+    <script src="cloud-sync.js?v=18"></script>
     <script src="auto-sync.js?v=8"></script>
     <script src="plans.js?v=2"></script>
-    <script src="account.js?v=1"></script>
+    <script src="account.js?v=2"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

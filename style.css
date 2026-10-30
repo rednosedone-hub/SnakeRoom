@@ -2057,10 +2057,19 @@ p {
     background: var(--background-color);
 }
 
-.photo-main-badge {
+/* Badges sit in one row over the picture, so "Main" and a share state never
+   overlap on a narrow thumbnail. */
+.photo-badges {
     position: absolute;
     top: 12px;
     left: 12px;
+    right: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.photo-main-badge {
     background: var(--gold-color);
     color: #222;
     font-size: 11px;
@@ -2074,6 +2083,40 @@ p {
     font-size: 11px;
     color: #cfc4a0;
     margin: 6px 0 4px;
+}
+
+/* Per-photo state on the snake form: shared in the morph gallery, or still
+   sitting on this one device. */
+.photo-gallery-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: bold;
+    line-height: 1.4;
+}
+
+.photo-gallery-badge.is-published {
+    background: #1f6b3a;
+    border: 1px solid #46d47f;
+    color: #eaffee;
+}
+
+.photo-gallery-badge.is-local {
+    background: #6b4a12;
+    border: 1px solid #e0a43a;
+    color: #ffe9b8;
+}
+
+.photo-note {
+    display: block;
+    margin-top: 6px;
+    font-size: 11px;
+    color: #e0a43a;
+}
+
+.gene-action-button:disabled {
+    opacity: 0.5;
+    cursor: default;
 }
 
 .photo-thumb-actions {
@@ -5029,6 +5072,87 @@ body.has-sync-banner .collection-notice {
     color: #c9c2a6;
 }
 
+/* Bulk publishing: one row per animal, so a whole collection can be ticked
+   in one pass and the keeper can see at a glance what is already shared. */
+.bulk-publish-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 6px 0 12px;
+}
+
+.bulk-publish-list {
+    display: grid;
+    gap: 8px;
+    max-height: 420px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.bulk-publish-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 215, 0, 0.25);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    cursor: pointer;
+}
+
+.bulk-publish-row.is-locked {
+    cursor: default;
+    opacity: 0.62;
+}
+
+.bulk-publish-row input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 auto;
+    accent-color: var(--gold-color);
+}
+
+.bulk-publish-row img {
+    width: 48px;
+    height: 48px;
+    flex: 0 0 auto;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 215, 0, 0.4);
+}
+
+.bulk-publish-row img.is-broken {
+    opacity: 0.3;
+}
+
+.bulk-publish-name {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.bulk-publish-name strong {
+    color: var(--gold-color);
+    font-weight: 600;
+}
+
+.bulk-publish-name span {
+    color: #c9c2a6;
+    font-size: 13px;
+}
+
+.bulk-publish-note {
+    flex: 0 0 auto;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 215, 0, 0.35);
+    color: #c9c2a6;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
 .hatchling-morph-field {
     min-width: 190px;
 }
@@ -5457,4 +5581,60 @@ body.has-sync-banner .collection-notice {
     font-size: 16px;
     line-height: 1.7;
     white-space: pre-wrap;
+}
+
+/* Backup history: one row per saved version, plus the undo bar shown right
+   after a restore. */
+.backup-history-list {
+    display: grid;
+    gap: 8px;
+    margin: 12px 0;
+}
+
+.backup-history-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 215, 0, 0.25);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.backup-history-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.backup-history-main strong {
+    color: var(--gold-color);
+    font-weight: 600;
+}
+
+.backup-history-main span {
+    color: #c9c2a6;
+    font-size: 13px;
+}
+
+.history-undo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 12px 0;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 215, 0, 0.45);
+    border-radius: 10px;
+    background: rgba(255, 215, 0, 0.08);
+    color: #e6d986;
+    font-size: 15px;
+}
+
+/* `display: flex` above would otherwise override the hidden attribute. */
+.history-undo[hidden] {
+    display: none;
 }

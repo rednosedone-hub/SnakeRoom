@@ -49,6 +49,12 @@
         supabaseKey: "sb_publishable_csOyxq6yvn4o4M1tkgikzg_-bRd3PBS"
     };
 
+    // History is per account, not an administrator's view: every row belongs
+    // to one keeper, and row level security on the table makes that true in the
+    // database rather than in this file. The retention numbers are policy and
+    // live in backup-helpers.js.
+    const HISTORY_TABLE = "snake_room_backup_history";
+
     const SETUP_SQL = [
         "-- The Snake Room: one-time cloud backup setup",
         "create table if not exists snake_room_backups (",
@@ -60,8 +66,31 @@
         "",
         "alter table snake_room_backups enable row level security;",
         "",
+        "drop policy if exists \"Own backup only\" on snake_room_backups;",
         "create policy \"Own backup only\"",
         "  on snake_room_backups",
+        "  for all",
+        "  using (auth.uid () = user_id)",
+        "  with check (auth.uid () = user_id);",
+        "",
+        "-- Saved versions, so a bad edit or a restore can be undone.",
+        "create table if not exists snake_room_backup_history (",
+        "  id uuid primary key default gen_random_uuid(),",
+        "  user_id uuid not null references auth.users (id) on delete cascade,",
+        "  snapshot jsonb not null,",
+        "  device text,",
+        "  reason text,",
+        "  created_at timestamptz not null default now()",
+        ");",
+        "",
+        "create index if not exists snake_room_backup_history_user_idx",
+        "  on snake_room_backup_history (user_id, created_at desc);",
+        "",
+        "alter table snake_room_backup_history enable row level security;",
+        "",
+        "drop policy if exists \"Own backup history only\" on snake_room_backup_history;",
+        "create policy \"Own backup history only\"",
+        "  on snake_room_backup_history",
         "  for all",
         "  using (auth.uid () = user_id)",
         "  with check (auth.uid () = user_id);"
@@ -1173,6 +1202,7 @@
             let mergedSnapshot = localSnapshot;
             let stats = { remoteRecords: 0, conflicts: [] };
             let hadCloudCopy = false;
+            let previousCloudSnapshot = null;
             let row = null;
             let written = false;
 
@@ -1192,6 +1222,7 @@
                     : null;
 
                 hadCloudCopy = Boolean(cloudSnapshot);
+                previousCloudSnapshot = cloudSnapshot;
                 mergedSnapshot = localSnapshot;
                 stats = { remoteRecords: 0, conflicts: [] };
 
@@ -1222,6 +1253,23 @@
 
             if (!written) {
                 throw new Error("The cloud copy kept changing while this device merged. Nothing was overwritten; try again in a moment.");
+            }
+
+            // The copy that was just replaced becomes a saved version. A push
+            // that changed nothing saves nothing, so the history stays a trail
+            // of real changes.
+            if (hadCloudCopy && previousCloudSnapshot) {
+                let changed = true;
+
+                try {
+                    changed = JSON.stringify(previousCloudSnapshot) !== JSON.stringify(mergedSnapshot);
+                } catch (error) {
+                    changed = true;
+                }
+
+                if (changed) {
+                    await archiveAutoVersion(previousCloudSnapshot);
+                }
             }
 
             // Put the combined copy on this device only when the caller can
@@ -1377,6 +1425,264 @@
             console.error(error);
             return "error";
         }
+    }
+
+    // ---- Backup history ----------------------------------------------------
+    //
+    // One row per saved version, owned by the keeper who made it. A push stores
+    // the cloud copy it is replacing, so the history is a real trail of what the
+    // account looked like before each change rather than a copy of the current
+    // state. Restoring writes the chosen version back as the cloud copy and
+    // archives the data it replaced first, which is what makes undo possible.
+
+    function historyHelpers() {
+        return window.BackupHistory || null;
+    }
+
+    function isMissingHistoryTable(error) {
+        const code = String((error && error.code) || "");
+        const message = String((error && error.message) || "");
+
+        return code === "42P01"
+            || code === "PGRST205"
+            || /relation .*snake_room_backup_history.* does not exist/i.test(message)
+            || /could not find the table .*snake_room_backup_history/i.test(message);
+    }
+
+    function describeHistoryError(error) {
+        if (isMissingHistoryTable(error)) {
+            return "The backup history table is not set up yet. Open the Account page, find Advanced setup, press Copy SQL and run it once in the Supabase SQL Editor.";
+        }
+
+        return String((error && error.message) || error);
+    }
+
+    function historyLimit() {
+        const helpers = historyHelpers();
+
+        return helpers ? helpers.HISTORY_LIMIT : 40;
+    }
+
+    async function pruneHistory(activeClient, userId) {
+        const limit = historyLimit();
+        const { data, error } = await activeClient
+            .from(HISTORY_TABLE)
+            .select("id, created_at")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(limit + 5);
+
+        if (error) {
+            return;
+        }
+
+        const helpers = historyHelpers();
+        const drop = helpers
+            ? helpers.historyIdsToDrop(data, limit)
+            : (data || []).slice(limit).map(row => row.id).filter(Boolean);
+
+        if (drop.length === 0) {
+            return;
+        }
+
+        await activeClient
+            .from(HISTORY_TABLE)
+            .delete()
+            .eq("user_id", userId)
+            .in("id", drop);
+    }
+
+    // Stores one version and trims the oldest. Throws: a caller that needs the
+    // copy to exist (a restore) must not mistake a failure for success.
+    async function archiveSnapshot(snapshot, { reason = "manual" } = {}) {
+        const session = await getSession();
+
+        if (!session) {
+            throw new Error("Sign in to save a backup version.");
+        }
+
+        const activeClient = getClient();
+
+        if (!activeClient) {
+            throw new Error("No Supabase connection is saved.");
+        }
+
+        if (!isValidSnapshot(snapshot)) {
+            throw new Error("That is not a Snake Room snapshot.");
+        }
+
+        const { data, error } = await activeClient
+            .from(HISTORY_TABLE)
+            .insert({
+                user_id: session.user.id,
+                snapshot,
+                device: navigator.userAgent.slice(0, 120),
+                reason
+            })
+            .select("id, created_at");
+
+        if (error) {
+            throw new Error(describeHistoryError(error));
+        }
+
+        await pruneHistory(activeClient, session.user.id);
+
+        return (data || [])[0] || null;
+    }
+
+    // A push happens seconds after an edit, so automatic versions are coalesced:
+    // a busy afternoon is a handful of versions, not forty. Manual checkpoints
+    // and the copy taken before a restore always go in.
+    async function archiveAutoVersion(snapshot) {
+        try {
+            const session = await getSession();
+            const activeClient = getClient();
+
+            if (!session || !activeClient) {
+                return;
+            }
+
+            const helpers = historyHelpers();
+            const { data: newest, error } = await activeClient
+                .from(HISTORY_TABLE)
+                .select("id, created_at")
+                .eq("user_id", session.user.id)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            // The history table is optional: a backup must still work before
+            // that SQL has been run.
+            if (error || (helpers && !helpers.shouldArchiveAuto({ newest }))) {
+                return;
+            }
+
+            await archiveSnapshot(snapshot, { reason: "auto" });
+        } catch (error) {
+            console.warn("Could not save a backup version:", error);
+        }
+    }
+
+    // Newest first, without the snapshots themselves: the list stays small, and
+    // a restore fetches the one version it needs.
+    async function fetchHistory({ limit = 25 } = {}) {
+        const activeClient = getClient();
+        const session = await getSession();
+
+        if (!activeClient || !session) {
+            return { rows: [], signedIn: false, setupNeeded: false, error: "" };
+        }
+
+        const { data, error } = await activeClient
+            .from(HISTORY_TABLE)
+            .select("id, created_at, device, reason")
+            .eq("user_id", session.user.id)
+            .order("created_at", { ascending: false })
+            .limit(limit);
+
+        if (error) {
+            return {
+                rows: [],
+                signedIn: true,
+                setupNeeded: isMissingHistoryTable(error),
+                error: describeHistoryError(error)
+            };
+        }
+
+        return { rows: data || [], signedIn: true, setupNeeded: false, error: "" };
+    }
+
+    async function saveCheckpoint() {
+        return archiveSnapshot(buildSnapshot(), { reason: "manual" });
+    }
+
+    async function restoreHistoryEntry(id) {
+        const session = await getSession();
+
+        if (!session) {
+            throw new Error("Sign in to restore a saved version.");
+        }
+
+        const activeClient = getClient();
+
+        if (!activeClient) {
+            throw new Error("No Supabase connection is saved.");
+        }
+
+        const { data: entry, error } = await activeClient
+            .from(HISTORY_TABLE)
+            .select("snapshot, created_at")
+            .eq("id", id)
+            .eq("user_id", session.user.id)
+            .maybeSingle();
+
+        if (error) {
+            throw new Error(describeHistoryError(error));
+        }
+
+        if (!entry || !isValidSnapshot(entry.snapshot)) {
+            throw new Error("That saved version could not be read.");
+        }
+
+        // The copy taken here is the undo, so it has to exist before anything
+        // is replaced. Refusing is kinder than a restore nobody can reverse.
+        let archived = null;
+
+        try {
+            archived = await archiveSnapshot(buildSnapshot(), { reason: "before restore" });
+        } catch (archiveError) {
+            throw new Error(`Nothing was restored, because the current data could not be copied first: ${archiveError.message}`);
+        }
+
+        let row = null;
+        let written = false;
+
+        for (let attempt = 0; attempt < PUSH_ATTEMPTS && !written; attempt += 1) {
+            const existing = await activeClient
+                .from("snake_room_backups")
+                .select("updated_at")
+                .eq("user_id", session.user.id)
+                .maybeSingle();
+
+            if (existing.error) {
+                throw existing.error;
+            }
+
+            row = {
+                user_id: session.user.id,
+                snapshot: entry.snapshot,
+                device: navigator.userAgent.slice(0, 120),
+                updated_at: new Date().toISOString()
+            };
+
+            written = await writeRowIfUnchanged(activeClient, row, existing.data);
+        }
+
+        if (!written) {
+            throw new Error("The cloud copy kept changing while the restore ran. Nothing was overwritten; try again in a moment.");
+        }
+
+        // A restore is not a local edit: the restored snapshot is the cloud copy
+        // now, so it must not queue a push of its own.
+        if (window.AutoSync && window.AutoSync.withWritesIgnored) {
+            window.AutoSync.withWritesIgnored(() => applySnapshot(entry.snapshot));
+        } else {
+            applySnapshot(entry.snapshot);
+        }
+
+        writeMergeBase(session.user.id, entry.snapshot);
+        clearNeedsPullFlag();
+
+        saveSettings({
+            ...readSettings(),
+            lastPulledAt: new Date().toISOString(),
+            cloudUpdatedAt: row.updated_at
+        });
+
+        return {
+            archivedId: archived && archived.id ? archived.id : "",
+            restoredAt: entry.created_at || ""
+        };
     }
 
     async function pushSnapshot() {
@@ -1800,7 +2106,7 @@
         return PHOTO_LIMITS[plan] ?? PHOTO_LIMITS.owner;
     }
 
-    async function uploadSnakePhotoFile(file, existingImage = "") {
+    async function uploadSnakePhotoBlob(blob, existingImage = "", contentType = "image/jpeg") {
         const activeClient = getClient();
 
         if (!activeClient) {
@@ -1813,7 +2119,6 @@
             throw new Error("Not signed in.");
         }
 
-        const blob = await compressImageToJpeg(file);
         const existingPath = snakePhotoPathFromImageValue(existingImage);
         const path = existingPath && existingPath.startsWith(`${session.user.id}/`)
             ? existingPath
@@ -1821,7 +2126,7 @@
         const bucket = activeClient.storage.from(PHOTO_BUCKET);
 
         const { error } = await bucket.upload(path, blob, {
-            contentType: "image/jpeg",
+            contentType,
             upsert: true
         });
 
@@ -1830,6 +2135,29 @@
         }
 
         return bucket.getPublicUrl(path).data.publicUrl;
+    }
+
+    async function uploadSnakePhotoFile(file, existingImage = "") {
+        const blob = await compressImageToJpeg(file);
+
+        return uploadSnakePhotoBlob(blob, existingImage);
+    }
+
+    // A photo taken while signed out is kept on the device as a data URL. This
+    // is how it gets into the cloud later, without asking the keeper to find
+    // the original file again (which a phone camera roll often no longer has).
+    async function uploadSnakePhotoDataUrl(dataUrl, existingImage = "") {
+        const value = String(dataUrl || "");
+
+        if (!/^data:image\//i.test(value)) {
+            throw new Error("That photo is not stored on this device as an image.");
+        }
+
+        const response = await fetch(value);
+        const blob = await response.blob();
+        const type = /^data:(image\/[a-z0-9.+-]+)/i.exec(value);
+
+        return uploadSnakePhotoBlob(blob, existingImage, type ? type[1].toLowerCase() : "image/jpeg");
     }
 
     async function deleteSnakePhoto(imageValue) {
@@ -2120,12 +2448,15 @@
         applySnapshot,
         readSettings,
         SNAPSHOT_KEYS,
+        HISTORY_TABLE,
         PHOTO_BUCKET,
         PHOTO_SETUP_SQL,
         MORPH_SETUP_SQL,
         PHOTO_LIMITS,
         compressImageToJpeg,
+        uploadSnakePhotoBlob,
         uploadSnakePhotoFile,
+        uploadSnakePhotoDataUrl,
         deleteSnakePhoto,
         migrateImagesFolder,
         getPhotoLimit,
@@ -2134,6 +2465,9 @@
         refreshStatusChip,
         pushCore,
         pullCore,
+        fetchHistory,
+        saveCheckpoint,
+        restoreHistoryEntry,
         _getClient: getClient,
         _mergeSnapshots: mergeSnapshots,
         _readMergeBase: readMergeBase,

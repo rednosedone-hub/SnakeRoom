@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Morph Gallery</title>
-    <link rel="stylesheet" href="style.css?v=49">
+    <link rel="stylesheet" href="style.css?v=53">
 </head>
 
 <body>
@@ -137,6 +137,48 @@
                 <p class="fin-status" id="galleryPublishStatus" role="status"></p>
             </section>
 
+            <section class="form-section" id="bulkPublishSection">
+                <h3>Publish a whole collection</h3>
+
+                <p class="gene-help">
+                    New here, or just bought out someone's collection? Tick every animal at once
+                    instead of publishing one at a time. Each one publishes its <strong>main
+                    photo</strong> &mdash; use the box above if you want a different photo for a
+                    single animal. Animals already in the gallery are marked and skipped, so
+                    pressing it twice cannot duplicate anything.
+                </p>
+
+                <div class="bulk-publish-toolbar">
+                    <button type="button" class="gene-action-button" id="bulkSelectAllButton">
+                        Select all ready
+                    </button>
+                    <button type="button" class="gene-action-button" id="bulkClearButton">
+                        Clear
+                    </button>
+                    <span class="empty-message" id="bulkPublishCount">0 selected</span>
+                </div>
+
+                <div class="bulk-publish-list" id="bulkPublishList">
+                    <p class="empty-message">Sign in and add snakes to see them here.</p>
+                </div>
+
+                <label class="consent-field">
+                    <input type="checkbox" id="bulkPublishConsentInput">
+                    <span>
+                        I took these photos, or have permission from the person who did, and I am
+                        happy for every user of the app to see them.
+                    </span>
+                </label>
+
+                <div class="form-page-actions">
+                    <button type="button" class="main-button" id="bulkPublishButton" disabled>
+                        Publish Selected
+                    </button>
+                </div>
+
+                <p class="fin-status" id="bulkPublishStatus" role="status"></p>
+            </section>
+
             <section class="form-section">
                 <h3>Your published photos</h3>
 
@@ -166,14 +208,15 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="data-helpers.js"></script>
-    <script src="cloud-sync.js?v=16"></script>
+    <script src="backup-helpers.js?v=1"></script>
+    <script src="cloud-sync.js?v=18"></script>
     <script src="auto-sync.js?v=8"></script>
     <script src="account-gate.js?v=1"></script>
     <script src="geneCatalog.js?v=3"></script>
     <script src="genes.js?v=8"></script>
     <script src="morphCalculator.js?v=8"></script>
-    <script src="morph-gallery.js?v=4"></script>
-    <script src="morphGallery.js?v=7"></script>
+    <script src="morph-gallery.js?v=6"></script>
+    <script src="morphGallery.js?v=8"></script>
 
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>

@@ -295,6 +295,7 @@ function renderGeneList() {
         geneList.innerHTML = `
             <span class="gene-pill">No genes entered</span>
         `;
+        renderPhotoGallery();
         return;
     }
 
@@ -318,6 +319,10 @@ function renderGeneList() {
         </span>
     `;
         }).join("");
+
+    // The gallery files photos by genotype, so adding or removing a gene
+    // changes whether each thumbnail can be published.
+    renderPhotoGallery();
 }
 
 function updateImagePreview() {
@@ -341,6 +346,26 @@ function setPhotoStatus(message, isError = false) {
     status.classList.toggle("import-error", isError);
 }
 
+async function compressFileToDataUrl(file) {
+    let blob = file;
+
+    if (window.CloudSync && typeof window.CloudSync.compressImageToJpeg === "function") {
+        try {
+            blob = await window.CloudSync.compressImageToJpeg(file);
+        } catch (error) {
+            blob = file;
+        }
+    }
+
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("Could not read that file."));
+        reader.readAsDataURL(blob);
+    });
+}
+
 async function savePhotoAsDataUrl(file, reason) {
     const keepLocal = confirm(
         reason + "\n\n" +
@@ -355,23 +380,7 @@ async function savePhotoAsDataUrl(file, reason) {
 
     setPhotoStatus("Preparing photo for this device\u2026");
 
-    let blob = file;
-
-    if (window.CloudSync && typeof window.CloudSync.compressImageToJpeg === "function") {
-        try {
-            blob = await window.CloudSync.compressImageToJpeg(file);
-        } catch (error) {
-            blob = file;
-        }
-    }
-
-    const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error("Could not read that file."));
-        reader.readAsDataURL(blob);
-    });
+    const dataUrl = await compressFileToDataUrl(file);
 
     currentPhotos.push({ url: dataUrl, addedAt: new Date().toISOString() });
     syncMainPhotoField();
@@ -388,20 +397,38 @@ function renderPhotoGallery() {
         return;
     }
 
+    const states = photoStates();
+
     gallery.innerHTML = currentPhotos.map((photo, index) => {
         const added = photo.addedAt ? new Date(photo.addedAt).toLocaleDateString() : "Date unknown";
         const isMain = index === 0;
+        const state = states[index] || { cloud: true, published: false, canPublish: false, reason: "" };
+
+        // Publish, take the photo out again, or (for a photo that never made it
+        // to the cloud) upload it — one honest action per picture.
+        const shareAction = state.published
+            ? `<button type="button" class="gene-remove-button" onclick="unpublishPhotoFromForm(${index})">Unpublish</button>`
+            : state.cloud
+                ? `<button type="button" class="gene-action-button" onclick="publishPhotoFromForm(${index})" ${state.canPublish ? "" : "disabled"}>Publish</button>`
+                : `<button type="button" class="gene-action-button" onclick="uploadPhotoFromForm(${index})">Upload</button>`;
+        const note = state.reason && state.cloud ? `<span class="photo-note">${state.reason}</span>` : "";
 
         return `
             <div class="photo-gallery-item${isMain ? " main" : ""}">
                 <img src="${photo.url}" alt="Snake photo ${index + 1}" loading="lazy"
                     onerror="this.onerror=null;this.src='Images/TheSnakeRoom.jpg'">
-                ${isMain ? `<span class="photo-main-badge">Main</span>` : ""}
+                <div class="photo-badges">
+                    ${isMain ? `<span class="photo-main-badge">Main</span>` : ""}
+                    ${state.published ? `<span class="photo-gallery-badge is-published">In gallery</span>` : ""}
+                    ${state.cloud ? "" : `<span class="photo-gallery-badge is-local">Device only</span>`}
+                </div>
                 <span class="photo-date">${added}</span>
                 <div class="photo-thumb-actions">
+                    ${shareAction}
                     ${isMain ? "" : `<button type="button" class="gene-action-button" onclick="makePhotoMain(${index})">Make Main</button>`}
                     <button type="button" class="gene-remove-button" onclick="removePhoto(${index})">Remove</button>
                 </div>
+                ${note}
             </div>
         `;
     }).join("");
@@ -440,7 +467,12 @@ function removePhoto(index) {
 
     if (!photo) return;
 
-    if (!confirm("Remove this photo from the snake?")) return;
+    const stillShared = publishedPhotoRows.has(photo.url);
+    const question = stillShared
+        ? "Remove this photo from the snake? It stays in the shared Morph Gallery \u2014 press Unpublish first if you want it gone from there too."
+        : "Remove this photo from the snake?";
+
+    if (!confirm(question)) return;
 
     currentPhotos.splice(index, 1);
 
@@ -453,6 +485,28 @@ function removePhoto(index) {
     syncMainPhotoField();
 }
 
+// A camera upload on a phone can take a while. Saving used to refuse while one
+// was in flight and leave the keeper with a photo that never arrived, so the
+// upload is tracked and the save waits for it instead.
+const pendingPhotoUploads = new Set();
+
+function trackPhotoUpload(work) {
+    pendingPhotoUploads.add(work);
+
+    const done = () => pendingPhotoUploads.delete(work);
+
+    work.then(done, done);
+
+    return work;
+}
+
+async function waitForPhotoUploads() {
+    if (pendingPhotoUploads.size === 0) return;
+
+    setPhotoStatus("Waiting for the photo to finish uploading\u2026");
+    await Promise.allSettled([...pendingPhotoUploads]);
+}
+
 function handlePhotoFileChange(event) {
     const input = event.target;
     const file = input.files && input.files[0];
@@ -462,7 +516,7 @@ function handlePhotoFileChange(event) {
     // Reset so picking the exact same file again still fires a change event.
     input.value = "";
 
-    processPhotoFile(file);
+    trackPhotoUpload(processPhotoFile(file));
 }
 
 async function processPhotoFile(file) {
@@ -504,9 +558,208 @@ async function processPhotoFile(file) {
         }
 
         URL.revokeObjectURL(objectUrl);
-        syncMainPhotoField();
+
+        // The upload failed for some other reason (storage not set up, bad
+        // connection). The photo itself is fine, so keep it on the device
+        // instead of throwing away the only copy the keeper has.
         const cleanMessage = message.replace(/\.+$/, "");
+        let deviceUrl = "";
+
+        try {
+            deviceUrl = await compressFileToDataUrl(file);
+        } catch (readError) {
+            deviceUrl = "";
+        }
+
+        if (deviceUrl) {
+            currentPhotos.push({ url: deviceUrl, addedAt: new Date().toISOString() });
+            syncMainPhotoField();
+            setPhotoStatus(`Photo kept on this device only: ${cleanMessage}. Press Upload on the photo when that is fixed.`, true);
+            return;
+        }
+
+        syncMainPhotoField();
         setPhotoStatus(`Photo upload failed: ${cleanMessage}. The photo was not added.`, true);
+    }
+}
+
+// ---- Publish / upload each photo -------------------------------------------
+// The shared gallery is optional and additive: a snake saves whether or not a
+// photo goes with it. Each thumbnail carries its own action, because the photo
+// a keeper wants to share is not always the main one.
+
+// url -> gallery row id, for the photos this keeper has already published.
+const publishedPhotoRows = new Map();
+
+function formSnakeForPublish() {
+    return {
+        name: document.getElementById("nameInput").value.trim(),
+        genes: currentGenes
+    };
+}
+
+function photoStates() {
+    if (!window.MorphGallery || typeof window.MorphGallery.photoPublishStates !== "function") {
+        return currentPhotos.map(photo => ({
+            url: photo.url,
+            cloud: /^https?:\/\//i.test(photo.url),
+            published: false,
+            canPublish: false,
+            reason: ""
+        }));
+    }
+
+    return window.MorphGallery.photoPublishStates({
+        urls: currentPhotos.map(photo => photo.url),
+        genes: currentGenes,
+        publishedUrls: new Set(publishedPhotoRows.keys())
+    });
+}
+
+// The gallery remembers who published what; asking once keeps every thumbnail
+// honest about Publish vs Unpublish without a request per photo.
+async function loadPublishedPhotoRows() {
+    if (!window.MorphGallery || typeof window.MorphGallery.fetchMine !== "function") {
+        return;
+    }
+
+    try {
+        const rows = await window.MorphGallery.fetchMine();
+
+        publishedPhotoRows.clear();
+        (rows || []).forEach(row => {
+            if (row && row.photoUrl && row.id) {
+                publishedPhotoRows.set(row.photoUrl, row.id);
+            }
+        });
+        renderPhotoGallery();
+    } catch (error) {
+        // Offline, or the gallery is not set up: the photos are still fine.
+    }
+}
+
+async function publishPhotoFromForm(index) {
+    const photo = currentPhotos[index];
+
+    if (!photo) return;
+
+    if (!window.MorphGallery || typeof window.MorphGallery.publish !== "function") {
+        setPhotoStatus("The morph gallery helper did not load on this page.", true);
+        return;
+    }
+
+    setPhotoStatus("Publishing photo to the shared gallery\u2026");
+
+    try {
+        const saved = await window.MorphGallery.publish({
+            snake: formSnakeForPublish(),
+            photoUrl: photo.url
+        });
+
+        if (saved && saved.id) {
+            publishedPhotoRows.set(photo.url, saved.id);
+        }
+
+        setPhotoStatus("Published. Every keeper's calculator can use this photo now.");
+    } catch (error) {
+        setPhotoStatus(error && error.message ? error.message : String(error), true);
+    }
+
+    renderPhotoGallery();
+}
+
+async function unpublishPhotoFromForm(index) {
+    const photo = currentPhotos[index];
+    const rowId = photo ? publishedPhotoRows.get(photo.url) : "";
+
+    if (!photo) return;
+
+    if (!rowId) {
+        setPhotoStatus("That photo is not in the shared gallery.", true);
+        renderPhotoGallery();
+        return;
+    }
+
+    if (!confirm("Take this photo out of the shared gallery? It stays on this snake.")) {
+        return;
+    }
+
+    setPhotoStatus("Removing the photo from the shared gallery\u2026");
+
+    try {
+        await window.MorphGallery.remove(rowId);
+        publishedPhotoRows.delete(photo.url);
+        setPhotoStatus("Removed from the shared gallery. The photo stays on this snake.");
+    } catch (error) {
+        setPhotoStatus(error && error.message ? error.message : String(error), true);
+    }
+
+    renderPhotoGallery();
+}
+
+// A photo taken while signed out, or whose upload failed, is saved on this
+// device as a data URL. This is the way back: upload it now and swap the record
+// over to the cloud URL, keeping its place in the gallery.
+async function uploadPhotoFromForm(index) {
+    const photo = currentPhotos[index];
+
+    if (!photo) return;
+
+    if (!window.CloudSync || typeof window.CloudSync.uploadSnakePhotoDataUrl !== "function") {
+        setPhotoStatus("Cloud upload is not available on this page.", true);
+        return;
+    }
+
+    setPhotoStatus("Uploading the photo to your cloud storage\u2026");
+
+    try {
+        const url = await window.CloudSync.uploadSnakePhotoDataUrl(photo.url);
+
+        photo.url = url;
+        photo.addedAt = photo.addedAt || new Date().toISOString();
+        syncMainPhotoField();
+        setPhotoStatus("Photo uploaded to the cloud. Press Save Snake to keep the change.");
+    } catch (error) {
+        setPhotoStatus(`Photo upload failed: ${error && error.message ? error.message : String(error)}`, true);
+    }
+}
+
+// Saving is the last chance to get device-only photos into the cloud, so a
+// phone photo that never uploaded heals itself the next time the keeper saves
+// while signed in. A failure here leaves the photo exactly as it was.
+async function uploadDeviceOnlyPhotos() {
+    if (!window.CloudSync || typeof window.CloudSync.uploadSnakePhotoDataUrl !== "function") {
+        return;
+    }
+
+    const pending = currentPhotos.filter(photo => /^data:/i.test(photo.url));
+
+    if (pending.length === 0) {
+        return;
+    }
+
+    const session = window.CloudSync.getSession ? await window.CloudSync.getSession() : null;
+
+    if (!session) {
+        return;
+    }
+
+    setPhotoStatus(`Uploading ${pending.length} photo${pending.length === 1 ? "" : "s"} saved on this device\u2026`);
+
+    let uploaded = 0;
+
+    for (const photo of pending) {
+        try {
+            photo.url = await window.CloudSync.uploadSnakePhotoDataUrl(photo.url);
+            uploaded += 1;
+        } catch (error) {
+            // It stays a device photo; the thumbnail keeps saying so.
+        }
+    }
+
+    if (uploaded > 0) {
+        syncMainPhotoField();
+        setPhotoStatus(`${uploaded} photo${uploaded === 1 ? "" : "s"} uploaded to the cloud.`);
     }
 }
 
@@ -2481,7 +2734,7 @@ function initMoneySection() {
     updateRetirementFields(false);
 }
 
-function saveSnakeFromPage() {
+async function saveSnakeFromPage() {
     const name = document.getElementById("nameInput").value.trim();
     const morph = document.getElementById("snakeIDInput").value.trim();
 
@@ -2490,6 +2743,12 @@ function saveSnakeFromPage() {
         alert("Please enter at least a name and ID.");
         return;
     }
+
+    // A phone photo can still be uploading when Save is pressed; finish it, and
+    // give any leftover device-only photo one more chance at the cloud, before
+    // the record is written.
+    await waitForPhotoUploads();
+    await uploadDeviceOnlyPhotos();
 
     const imageValue = document.getElementById("imageInput").value.trim();
 
@@ -2616,6 +2875,9 @@ window.removeFeedingHistoryEntry = removeFeedingHistoryEntry;
 window.removeShedHistoryEntry = removeShedHistoryEntry;
 window.removePhoto = removePhoto;
 window.makePhotoMain = makePhotoMain;
+window.publishPhotoFromForm = publishPhotoFromForm;
+window.unpublishPhotoFromForm = unpublishPhotoFromForm;
+window.uploadPhotoFromForm = uploadPhotoFromForm;
 window.saveSnakeFromPage = saveSnakeFromPage;
 
 setupCollapsibleSections();
@@ -2649,6 +2911,10 @@ if (cameraFileInput) {
 if (cameraPhotoButton && cameraFileInput) {
     cameraPhotoButton.addEventListener("click", () => cameraFileInput.click());
 }
+
+// Which photos this keeper already shares, so each thumbnail shows Publish or
+// Unpublish from the first paint.
+loadPublishedPhotoRows();
 
 // The floating Save pill shows whenever the normal save row is scrolled out
 // of view, so long forms can be saved without scrolling to the bottom.

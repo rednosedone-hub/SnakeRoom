@@ -4,7 +4,7 @@
   "private": true,
   "description": "Local-first ball python collection manager.",
   "scripts": {
-    "test": "node --test tests/gene-labels.test.js tests/combo-names.test.js tests/health-helpers.test.js tests/lineage.test.js tests/readiness.test.js tests/feeder-inventory.test.js tests/finance-feeders.test.js tests/morph-gallery.test.js tests/calendar-helpers.test.js"
+    "test": "node --test tests/gene-labels.test.js tests/combo-names.test.js tests/health-helpers.test.js tests/lineage.test.js tests/readiness.test.js tests/feeder-inventory.test.js tests/finance-feeders.test.js tests/morph-gallery.test.js tests/backup-helpers.test.js tests/calendar-helpers.test.js"
   },
   "engines": {
     "node": ">=18"

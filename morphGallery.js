@@ -10,7 +10,11 @@
         search: "",
         sort: "photos",
         userId: "",
-        reportCounts: new Map()
+        reportCounts: new Map(),
+        mineRows: [],
+        publishedUrls: new Set(),
+        bulkRows: [],
+        bulkSelected: new Set()
     };
 
     const elements = {
@@ -30,6 +34,13 @@
         publishButton: document.getElementById("publishMorphPhotoButton"),
         publishStatus: document.getElementById("galleryPublishStatus"),
         consentInput: document.getElementById("galleryConsentInput"),
+        bulkList: document.getElementById("bulkPublishList"),
+        bulkCount: document.getElementById("bulkPublishCount"),
+        bulkConsentInput: document.getElementById("bulkPublishConsentInput"),
+        bulkPublishButton: document.getElementById("bulkPublishButton"),
+        bulkPublishStatus: document.getElementById("bulkPublishStatus"),
+        bulkSelectAllButton: document.getElementById("bulkSelectAllButton"),
+        bulkClearButton: document.getElementById("bulkClearButton"),
         mineGrid: document.getElementById("galleryMineGrid"),
         mineNote: document.getElementById("galleryMineNote"),
         mineStatus: document.getElementById("galleryMineStatus"),
@@ -418,6 +429,146 @@
         }
     }
 
+    // ---- Bulk publishing ---------------------------------------------------
+
+    function bulkRowId(row) {
+        return String(row.snake.id || row.snake.ID || row.snake.name || row.photoUrl);
+    }
+
+    function bulkRowIsReady(row) {
+        return !row.reason && !row.alreadyPublished;
+    }
+
+    function selectedBulkRows() {
+        return state.bulkRows.filter(row => bulkRowIsReady(row) && state.bulkSelected.has(bulkRowId(row)));
+    }
+
+    function renderBulkRow(row) {
+        const id = bulkRowId(row);
+        const ready = bulkRowIsReady(row);
+        // "Published" only describes a row that could be shared: an animal with
+        // no genes is not published just because another snake uses its picture.
+        const note = row.alreadyPublished && !row.reason ? "Published" : row.reason;
+        const photo = row.photoUrl || "Images/TheSnakeRoom.jpg";
+
+        return `
+            <label class="bulk-publish-row${ready ? "" : " is-locked"}">
+                <input type="checkbox" data-action="bulk-pick" value="${escapeHtml(id)}"
+                    ${state.bulkSelected.has(id) ? "checked" : ""} ${ready ? "" : "disabled"}>
+                <img src="${escapeHtml(photo)}" alt="" loading="lazy"
+                    onerror="this.classList.add('is-broken')">
+                <span class="bulk-publish-name">
+                    <strong>${escapeHtml(row.snake.name || "Unnamed")}</strong>
+                    <span>${escapeHtml(row.morphName)}</span>
+                </span>
+                ${note ? `<span class="bulk-publish-note">${escapeHtml(note)}</span>` : ""}
+            </label>
+        `;
+    }
+
+    function updateBulkCount() {
+        const count = selectedBulkRows().length;
+
+        if (elements.bulkCount) {
+            elements.bulkCount.textContent = `${count} selected`;
+        }
+
+        if (elements.bulkPublishButton) {
+            elements.bulkPublishButton.disabled = count === 0;
+        }
+    }
+
+    function renderBulk() {
+        if (!elements.bulkList) {
+            return;
+        }
+
+        const rows = window.MorphGallery.bulkPublishRows(snakes(), state.publishedUrls);
+        state.bulkRows = rows;
+
+        // A row that has just been published (or stopped being ready) must not
+        // stay ticked, or the next press would claim work that is already done.
+        const readyIds = new Set(rows.filter(bulkRowIsReady).map(bulkRowId));
+
+        [...state.bulkSelected].forEach(id => {
+            if (!readyIds.has(id)) {
+                state.bulkSelected.delete(id);
+            }
+        });
+
+        elements.bulkList.innerHTML = rows.length === 0
+            ? `<p class="empty-message">No snakes in this collection yet.</p>`
+            : rows.map(renderBulkRow).join("");
+
+        updateBulkCount();
+    }
+
+    function toggleAllBulk(isSelected) {
+        state.bulkRows.filter(bulkRowIsReady).forEach(row => {
+            if (isSelected) {
+                state.bulkSelected.add(bulkRowId(row));
+            } else {
+                state.bulkSelected.delete(bulkRowId(row));
+            }
+        });
+
+        renderBulk();
+    }
+
+    async function publishSelectedBulk() {
+        const rows = selectedBulkRows();
+
+        if (rows.length === 0) {
+            elements.bulkPublishStatus.textContent = "Tick at least one animal first.";
+            return;
+        }
+
+        if (elements.bulkConsentInput && !elements.bulkConsentInput.checked) {
+            elements.bulkPublishStatus.textContent = "Tick the permission box first \u2014 it is the one promise the gallery asks of you.";
+            return;
+        }
+
+        const session = window.CloudSync && window.CloudSync.getSession
+            ? await window.CloudSync.getSession()
+            : null;
+
+        if (!session) {
+            elements.bulkPublishStatus.textContent = "Sign in to publish photos to the shared gallery.";
+            return;
+        }
+
+        elements.bulkPublishButton.disabled = true;
+        elements.bulkPublishStatus.textContent = `Publishing 0 of ${rows.length}\u2026`;
+
+        try {
+            const results = await window.MorphGallery.publishMany({
+                targets: rows.map(row => ({ snake: row.snake, photoUrl: row.photoUrl })),
+                onProgress: ({ done, total }) => {
+                    elements.bulkPublishStatus.textContent = `Publishing ${done} of ${total}\u2026`;
+                }
+            });
+            const published = results.filter(result => result.ok).length;
+            const failed = results.filter(result => !result.ok);
+
+            elements.bulkPublishStatus.textContent = failed.length === 0
+                ? `Published ${published} photo${published === 1 ? "" : "s"}. Every keeper's calculator can use ${published === 1 ? "it" : "them"} now.`
+                : `${published} published, ${failed.length} could not be: ${failed[0].error}`;
+
+            if (elements.bulkConsentInput) {
+                elements.bulkConsentInput.checked = false;
+            }
+            state.bulkSelected.clear();
+
+            await loadGallery();
+            await loadMine();
+        } catch (error) {
+            elements.bulkPublishStatus.textContent = error.message;
+        } finally {
+            elements.bulkPublishButton.disabled = selectedBulkRows().length === 0;
+            showSetup();
+        }
+    }
+
     // ---- Your photos -------------------------------------------------------
 
     async function loadMine() {
@@ -431,10 +582,15 @@
             elements.mineNote.hidden = false;
             elements.mineNote.textContent = "Sign in to see and manage the photos you have published.";
             elements.mineGrid.innerHTML = "";
+            state.mineRows = [];
+            state.publishedUrls = new Set();
+            renderBulk();
             return;
         }
 
         const rows = await window.MorphGallery.fetchMine();
+        state.mineRows = rows;
+        state.publishedUrls = window.MorphGallery.photoUrlSet(rows);
         state.reportCounts = await window.MorphGallery.fetchMyReportCounts();
 
         elements.mineNote.hidden = rows.length > 0;
@@ -462,6 +618,8 @@
                 </article>
             `;
         }).join("");
+
+        renderBulk();
     }
 
     async function removePhoto(id) {
@@ -527,6 +685,36 @@
         elements.snakeSelect.addEventListener("change", renderPhotoOptions);
         elements.photoSelect.addEventListener("change", renderPreview);
         elements.publishButton.addEventListener("click", publishPhoto);
+
+        if (elements.bulkList) {
+            elements.bulkList.addEventListener("change", event => {
+                const box = event.target.closest("input[data-action='bulk-pick']");
+
+                if (!box) {
+                    return;
+                }
+
+                if (box.checked) {
+                    state.bulkSelected.add(box.value);
+                } else {
+                    state.bulkSelected.delete(box.value);
+                }
+
+                updateBulkCount();
+            });
+        }
+
+        if (elements.bulkSelectAllButton) {
+            elements.bulkSelectAllButton.addEventListener("click", () => toggleAllBulk(true));
+        }
+
+        if (elements.bulkClearButton) {
+            elements.bulkClearButton.addEventListener("click", () => toggleAllBulk(false));
+        }
+
+        if (elements.bulkPublishButton) {
+            elements.bulkPublishButton.addEventListener("click", publishSelectedBulk);
+        }
         elements.refreshButton.addEventListener("click", () => {
             elements.status.textContent = "";
             loadGallery();
