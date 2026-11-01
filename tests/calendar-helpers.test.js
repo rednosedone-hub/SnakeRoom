@@ -12,9 +12,17 @@ context.SnakeData = {
     isInactiveSnake: snake => ["Sold", "Archived", "Deceased"].includes(String(snake.status || ""))
 };
 vm.createContext(context);
+// The calendar shares the incubation maths with the outcomes page, so load it
+// first: a clutch's own incubation length must move its hatch window.
+vm.runInContext(
+    fs.readFileSync(path.join(projectRoot, "incubation-helpers.js"), "utf8"),
+    context,
+    { filename: "incubation-helpers.js" }
+);
 vm.runInContext(
     fs.readFileSync(path.join(projectRoot, "calendar-helpers.js"), "utf8"),
-    context
+    context,
+    { filename: "calendar-helpers.js" }
 );
 
 const calendar = context.window.CalendarTools;
@@ -112,11 +120,65 @@ test("a clutch's hatch window lands 55 days after it was laid", () => {
         startDate: "2026-10-01",
         endDate: "2026-12-31"
     });
-    const breeding = tasks.find(task => task.type === "breeding");
+    const breeding = tasks.find(task => /Hatch window/.test(task.title));
 
     assert.equal(breeding.date, "2026-11-14");
     assert.match(breeding.title, /Hatch window opens/);
     assert.match(breeding.href, /breedingOutcomes\.html#clutch-2026-01/);
+});
+
+test("a clutch is asked to be candled once, around day 21", () => {
+    const tasks = calendar.collectTasks({
+        clutches: [
+            { id: "2026-01", laidDate: "2026-09-20", eggCount: 6 },
+            { id: "2026-02", laidDate: "2026-09-20", eggCount: 5, candleLog: [{ date: "2026-10-11", fertile: 5 }] }
+        ],
+        today: TODAY,
+        startDate: "2026-10-01",
+        endDate: "2026-12-31"
+    });
+    const candleTasks = tasks.filter(task => /^Candle clutch/.test(task.title));
+
+    assert.equal(candleTasks.length, 1);
+    // Candling day has passed, so like every overdue job it lands on today.
+    assert.equal(candleTasks[0].date, TODAY);
+    assert.equal(candleTasks[0].overdue, true);
+    assert.match(candleTasks[0].detail, /first look for veins/);
+});
+
+test("a clutch with its own incubation length moves its hatch window", () => {
+    const tasks = calendar.collectTasks({
+        clutches: [{ id: "2026-03", laidDate: "2026-09-20", eggCount: 6, incubationDays: 50, candleLog: [{ date: "2026-10-11", fertile: 6 }] }],
+        today: TODAY,
+        startDate: "2026-10-01",
+        endDate: "2026-12-31"
+    });
+    const breeding = tasks.find(task => /Hatch window/.test(task.title));
+
+    assert.equal(breeding.date, "2026-11-09");
+});
+
+test("a clutch past its hatch window is not told to candle", () => {
+    const tasks = calendar.collectTasks({
+        clutches: [{ id: "2026-05", laidDate: "2026-03-01", eggCount: 7 }],
+        today: TODAY,
+        startDate: "2026-10-01",
+        endDate: "2026-11-30"
+    });
+
+    assert.equal(tasks.filter(task => /^Candle clutch/.test(task.title)).length, 0);
+    assert.equal(tasks.filter(task => /Hatch window passed/.test(task.title)).length, 1);
+});
+
+test("a hatched clutch leaves no candling or hatch reminders behind", () => {
+    const tasks = calendar.collectTasks({
+        clutches: [{ id: "2026-04", laidDate: "2026-09-20", eggCount: 6, convertedToSnakes: true }],
+        today: TODAY,
+        startDate: "2026-10-01",
+        endDate: "2026-12-31"
+    });
+
+    assert.equal(tasks.filter(task => task.type === "breeding").length, 0);
 });
 
 test("a feeder order appears on its re-order date, and overdue orders land today", () => {

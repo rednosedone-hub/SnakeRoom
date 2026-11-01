@@ -742,6 +742,25 @@ function clearSelectedSnakes() {
     renderSnakes();
 }
 
+// The feeder size to record for a meal. The size actually used last time is
+// the best guess — it is what this snake has been eating — and the size set on
+// the record is the fallback, exactly as the feeding session defaults. Saving
+// it here is what lets Finances price the feeding: an entry without a size is
+// a meal the cost estimate has to skip.
+function getFeederSizeForFeeding(snake) {
+    const history = Array.isArray(snake && snake.feedingHistory) ? snake.feedingHistory : [];
+
+    for (let index = history.length - 1; index >= 0; index -= 1) {
+        const size = String((history[index] && history[index].feederSize) || "").trim();
+
+        if (size) {
+            return size;
+        }
+    }
+
+    return String((snake && snake.feederSize) || "").trim();
+}
+
 function markSelectedFed() {
     const fedDate = document.getElementById("bulkFedDateInput").value || getTodayText();
 
@@ -751,11 +770,17 @@ function markSelectedFed() {
     }
 
     selectedSnakeIndexes.forEach(index => {
-        snakes[index].lastFed = fedDate;
-        if (!Array.isArray(snakes[index].feedingHistory)) {
-            snakes[index].feedingHistory = [];
+        const snake = snakes[index];
+
+        snake.lastFed = fedDate;
+        if (!Array.isArray(snake.feedingHistory)) {
+            snake.feedingHistory = [];
         }
-        snakes[index].feedingHistory.push({ date: fedDate, result: "" });
+        snake.feedingHistory.push({
+            date: fedDate,
+            feederSize: getFeederSizeForFeeding(snake),
+            result: ""
+        });
     });
 
     saveSnakes();

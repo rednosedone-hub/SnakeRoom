@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Morph Gallery</title>
-    <link rel="stylesheet" href="style.css?v=53">
+    <link rel="stylesheet" href="style.css?v=54">
 </head>
 
 <body>
@@ -202,6 +202,13 @@
 
             <p class="empty-message" id="galleryModalGenes"></p>
             <div class="morph-gallery-modal-photos" id="galleryModalPhotos"></div>
+
+            <div class="form-page-actions morph-gallery-modal-actions" id="galleryModalActions" hidden>
+                <a href="morphCalculator.html" class="main-button" id="galleryModalBack">
+                    Back to Calculator
+                </a>
+                <span class="empty-message">Your pairing is still selected.</span>
+            </div>
         </div>
     </div>
 
@@ -215,8 +222,8 @@
     <script src="geneCatalog.js?v=3"></script>
     <script src="genes.js?v=8"></script>
     <script src="morphCalculator.js?v=8"></script>
-    <script src="morph-gallery.js?v=6"></script>
-    <script src="morphGallery.js?v=8"></script>
+    <script src="morph-gallery.js?v=7"></script>
+    <script src="morphGallery.js?v=10"></script>
 
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>

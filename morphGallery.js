@@ -14,7 +14,11 @@
         mineRows: [],
         publishedUrls: new Set(),
         bulkRows: [],
-        bulkSelected: new Set()
+        bulkSelected: new Set(),
+        // A calculator row links here to show examples. Closing that viewer
+        // should land the keeper back on their pairing, not on the gallery.
+        returnToCalculator: false,
+        returnOnClose: false
     };
 
     const elements = {
@@ -49,8 +53,11 @@
         modalTitle: document.getElementById("galleryModalTitle"),
         modalGenes: document.getElementById("galleryModalGenes"),
         modalPhotos: document.getElementById("galleryModalPhotos"),
-        modalClose: document.getElementById("galleryModalClose")
+        modalClose: document.getElementById("galleryModalClose"),
+        modalActions: document.getElementById("galleryModalActions")
     };
+
+    const CALCULATOR_URL = "morphCalculator.html";
 
     function escapeHtml(value) {
         return String(value === undefined || value === null ? "" : value)
@@ -121,11 +128,13 @@
     }
 
     function visibleGroups() {
-        const search = state.search.trim().toLowerCase();
+        const search = state.search.trim();
         let groups = [...state.groups.values()];
 
+        // Gene order is not part of a morph's identity, so neither is it part
+        // of the search: "Cinnamon Enchi Pastel" finds "Cinnamon Pastel Enchi".
         if (search) {
-            groups = groups.filter(group => group.searchText.includes(search));
+            groups = groups.filter(group => window.MorphGallery.matchesSearch(group.searchText, search));
         }
 
         if (state.sort === "name") {
@@ -248,6 +257,15 @@
             `;
         }).join("");
 
+        if (elements.modalActions) {
+            elements.modalActions.hidden = !state.returnToCalculator;
+        }
+
+        elements.modalClose.setAttribute(
+            "aria-label",
+            state.returnOnClose ? "Close photos and return to the calculator" : "Close"
+        );
+
         elements.modal.classList.add("is-open");
         elements.modal.setAttribute("aria-hidden", "false");
     }
@@ -255,6 +273,11 @@
     function closeModal() {
         elements.modal.classList.remove("is-open");
         elements.modal.setAttribute("aria-hidden", "true");
+
+        if (state.returnOnClose) {
+            state.returnOnClose = false;
+            window.location.assign(CALCULATOR_URL);
+        }
     }
 
     const REPORT_REASONS = [
@@ -670,6 +693,10 @@
             const button = event.target.closest("[data-action='open']");
 
             if (button) {
+                // Browsing the gallery is its own errand: closing here stays
+                // on the gallery even when the page was reached from the
+                // calculator.
+                state.returnOnClose = false;
                 renderModal(button.dataset.key);
             }
         });
@@ -767,11 +794,27 @@
         const group = key ? state.groups.get(key) : visibleGroups()[0];
 
         if (group) {
+            // The calculator sent the keeper here for one look, so closing the
+            // photos hands them back to the same pairing.
+            state.returnOnClose = state.returnToCalculator;
             renderModal(group.key);
         }
     }
 
+    function arrivedFromCalculator() {
+        const params = new URLSearchParams(window.location.search);
+
+        if (params.get("from") === "calculator") {
+            return true;
+        }
+
+        // A link saved before the parameter existed still came from there, and
+        // the referring page is the same promise.
+        return /morphCalculator\.html/i.test(document.referrer || "");
+    }
+
     async function init() {
+        state.returnToCalculator = arrivedFromCalculator();
         applyUrlSearch();
         bindEvents();
         renderSnakeOptions();

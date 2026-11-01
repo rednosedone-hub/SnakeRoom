@@ -5,6 +5,18 @@
         male: []
     };
 
+    // Which collection animal supplied each side, so coming back from the
+    // gallery puts both selects back the way they were. The gene list alone
+    // cannot say that: two animals can share a genotype.
+    const selectedSnakeIds = {
+        female: "",
+        male: ""
+    };
+
+    // Opening a morph's examples leaves this page, so the pairing is kept for
+    // the round trip (see calculator-state.js).
+    const pairingStore = window.CalculatorState;
+
     const elements = {
         femaleSnake: document.getElementById("femaleSnake"),
         maleSnake: document.getElementById("maleSnake"),
@@ -19,8 +31,35 @@
         femaleGeneList: document.getElementById("femaleGeneList"),
         maleGeneList: document.getElementById("maleGeneList"),
         calculateButton: document.getElementById("calculateButton"),
+        clearPairingButton: document.getElementById("clearPairingButton"),
         results: document.getElementById("results")
     };
+
+    function savePairing() {
+        if (!pairingStore) {
+            return;
+        }
+
+        pairingStore.write({
+            female: parentGenes.female,
+            male: parentGenes.male,
+            femaleSnakeId: selectedSnakeIds.female,
+            maleSnakeId: selectedSnakeIds.male
+        });
+    }
+
+    // The stored id is matched against the current collection: a sold or
+    // deleted snake simply leaves the gene pills standing without a select.
+    function selectStoredSnake(parent, snakeId) {
+        const select = parent === "female" ? elements.femaleSnake : elements.maleSnake;
+        const index = snakeId
+            ? readSnakes().findIndex(snake => snake.id === snakeId)
+            : -1;
+
+        select.value = index >= 0 ? String(index) : "";
+
+        return index >= 0 ? snakeId : "";
+    }
 
     function readSnakes() {
         return window.SnakeData.loadSnakesWithIds([])
@@ -229,11 +268,14 @@
         input.value = "";
         updateGeneState(input, select);
         renderParentGenes(parent);
+        savePairing();
     }
 
     function loadSnakeGenes(parent, snakeIndex) {
         const snakes = readSnakes();
         const snake = snakes[Number(snakeIndex)];
+
+        selectedSnakeIds[parent] = snake ? String(snake.id || "") : "";
 
         parentGenes[parent] = Array.isArray(snake?.genes)
             ? snake.genes.map(gene => {
@@ -249,6 +291,7 @@
             : [];
 
         renderParentGenes(parent);
+        savePairing();
     }
 
     function populateSnakeSelects() {
@@ -311,8 +354,9 @@
             </table>
 
             <p class="morph-example-note">
-                Morphs someone has photographed show a photo count &mdash; click the name to open
-                those examples in the <a href="morphGallery.html">Morph Gallery</a>.
+                Morphs someone has photographed show a photo count &mdash; click the name to see
+                real examples in the <a href="morphGallery.html">Morph Gallery</a>. Closing the
+                photos brings you back to this pairing.
             </p>
         `;
 
@@ -352,11 +396,16 @@
                 return;
             }
 
-            const galleryUrl = `morphGallery.html?q=${encodeURIComponent(outcome.morphName)}&open=1`;
+            // The genotype key is exact (a name can be shared), and
+            // "from=calculator" is what makes closing the photos come back
+            // here with this pairing still selected.
+            const galleryUrl = `morphGallery.html?q=${encodeURIComponent(outcome.morphName)}`
+                + `&key=${encodeURIComponent(window.MorphGallery.morphKeyFromOutcome(outcome))}`
+                + "&open=1&from=calculator";
 
             cell.innerHTML = `
                 <a class="morph-name-link" href="${galleryUrl}"
-                    title="See ${photos.length} real example${photos.length === 1 ? "" : "s"} of ${outcome.morphName}">
+                    title="See ${photos.length} real example${photos.length === 1 ? "" : "s"} of ${outcome.morphName}; closing them brings you back to this pairing">
                     ${outcome.morphName}<span class="morph-photo-badge">${photos.length} photo${photos.length === 1 ? "" : "s"}</span>
                 </a>
             `;
@@ -371,7 +420,43 @@
             parentGenes.male
         );
 
+        savePairing();
         renderResults(outcomes, parentGenes.female.length + parentGenes.male.length > 0);
+    }
+
+    // The pairing now survives a visit to the gallery, so there has to be one
+    // obvious way to start over.
+    function clearPairing() {
+        ["female", "male"].forEach(parent => {
+            parentGenes[parent] = [];
+            selectedSnakeIds[parent] = "";
+            (parent === "female" ? elements.femaleSnake : elements.maleSnake).value = "";
+            renderParentGenes(parent);
+        });
+
+        if (pairingStore) {
+            pairingStore.clear();
+        }
+
+        renderResults([], false);
+    }
+
+    function restorePairing() {
+        if (!pairingStore) {
+            return;
+        }
+
+        const saved = pairingStore.read();
+
+        ["female", "male"].forEach(parent => {
+            parentGenes[parent] = saved[parent];
+            selectedSnakeIds[parent] = selectStoredSnake(parent, saved[`${parent}SnakeId`]);
+            renderParentGenes(parent);
+        });
+
+        if (pairingStore.hasGenes(saved)) {
+            calculatePairing();
+        }
     }
 
     function bindEvents() {
@@ -402,9 +487,14 @@
 
             parentGenes[button.dataset.parent].splice(Number(button.dataset.index), 1);
             renderParentGenes(button.dataset.parent);
+            savePairing();
         });
 
         elements.calculateButton.addEventListener("click", calculatePairing);
+
+        if (elements.clearPairingButton) {
+            elements.clearPairingButton.addEventListener("click", clearPairing);
+        }
     }
 
     populateSnakeSelects();
@@ -413,4 +503,5 @@
     renderParentGenes("female");
     renderParentGenes("male");
     bindEvents();
+    restorePairing();
 })();

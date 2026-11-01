@@ -109,6 +109,20 @@
         };
     }
 
+    // A morph search is a set of genes, not a phrase: "Cinnamon Enchi Pastel"
+    // and "Cinnamon Pastel Enchi" ask for the same animal, and a keeper typing
+    // genes in a different order should still find the photo. Every word has to
+    // appear somewhere in the searchable text; order never matters.
+    function searchTerms(query) {
+        return text(query).toLowerCase().split(/\s+/).filter(Boolean);
+    }
+
+    function matchesSearch(haystack, query) {
+        const body = text(haystack).toLowerCase();
+
+        return searchTerms(query).every(term => body.includes(term));
+    }
+
     function describeSnake(snake) {
         const described = describeGenotype(snake && snake.genes);
 
@@ -937,6 +951,8 @@
         morphKeyFromSnake,
         morphKeyFromOutcome,
         describeGenotype,
+        searchTerms,
+        matchesSearch,
         describeSnake,
         descriptionToStorage,
         photoUrlsForSnake,

@@ -6,7 +6,7 @@
 // Every task is something the keeper can act on that day:
 //   feeding  - a snake's next meal (and the meals after it, inside the window)
 //   health   - quarantine release, or a follow-up on a health event
-//   breeding - a clutch's 55-day hatch window
+//   breeding - a clutch's hatch window, and its first candling around day 21
 //   order    - a feeder size that has reached its re-order date
 //
 // Overdue work is pinned to today: the app treats "was due last week" as "do it
@@ -242,37 +242,73 @@
         });
     }
 
+    // The incubation maths lives in incubation-helpers.js, which the outcomes
+    // page also loads. When it is absent the calendar keeps its own 55-day term
+    // rather than losing the reminder altogether.
+    function incubationTool() {
+        return window.Incubation || null;
+    }
+
     function collectBreedingTasks(clutches, options, push) {
         (Array.isArray(clutches) ? clutches : []).forEach(clutch => {
             if (!clutch || !parseDate(clutch.laidDate) || clutch.convertedToSnakes) {
                 return;
             }
 
-            const hatchDate = addDays(clutch.laidDate, HATCH_DAYS);
-
-            if (!hatchDate) {
-                return;
-            }
-
-            const date = hatchDate < options.today ? options.today : hatchDate;
-
-            if (date > options.endDate) {
-                return;
-            }
-
-            const overdue = hatchDate < options.today;
+            const incubation = incubationTool();
             const eggCount = number(clutch.eggCount, 0);
+            const href = `breedingOutcomes.html#clutch-${encodeURIComponent(text(clutch.id))}`;
+            const hatchDate = incubation && typeof incubation.expectedHatchDate === "function"
+                ? incubation.expectedHatchDate(clutch)
+                : addDays(clutch.laidDate, HATCH_DAYS);
 
-            push({
-                date,
-                type: "breeding",
-                title: overdue
-                    ? `Hatch window passed: clutch ${text(clutch.id)}`
-                    : `Hatch window opens: clutch ${text(clutch.id)}`,
-                detail: `${eggCount} egg${eggCount === 1 ? "" : "s"} · laid ${clutch.laidDate}`,
-                href: `breedingOutcomes.html#clutch-${encodeURIComponent(text(clutch.id))}`,
-                overdue
-            });
+            if (hatchDate) {
+                const date = hatchDate < options.today ? options.today : hatchDate;
+                const overdue = hatchDate < options.today;
+
+                if (date <= options.endDate) {
+                    push({
+                        date,
+                        type: "breeding",
+                        title: overdue
+                            ? `Hatch window passed: clutch ${text(clutch.id)}`
+                            : `Hatch window opens: clutch ${text(clutch.id)}`,
+                        detail: `${eggCount} egg${eggCount === 1 ? "" : "s"} · laid ${clutch.laidDate}`,
+                        href,
+                        overdue
+                    });
+                }
+            }
+
+            // One reminder around day 21, and only while the keeper has not
+            // recorded a candling. Past that date it is pinned to today like
+            // every other overdue job.
+            const candleDue = incubation && typeof incubation.candleDueDate === "function"
+                ? incubation.candleDueDate(clutch)
+                : addDays(clutch.laidDate, 21);
+            const candled = incubation && typeof incubation.latestCandle === "function"
+                ? Boolean(incubation.latestCandle(clutch))
+                : Boolean(clutch.candleLog && clutch.candleLog.length);
+
+            // Once the hatch window has passed the "open the incubator" task
+            // above is the useful one; telling a keeper to candle eggs that
+            // should already have hatched is noise.
+            const hatchWindowPassed = Boolean(hatchDate) && hatchDate < options.today;
+
+            if (candleDue && !candled && !hatchWindowPassed) {
+                const candleDate = candleDue < options.today ? options.today : candleDue;
+
+                if (candleDate <= options.endDate) {
+                    push({
+                        date: candleDate,
+                        type: "breeding",
+                        title: `Candle clutch ${text(clutch.id)}`,
+                        detail: `${eggCount} egg${eggCount === 1 ? "" : "s"} · first look for veins`,
+                        href,
+                        overdue: candleDue < options.today
+                    });
+                }
+            }
         });
     }
 

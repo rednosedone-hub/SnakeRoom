@@ -2005,54 +2005,83 @@ function resolveHealthFollowUp(index) {
     persistCurrentHistories();
 }
 
+function formatSignedGrams(value) {
+    const rounded = Math.abs(value) >= 100 ? Math.round(value) : Math.round(value * 10) / 10;
+
+    if (rounded === 0) {
+        return "0";
+    }
+
+    return `${rounded > 0 ? "+" : "−"}${Math.abs(rounded)}`;
+}
+
+// The chart maths live in weight-chart.js (dates decide the x axis), so this
+// function only turns its layout into SVG and says what the trend is.
 function renderWeightChart(history) {
     const container = document.getElementById("weightChartContainer");
     if (!container) return;
 
-    const rows = history
-        .map(entry => ({
-            date: entry.date || entry.day || entry.label || "",
-            weight: Number(entry.weight ?? entry.value ?? entry.result ?? entry)
-        }))
-        .filter(item => item.date && !Number.isNaN(item.weight))
-        .sort((a, b) => new Date(a.date) - new Date(b.date));
+    const chart = window.WeightChart;
 
-    if (rows.length === 0) {
+    if (!chart) {
+        container.innerHTML = `<p class="empty-message">The growth chart could not load. Reload the page.</p>`;
+        return;
+    }
+
+    const series = chart.buildSeries(history);
+
+    if (series.length === 0) {
         container.innerHTML = `<p class="empty-message">No chart data yet.</p>`;
         return;
     }
 
-    const width = 440;
-    const height = 180;
-    const padding = 30;
-    const values = rows.map(item => item.weight);
-    const minWeight = Math.min(...values);
-    const maxWeight = Math.max(...values);
-    const range = Math.max(1, maxWeight - minWeight);
+    const laidOut = chart.layout(series, { width: 440, height: 180, padding: 34 });
+    const growth = chart.growthSummary(series);
+    const latest = series[series.length - 1];
+    const first = series[0];
+    const summary = growth
+        ? `<strong>${latest.weight} g</strong> on ${latest.date} · ${formatSignedGrams(growth.gain)} g over ${growth.days} day${growth.days === 1 ? "" : "s"} (${formatSignedGrams(growth.gramsPerWeek)} g/week since ${chart.shortDate(first.date)})`
+        : `<strong>${latest.weight} g</strong> on ${latest.date} · add one more weigh-in to see the trend`;
+    const linePath = laidOut.points.map(point => `${point.x},${point.y}`).join(" ");
+    const midWeight = Math.round((laidOut.min + laidOut.max) / 2);
+    const midY = laidOut.height - laidOut.padding
+        - ((midWeight - laidOut.min) / Math.max(1, laidOut.max - laidOut.min)) * (laidOut.height - 2 * laidOut.padding);
+    const yLabels = [
+        { weight: laidOut.max, y: laidOut.padding },
+        { weight: midWeight, y: midY },
+        { weight: laidOut.min, y: laidOut.height - laidOut.padding }
+    ].map(label => `
+        <text class="weight-chart-label" x="${laidOut.padding - 8}" y="${label.y + 4}"
+            text-anchor="end">${label.weight}</text>
+    `).join("");
+    const gridLines = [laidOut.padding, midY, laidOut.height - laidOut.padding].map(y => `
+        <line class="weight-chart-grid" x1="${laidOut.padding}" y1="${y}"
+            x2="${laidOut.width - laidOut.padding}" y2="${y}" />
+    `).join("");
+    const xLabels = laidOut.ticks.map((tick, index) => {
+        const isFirst = index === 0;
+        const isLast = index === laidOut.ticks.length - 1 && !isFirst;
 
-    const points = rows.map((item, index) => {
-        const x = padding + (index * (width - 2 * padding) / Math.max(1, rows.length - 1));
-        const y = height - padding - ((item.weight - minWeight) / range) * (height - 2 * padding);
-        return { x, y };
-    });
-
-    const linePath = points.map(point => `${point.x},${point.y}`).join(" ");
-    const minLabel = `${minWeight}g`;
-    const maxLabel = `${maxWeight}g`;
-    const xLabels = rows.map((row, index) => `
-            <text x="${points[index].x}" y="${height - 8}" text-anchor="middle" font-size="10" fill="#e6d986">
-                ${row.date}
-            </text>
-        `).join("");
+        return `
+            <text class="weight-chart-label" x="${tick.x}" y="${laidOut.height - 8}"
+                text-anchor="${isFirst ? "start" : (isLast ? "end" : "middle")}">${tick.label}</text>
+        `;
+    }).join("");
+    const dots = laidOut.points.map((point, index) => `
+        <circle class="weight-chart-dot${index === laidOut.points.length - 1 ? " is-latest" : ""}"
+            cx="${point.x}" cy="${point.y}" r="${index === laidOut.points.length - 1 ? 5 : 3.5}">
+            <title>${point.weight} g on ${point.date}</title>
+        </circle>
+    `).join("");
 
     container.innerHTML = `
-        <svg viewBox="0 0 ${width} ${height}" width="100%" height="180" aria-label="Weight growth chart">
-            <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" stroke="#555" stroke-width="1" />
-            <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="#555" stroke-width="1" />
-            <text x="${padding - 8}" y="${padding + 4}" text-anchor="end" font-size="10" fill="#e6d986">${maxLabel}</text>
-            <text x="${padding - 8}" y="${height - padding + 4}" text-anchor="end" font-size="10" fill="#e6d986">${minLabel}</text>
-            <polyline points="${linePath}" fill="none" stroke="gold" stroke-width="2" />
-            ${points.map(point => `<circle cx="${point.x}" cy="${point.y}" r="4" fill="gold" />`).join("")}
+        <p class="weight-chart-summary">${summary}</p>
+        <svg viewBox="0 0 ${laidOut.width} ${laidOut.height}" width="100%" height="180"
+            role="img" aria-label="Weight growth chart for ${laidOut.points.length} weigh-in${laidOut.points.length === 1 ? "" : "s"}">
+            ${gridLines}
+            ${yLabels}
+            ${laidOut.points.length > 1 ? `<polyline class="weight-chart-line" points="${linePath}" />` : ""}
+            ${dots}
             ${xLabels}
         </svg>
     `;

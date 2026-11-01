@@ -49,6 +49,21 @@ test("no genes is the normal key", () => {
     assert.equal(gallery.morphKeyFromGenes(undefined), "normal");
 });
 
+test("a gene search ignores the order the genes are typed in", () => {
+    const searchable = "Cinnamon Pastel Enchi cinnamon pastel enchi";
+
+    assert.equal(gallery.matchesSearch(searchable, "Cinnamon Enchi Pastel"), true);
+    assert.equal(gallery.matchesSearch(searchable, "cinnamon   pastel  enchi"), true);
+    assert.equal(gallery.matchesSearch(searchable, "Pastel"), true);
+    assert.equal(gallery.matchesSearch(searchable, "Pastel Enchi Clown"), false);
+});
+
+test("an empty search matches every morph", () => {
+    assert.equal(gallery.matchesSearch("Cinnamon Pastel Enchi", ""), true);
+    assert.equal(gallery.matchesSearch("Cinnamon Pastel Enchi", "   "), true);
+    assert.equal(gallery.matchesSearch("", "Pastel"), false);
+});
+
 test("the gallery names a genotype exactly like the calculator does", () => {
     const genes = [
         { name: "Pastel", copies: 1 },

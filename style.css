@@ -1417,11 +1417,53 @@ p {
 .weight-chart-container svg {
     width: 100%;
     height: 180px;
+    overflow: visible;
 }
 
 .weight-chart-container p.empty-message {
     margin: 0;
     color: #ccc;
+}
+
+.weight-chart-summary {
+    margin: 0 0 8px;
+    color: #e6d986;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.weight-chart-summary strong {
+    color: var(--gold-color);
+    font-size: 18px;
+}
+
+.weight-chart-grid {
+    stroke: rgba(255, 215, 0, 0.18);
+    stroke-width: 1;
+    stroke-dasharray: 3 4;
+}
+
+.weight-chart-line {
+    fill: none;
+    stroke: var(--gold-color);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.weight-chart-dot {
+    fill: var(--gold-color);
+    stroke: #0a0a0a;
+    stroke-width: 1.5;
+}
+
+.weight-chart-dot.is-latest {
+    fill: #fff4b8;
+}
+
+.weight-chart-label {
+    fill: #e6d986;
+    font-size: 10px;
 }
 
 /* Pop-up Box */
@@ -1960,7 +2002,9 @@ p {
 
 .calculate-area {
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
+    gap: 14px;
     margin: 22px 0;
 }
 
@@ -2169,9 +2213,114 @@ p {
     border-style: dashed;
 }
 
+/* Incubation: the weeks between eggs laid and hatched. */
+
+.incubation-panel {
+    margin-top: 4px;
+    padding-top: 14px;
+    border-top: 1px dashed rgba(255, 215, 0, 0.35);
+}
+
+.incubation-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px 16px;
+}
+
+.incubation-head h4,
+.candling-block h4 {
+    margin: 0;
+    color: var(--gold-color);
+}
+
+.incubation-status {
+    margin: 0;
+    color: #e6d986;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.incubation-status.is-overdue {
+    color: #ff9d9d;
+}
+
+.incubation-grid {
+    margin-top: 12px;
+}
+
+.candling-block {
+    margin-top: 16px;
+}
+
+.candling-block .candling-summary {
+    margin: 0;
+    font-size: 14px;
+    text-align: right;
+}
+
+.candling-log .empty-message {
+    margin: 0;
+    font-size: 14px;
+}
+
+.candling-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+    align-items: end;
+    margin: 12px 0;
+}
+
+.candling-form .gene-action-button {
+    align-self: end;
+    height: 44px;
+}
+
+.candling-log {
+    display: grid;
+    gap: 8px;
+}
+
+.candling-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.candling-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.candling-text strong {
+    color: var(--gold-color);
+    font-size: 15px;
+}
+
+.candling-text small {
+    color: #c9c2a6;
+    font-size: 14px;
+    overflow-wrap: anywhere;
+}
+
+.incubation-hatched-line {
+    font-size: 14px;
+}
+
 @media (max-width: 700px) {
     .hatchling-editor-row {
         grid-template-columns: 1fr 1fr;
+    }
+
+    .candling-block .candling-summary {
+        text-align: left;
     }
 }
 
@@ -4999,6 +5148,17 @@ body.has-sync-banner .collection-notice {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 14px;
+}
+
+/* Only shown when the calculator sent the keeper here for a look. */
+.morph-gallery-modal-actions {
+    justify-content: flex-start;
+    align-items: center;
+    margin-top: 16px;
+}
+
+.morph-gallery-modal-actions .empty-message {
+    margin: 0;
 }
 
 .morph-gallery-modal-photo {

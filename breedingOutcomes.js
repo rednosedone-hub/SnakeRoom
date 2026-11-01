@@ -28,15 +28,336 @@ function getTodayText() {
     return `${year}-${month}-${day}`;
 }
 
-function getExpectedHatchDate(layDate) {
-    if (!layDate) {
+// ---- Incubation ---------------------------------------------------------
+// The due date, candling and hatch maths live in incubation-helpers.js so the
+// calendar can ask the same question and get the same answer.
+
+function incubationTool() {
+    return window.Incubation || null;
+}
+
+// Plain text, because this line is also refreshed with textContent after a
+// field changes. The one place it enters HTML escapes it.
+function incubationStatusText(clutch) {
+    const incubation = incubationTool();
+
+    if (!incubation) {
         return "";
     }
 
-    const date = new Date(layDate);
-    date.setDate(date.getDate() + 55);
+    const info = incubation.status(clutch, getTodayText());
+    const days = incubation.incubationDays(clutch);
 
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    if (info.stage === "unlaid") {
+        return "No laid date yet — record it on the pair to start the countdown.";
+    }
+
+    if (info.stage === "hatched") {
+        const incubated = incubation.incubatedDays(clutch);
+
+        return `Hatched ${clutch.hatchedDate || ""}${incubated === null ? "" : ` after ${incubated} days`}.`;
+    }
+
+    if (info.stage === "pipped") {
+        return `Pipped ${info.pipDate} · due ${info.dueDate} · hatch within a day or two.`;
+    }
+
+    if (info.stage === "overdue") {
+        const late = Math.abs(info.daysToHatch);
+
+        return `Day ${info.day} of ${days} · due ${info.dueDate} · ${late} day${late === 1 ? "" : "s"} overdue — open the incubator and check for pips.`;
+    }
+
+    if (info.stage === "due") {
+        return `Day ${info.day} of ${days} · due today.`;
+    }
+
+    return `Day ${info.day} of ${days} · due ${info.dueDate} · ${info.daysToHatch} day${info.daysToHatch === 1 ? "" : "s"} to go.`;
+}
+
+function isIncubationOverdue(clutch) {
+    const incubation = incubationTool();
+
+    return Boolean(incubation && incubation.status(clutch, getTodayText()).stage === "overdue");
+}
+
+function describeCandleEntry(entry) {
+    const parts = [];
+
+    if (entry.fertile !== "") {
+        parts.push(`${entry.fertile} fertile`);
+    }
+
+    if (entry.slugs !== "") {
+        parts.push(`${entry.slugs} slug${entry.slugs === 1 ? "" : "s"}`);
+    }
+
+    if (entry.note) {
+        parts.push(entry.note);
+    }
+
+    return parts.join(" · ");
+}
+
+function candlingSummaryText(clutch) {
+    const incubation = incubationTool();
+
+    if (!incubation) {
+        return "";
+    }
+
+    const summary = incubation.candlingSummary(clutch);
+
+    if (!summary.date) {
+        const due = incubation.candleDueDate(clutch);
+
+        return due
+            ? `Not candled yet · a first look around ${due} shows which eggs have veins.`
+            : "Not candled yet.";
+    }
+
+    const counts = describeCandleEntry({
+        fertile: summary.fertile === null ? "" : summary.fertile,
+        slugs: summary.slugs === null ? "" : summary.slugs,
+        note: ""
+    });
+    const eggNote = summary.candled !== null && summary.eggs > 0 && summary.candled > summary.eggs
+        ? ` · more than the ${summary.eggs} egg${summary.eggs === 1 ? "" : "s"} on record`
+        : "";
+
+    return `Candled ${summary.date}${counts ? ` · ${counts}` : ""}${eggNote}`;
+}
+
+function renderCandlingRows(clutch) {
+    const incubation = incubationTool();
+    const raw = Array.isArray(clutch.candleLog) ? clutch.candleLog : [];
+
+    if (!incubation) {
+        return "";
+    }
+
+    const rows = raw
+        .map((entry, index) => ({ entry: incubation.candleEntry(entry), index }))
+        .filter(item => item.entry)
+        .sort((left, right) => right.entry.date.localeCompare(left.entry.date) || right.index - left.index);
+
+    if (rows.length === 0) {
+        return `<p class="empty-message">No candling records yet.</p>`;
+    }
+
+    return rows.map(({ entry, index }) => `
+        <div class="candling-row">
+            <span class="candling-text">
+                <strong>${escapeHtml(entry.date)}</strong>
+                <small>${escapeHtml(describeCandleEntry(entry))}</small>
+            </span>
+            <button type="button" class="gene-remove-button"
+                onclick="removeCandling('${clutch.clutchToken}', ${index})"
+                title="Remove this candling record">✕</button>
+        </div>
+    `).join("");
+}
+
+function renderIncubationPanel(clutch) {
+    const incubation = incubationTool();
+
+    if (!incubation) {
+        return "";
+    }
+
+    const token = clutch.clutchToken;
+    const today = getTodayText();
+
+    return `
+        <div class="incubation-panel">
+            <div class="incubation-head">
+                <h4>Incubation</h4>
+                <p class="incubation-status${isIncubationOverdue(clutch) ? " is-overdue" : ""}"
+                    id="incubationStatus-${token}">${escapeHtml(incubationStatusText(clutch))}</p>
+            </div>
+
+            <div class="form-grid incubation-grid">
+                <label class="form-field">
+                    <span>Incubator</span>
+                    <input type="text" id="incubator-${token}" maxlength="60"
+                        placeholder="e.g. Mini fridge"
+                        value="${escapeHtml(clutch.incubator || "")}"
+                        onchange="updateClutchField('${token}', 'incubator', this.value)">
+                </label>
+
+                <label class="form-field">
+                    <span>Days to hatch</span>
+                    <input type="number" id="incubationDays-${token}" min="${incubation.MIN_DAYS}"
+                        max="${incubation.MAX_DAYS}" step="1"
+                        value="${incubation.incubationDays(clutch)}"
+                        onchange="updateClutchField('${token}', 'incubationDays', this.value)">
+                </label>
+
+                <label class="form-field">
+                    <span>Pipped</span>
+                    <input type="date" id="pipDate-${token}"
+                        value="${escapeHtml(clutch.pipDate || "")}"
+                        onchange="updateClutchField('${token}', 'pipDate', this.value)">
+                </label>
+            </div>
+
+            <div class="candling-block">
+                <div class="section-heading-row">
+                    <h4>Candling</h4>
+                    <span class="empty-message candling-summary" id="candleSummary-${token}">${candlingSummaryText(clutch)}</span>
+                </div>
+
+                <div class="candling-form">
+                    <label class="form-field">
+                        <span>Date</span>
+                        <input type="date" id="candleDate-${token}" value="${today}">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Fertile</span>
+                        <input type="number" id="candleFertile-${token}" min="0" step="1" placeholder="Count">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Slugs</span>
+                        <input type="number" id="candleSlugs-${token}" min="0" step="1" placeholder="Count">
+                    </label>
+
+                    <label class="form-field candling-note-field">
+                        <span>Note</span>
+                        <input type="text" id="candleNote-${token}" maxlength="200" placeholder="Veins, mould, moved to...">
+                    </label>
+
+                    <button type="button" class="gene-action-button"
+                        onclick="addCandling('${token}')">Add Candling</button>
+                </div>
+
+                <div class="candling-log" id="candleLog-${token}">
+                    ${renderCandlingRows(clutch)}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Editing the panel must not rebuild the page: typed hatchling names live only
+// in the DOM until they are saved, so the status line is refreshed in place.
+function refreshIncubationStatus(clutch) {
+    const status = document.getElementById(`incubationStatus-${clutch.clutchToken}`);
+
+    if (!status || !incubationTool()) {
+        return;
+    }
+
+    status.textContent = incubationStatusText(clutch);
+    status.classList.toggle("is-overdue", isIncubationOverdue(clutch));
+}
+
+function updateClutchField(token, field, value) {
+    const clutch = clutches.find(item => item.clutchToken === token);
+    const allowed = ["incubator", "incubationDays", "pipDate"];
+
+    if (!clutch || !allowed.includes(field)) {
+        return;
+    }
+
+    if (field === "incubator") {
+        clutch.incubator = String(value || "").trim().slice(0, 60);
+    }
+
+    if (field === "incubationDays") {
+        const days = Math.round(Number(value));
+        const incubation = incubationTool();
+        const min = incubation ? incubation.MIN_DAYS : 40;
+        const max = incubation ? incubation.MAX_DAYS : 100;
+
+        // An impossible number falls back to the normal term rather than
+        // producing a due date in 2094.
+        clutch.incubationDays = Number.isFinite(days) && days >= min && days <= max ? days : "";
+
+        const input = document.getElementById(`incubationDays-${token}`);
+
+        if (input) {
+            input.value = incubation ? incubation.incubationDays(clutch) : 55;
+        }
+    }
+
+    if (field === "pipDate") {
+        const incubation = incubationTool();
+        const clean = String(value || "").slice(0, 10);
+
+        clutch.pipDate = incubation && incubation.parseDate(clean) ? clean : "";
+    }
+
+    saveClutches();
+    refreshIncubationStatus(clutch);
+}
+
+function addCandling(token) {
+    const clutch = clutches.find(item => item.clutchToken === token);
+    const incubation = incubationTool();
+
+    if (!clutch || !incubation) {
+        return;
+    }
+
+    const entry = incubation.candleEntry({
+        date: document.getElementById(`candleDate-${token}`)?.value || "",
+        fertile: document.getElementById(`candleFertile-${token}`)?.value || "",
+        slugs: document.getElementById(`candleSlugs-${token}`)?.value || "",
+        note: document.getElementById(`candleNote-${token}`)?.value || ""
+    });
+
+    if (!entry) {
+        alert("Add a date and at least one count or a note.");
+        return;
+    }
+
+    clutch.candleLog = Array.isArray(clutch.candleLog) ? clutch.candleLog : [];
+    clutch.candleLog.push(entry);
+    saveClutches();
+
+    const log = document.getElementById(`candleLog-${token}`);
+    const summary = document.getElementById(`candleSummary-${token}`);
+
+    if (log) {
+        log.innerHTML = renderCandlingRows(clutch);
+    }
+
+    if (summary) {
+        summary.textContent = candlingSummaryText(clutch);
+    }
+
+    ["candleFertile", "candleSlugs", "candleNote"].forEach(id => {
+        const input = document.getElementById(`${id}-${token}`);
+
+        if (input) {
+            input.value = "";
+        }
+    });
+}
+
+function removeCandling(token, index) {
+    const clutch = clutches.find(item => item.clutchToken === token);
+    const raw = clutch && Array.isArray(clutch.candleLog) ? clutch.candleLog : [];
+
+    if (!clutch || index < 0 || index >= raw.length) {
+        return;
+    }
+
+    raw.splice(index, 1);
+    saveClutches();
+
+    const log = document.getElementById(`candleLog-${token}`);
+    const summary = document.getElementById(`candleSummary-${token}`);
+
+    if (log) {
+        log.innerHTML = renderCandlingRows(clutch);
+    }
+
+    if (summary) {
+        summary.textContent = candlingSummaryText(clutch);
+    }
 }
 
 function getSnakeLabelByRef(reference) {
@@ -111,7 +432,14 @@ function buildHatchlingDefaults(clutch, index) {
 
 function prepareHatchlings(clutch) {
     if (!hatchlingPreparation[clutch.clutchToken]) {
-        const count = Number(clutch.eggCount) || 0;
+        // If the eggs were candled, the fertile count is the honest number of
+        // hatchlings to expect: slugs are eggs that never had a snake in them.
+        const incubation = incubationTool();
+        const summary = incubation ? incubation.candlingSummary(clutch) : null;
+        const count = summary && summary.fertile !== null && summary.fertile > 0
+            ? summary.fertile
+            : Number(clutch.eggCount) || 0;
+
         hatchlingPreparation[clutch.clutchToken] = Array.from({ length: count }, (_, offset) => {
             const index = offset + 1;
 
@@ -448,16 +776,16 @@ function updateOutcomesStatus() {
 function renderOutcomeCard(clutch) {
     const token = clutch.clutchToken;
     const rows = prepareHatchlings(clutch);
-    const expectedDate = getExpectedHatchDate(clutch.laidDate);
 
     return `
-        <div class="breeding-card outcome-card">
+        <div class="breeding-card outcome-card" id="outcomeCard-${token}">
             <div>
                 <h4>Clutch ${escapeHtml(clutch.id)}</h4>
                 <p>${escapeHtml(getSnakeLabelByRef(clutch.femaleSnakeId))} x ${escapeHtml(getSnakeLabelByRef(clutch.maleSnakeId))}</p>
                 <p>Laid: ${escapeHtml(clutch.laidDate || "Not recorded")} / ${escapeHtml(formatCount(clutch))}</p>
-                <p>Hatching. Expected around ${escapeHtml(expectedDate || "soon")}.</p>
             </div>
+
+            ${renderIncubationPanel(clutch)}
 
             <div class="form-grid hatchling-editor-grid">
                 <label class="form-field hatch-date-field">
@@ -545,18 +873,43 @@ function renderHatchlingEditorRow(clutch, row) {
     `;
 }
 
+function renderHatchedIncubationLine(clutch) {
+    const incubation = incubationTool();
+
+    if (!incubation || !clutch.laidDate) {
+        return "";
+    }
+
+    const incubated = incubation.incubatedDays(clutch);
+    const stats = incubation.hatchStats(clutch);
+    const parts = [
+        incubated === null ? "" : `Incubated ${incubated} days`,
+        clutch.pipDate ? `pipped ${escapeHtml(clutch.pipDate)}` : "",
+        stats.eggs > 0
+            ? `${stats.hatched} of ${stats.eggs} egg${stats.eggs === 1 ? "" : "s"} hatched${stats.percent === null ? "" : ` (${stats.percent}%)`}`
+            : ""
+    ].filter(Boolean);
+
+    if (parts.length === 0) {
+        return "";
+    }
+
+    return `<p class="empty-message incubation-hatched-line">${parts.join(" · ")}</p>`;
+}
+
 function renderHatchedCard(clutch) {
     const relatedCount = snakes.filter(snake => snake.clutchId === clutch.id).length;
     const rows = hatchlingPreparation[clutch.clutchToken];
 
     return `
-        <div class="breeding-card outcome-card hatched-card">
+        <div class="breeding-card outcome-card hatched-card" id="hatchedCard-${clutch.clutchToken}">
             <div>
                 <h4>Clutch ${escapeHtml(clutch.id)}</h4>
                 <p>${escapeHtml(getSnakeLabelByRef(clutch.femaleSnakeId))} x ${escapeHtml(getSnakeLabelByRef(clutch.maleSnakeId))}</p>
                 <p>Laid: ${escapeHtml(clutch.laidDate || "Not recorded")} / ${escapeHtml(formatCount(clutch))}</p>
                 <p>Hatched: ${escapeHtml(clutch.hatchedDate || "Not recorded")}
                     / Hatchlings: ${clutch.hatchlingCount || 0} (${relatedCount} in collection)</p>
+                ${renderHatchedIncubationLine(clutch)}
             </div>
 
             ${rows ? `
@@ -609,6 +962,9 @@ window.saveHatchlings = saveHatchlings;
 window.addHatchling = addHatchling;
 window.removePreparedHatchling = removePreparedHatchling;
 window.previewHatchlingMorph = previewHatchlingMorph;
+window.updateClutchField = updateClutchField;
+window.addCandling = addCandling;
+window.removeCandling = removeCandling;
 
 migrateClutchTokens();
 renderBreedingOutcomes();
