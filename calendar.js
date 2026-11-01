@@ -74,6 +74,8 @@
     function loadData() {
         const snakes = window.SnakeData.loadSnakesWithIds([]);
         const clutches = window.SnakeData.readStorageArray("clutches", []);
+        // Pairs carry the pre-lay shed that the ovulation and egg estimates need.
+        const pairs = window.SnakeData.readStorageArray("breedingPairs", []);
         const forecast = window.SnakeFeeders
             ? window.SnakeFeeders.buildForecast({
                 snakes,
@@ -82,7 +84,7 @@
             })
             : null;
 
-        return { snakes, clutches, forecast };
+        return { snakes, clutches, pairs, forecast };
     }
 
     function refreshTasks() {
@@ -94,6 +96,7 @@
         const base = {
             snakes: data.snakes,
             clutches: data.clutches,
+            pairs: data.pairs,
             forecast: data.forecast,
             health: window.SnakeHealth,
             today

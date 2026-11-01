@@ -20,6 +20,11 @@ vm.runInContext(
     { filename: "incubation-helpers.js" }
 );
 vm.runInContext(
+    fs.readFileSync(path.join(projectRoot, "breeding-timeline.js"), "utf8"),
+    context,
+    { filename: "breeding-timeline.js" }
+);
+vm.runInContext(
     fs.readFileSync(path.join(projectRoot, "calendar-helpers.js"), "utf8"),
     context,
     { filename: "calendar-helpers.js" }
@@ -179,6 +184,92 @@ test("a hatched clutch leaves no candling or hatch reminders behind", () => {
     });
 
     assert.equal(tasks.filter(task => task.type === "breeding").length, 0);
+});
+
+test("a pair's pre-lay shed puts ovulation and eggs on the calendar", () => {
+    const tasks = calendar.collectTasks({
+        snakes: [snake({
+            id: "female-shed",
+            name: "Nova",
+            sex: "Female",
+            weightHistory: [
+                { date: "2026-08-20", weight: 1600 },
+                { date: "2026-10-01", weight: 1780 }
+            ]
+        })],
+        pairs: [{ id: "pair-shed", femaleSnakeId: "female-shed", preLayShedDate: "2026-10-11" }],
+        today: TODAY,
+        startDate: "2026-09-01",
+        endDate: "2026-11-30"
+    });
+    const ovulation = tasks.find(task => task.title === "Ovulation (est.): Nova");
+    const eggs = tasks.find(task => task.title === "Eggs due (est.): Nova");
+
+    assert.equal(ovulation.date, "2026-09-23");
+    assert.match(ovulation.detail, /Pre-lay shed 2026-10-11/);
+    assert.match(ovulation.detail, /\+180g in 42 days/);
+
+    assert.equal(eggs.date, "2026-11-08");
+    assert.equal(eggs.overdue, false);
+    assert.match(eggs.detail, /2026-11-01 to 2026-11-15/);
+});
+
+test("a recorded ovulation is not re-estimated, and laid eggs end the reminders", () => {
+    const snakes = [snake({ id: "female-2", name: "Nova", sex: "Female" })];
+    const recorded = calendar.collectTasks({
+        snakes,
+        pairs: [{
+            femaleSnakeId: "female-2",
+            preLayShedDate: "2026-10-11",
+            ovulationObserved: true,
+            ovulationDate: "2026-09-25"
+        }],
+        today: TODAY,
+        startDate: "2026-09-01",
+        endDate: "2026-11-30"
+    });
+
+    assert.equal(recorded.filter(task => /^Ovulation/.test(task.title)).length, 0);
+    assert.equal(recorded.filter(task => /^Eggs due/.test(task.title)).length, 1);
+
+    const laid = calendar.collectTasks({
+        snakes,
+        pairs: [
+            { femaleSnakeId: "female-2", preLayShedDate: "2026-10-11", eggsLaidDate: "2026-11-05" },
+            { femaleSnakeId: "female-2", preLayShedDate: "2026-10-11", clutchId: "2026-07" }
+        ],
+        today: TODAY,
+        startDate: "2026-09-01",
+        endDate: "2026-11-30"
+    });
+
+    assert.equal(laid.filter(task => /^Ovulation|^Eggs/.test(task.title)).length, 0);
+});
+
+test("an overdue lay estimate is pinned to today, then fades out", () => {
+    const snakes = [snake({ id: "female-late", name: "Late", sex: "Female" })];
+    const recent = calendar.collectTasks({
+        snakes,
+        pairs: [{ femaleSnakeId: "female-late", preLayShedDate: "2026-09-20" }],
+        today: TODAY,
+        startDate: "2026-09-01",
+        endDate: "2026-11-30"
+    });
+    const late = recent.find(task => task.title === "Eggs overdue (est.): Late");
+
+    assert.equal(late.date, TODAY);
+    assert.equal(late.overdue, true);
+
+    // Two weeks past the end of the lay window it is history, not a job.
+    const stale = calendar.collectTasks({
+        snakes,
+        pairs: [{ femaleSnakeId: "female-late", preLayShedDate: "2026-06-01" }],
+        today: TODAY,
+        startDate: "2026-08-01",
+        endDate: "2026-10-31"
+    });
+
+    assert.equal(stale.filter(task => /Ovulation \(est\.\)|Eggs (due|overdue) \(est\.\)/.test(task.title)).length, 0);
 });
 
 test("a feeder order appears on its re-order date, and overdue orders land today", () => {

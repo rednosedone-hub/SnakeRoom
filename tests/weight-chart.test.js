@@ -108,6 +108,49 @@ test("points sit where their dates belong, not evenly by index", () => {
     });
 });
 
+test("a chosen window keeps only the weigh-ins inside it", () => {
+    const series = chart.buildSeries([
+        { date: "2026-08-15", weight: 640 },
+        { date: "2026-09-01", weight: 660 },
+        { date: "2026-09-20", weight: 685 },
+        { date: "2026-10-05", weight: 712 }
+    ]);
+
+    assert.deepEqual(
+        Array.from(chart.filterSeries(series, { from: "2026-09-01", to: "2026-10-05" }), point => point.date),
+        ["2026-09-01", "2026-09-20", "2026-10-05"]
+    );
+    // An open side means "no limit", and no range at all keeps everything.
+    assert.equal(chart.filterSeries(series, { from: "2026-09-20" }).length, 2);
+    assert.equal(chart.filterSeries(series, { to: "2026-09-01" }).length, 2);
+    assert.equal(chart.filterSeries(series, {}).length, 4);
+    assert.equal(chart.filterSeries(series, { from: "bad", to: "also bad" }).length, 4);
+    assert.deepEqual(Array.from(chart.filterSeries(series, { from: "2027-01-01" })), []);
+});
+
+test("a custom window shows the quiet weeks at its edges", () => {
+    const series = chart.buildSeries([
+        { date: "2026-09-01", weight: 660 },
+        { date: "2026-10-01", weight: 700 }
+    ]);
+    const times = plain(chart.rangeTimes({ from: "2026-08-01", to: "2026-11-01" }));
+    const laidOut = plain(chart.layout(series, {
+        width: 440,
+        height: 180,
+        padding: 34,
+        startTime: times.startTime,
+        endTime: times.endTime
+    }));
+
+    // September and October sit inside an August-to-November window, so neither
+    // point is pinned to the frame.
+    assert.ok(laidOut.points[0].x > 34);
+    assert.ok(laidOut.points[1].x < 406);
+    assert.ok(laidOut.points[1].x > laidOut.points[0].x);
+    // Roughly a third of the way in for 1 September: 31 of 92 days.
+    assert.ok(Math.abs(laidOut.points[0].x - 159) < 3);
+});
+
 test("a single point is centred, and labels never overlap", () => {
     const single = chart.layout(chart.buildSeries([{ date: "2026-05-01", weight: 800 }]), { width: 440, padding: 34 });
 
@@ -123,6 +166,46 @@ test("a single point is centred, and labels never overlap", () => {
 
     assert.ok(many.ticks.length <= 4);
     assert.equal(many.ticks[0].label, chart.shortDate(many.ticks[0].date));
+});
+
+test("a comparison series shares the axis and can outgrow the primary", () => {
+    const primary = chart.buildSeries([
+        { date: "2026-09-01", weight: 600 },
+        { date: "2026-10-01", weight: 700 }
+    ]);
+    const secondary = chart.buildSeries([
+        { date: "2026-09-01", weight: 800 },
+        { date: "2026-10-01", weight: 900 }
+    ]);
+    const laidOut = plain(chart.layout(primary, { width: 440, height: 180, padding: 34, secondary }));
+
+    assert.equal(laidOut.secondaryPoints.length, 2);
+    // The axis covers both animals, not just the one being edited.
+    assert.ok(laidOut.max >= 900);
+    assert.ok(laidOut.min <= 600);
+    // Same dates mean the points line up horizontally.
+    assert.equal(laidOut.secondaryPoints[0].x, laidOut.points[0].x);
+    assert.equal(laidOut.points[0].x, 34);
+    // The heavier comparison sits higher on the chart.
+    assert.ok(laidOut.secondaryPoints[0].y < laidOut.points[0].y);
+});
+
+test("last season shifts onto this season's dates but keeps the real one", () => {
+    const series = chart.buildSeries([
+        { date: "2025-09-10", weight: 820 },
+        { date: "2025-10-10", weight: 860 }
+    ]);
+    const shifted = plain(chart.shiftSeries(series, 364));
+
+    assert.equal(shifted[0].date, "2026-09-09");
+    assert.equal(shifted[0].originalDate, "2025-09-10");
+    assert.ok(shifted[0].time > series[0].time);
+
+    const inWindow = chart.filterSeries(chart.shiftSeries(series, 364), { from: "2026-09-01", to: "2026-10-31" });
+
+    assert.equal(inWindow.length, 2);
+    // This season's own points shift into next year and fall outside.
+    assert.equal(chart.filterSeries(chart.shiftSeries(series, 364), { from: "2027-01-01" }).length, 0);
 });
 
 test("a short date reads the way a keeper would say it", () => {

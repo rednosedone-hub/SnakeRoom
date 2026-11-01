@@ -169,6 +169,31 @@
         };
     }
 
+    // One egg can hold twins, and a keeper counting hatchlings out of the
+    // incubator knows the number before typing names. An explicit count wins,
+    // then the latest candling, then the eggs on record.
+    const MAX_HATCHLINGS = 60;
+
+    function expectedHatchlingCount(clutch) {
+        if (!clutch) {
+            return 0;
+        }
+
+        const explicit = countOrBlank(clutch.expectedHatchlings);
+
+        if (explicit !== "") {
+            return Math.min(MAX_HATCHLINGS, explicit);
+        }
+
+        const summary = candlingSummary(clutch);
+
+        if (summary.fertile !== null && summary.fertile > 0) {
+            return Math.min(MAX_HATCHLINGS, summary.fertile);
+        }
+
+        return Math.min(MAX_HATCHLINGS, Math.max(0, Math.round(number(clutch.eggCount, 0))));
+    }
+
     function candleDueDate(clutch) {
         return addDays(clutch && clutch.laidDate, CANDLE_DAY);
     }
@@ -232,6 +257,7 @@
         MIN_DAYS,
         MAX_DAYS,
         CANDLE_DAY,
+        MAX_HATCHLINGS,
         parseDate,
         dateText,
         addDays,
@@ -243,6 +269,7 @@
         candleLog,
         latestCandle,
         candlingSummary,
+        expectedHatchlingCount,
         candleDueDate,
         status,
         hatchStats,

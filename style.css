@@ -1461,6 +1461,40 @@ p {
     fill: #fff4b8;
 }
 
+/* A comparison line is silver and dashed so the gold series stays primary. */
+.weight-chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin: 0 0 8px;
+    color: #c9c2a6;
+    font-size: 13px;
+}
+
+.weight-chart-key {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background-color: var(--gold-color);
+}
+
+.weight-chart-key.is-compare {
+    background-color: var(--silver-color);
+}
+
+.weight-chart-line.is-compare {
+    stroke: var(--silver-color);
+    stroke-dasharray: 5 4;
+}
+
+.weight-chart-dot.is-compare {
+    fill: var(--background-color);
+    stroke: var(--silver-color);
+    stroke-width: 2;
+}
+
 .weight-chart-label {
     fill: #e6d986;
     font-size: 10px;
@@ -2317,6 +2351,28 @@ p {
 @media (max-width: 700px) {
     .hatchling-editor-row {
         grid-template-columns: 1fr 1fr;
+    }
+
+    /* Four fields in two columns: without minmax tracks and a zero min-width
+       the name and bin inputs squeeze the status selects to a sliver. */
+    .hatchling-editor-row {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .hatchling-editor-row .form-field {
+        min-width: 0;
+    }
+
+    .hatchling-editor-row input,
+    .hatchling-editor-row select {
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .hatchling-editor-row .hatchling-morph-field {
+        grid-column: 1 / -1;
+        min-width: 0;
     }
 
     .candling-block .candling-summary {
@@ -4388,6 +4444,27 @@ body.has-sync-banner .collection-notice {
     margin-top: 2px;
     color: var(--silver-color);
     font-size: 12px;
+}
+
+/* The follicular weight rise, shown in the readiness panel. */
+.readiness-weight-trend {
+    margin: 10px 0 0;
+    padding: 7px 10px;
+    border-left: 3px solid var(--gold-color);
+    border-radius: 6px;
+    background-color: rgba(255, 215, 0, 0.08);
+    color: #e6d986;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.readiness-weight-trend strong {
+    color: var(--gold-color);
+}
+
+.readiness-weight-trend[hidden] {
+    display: none;
 }
 
 .readiness-attention-list,

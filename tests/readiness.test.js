@@ -276,6 +276,90 @@ test("weight loss and refusals are warnings, not blockers", () => {
     );
 });
 
+test("a female building follicles shows the weight rise and its rate", () => {
+    const result = readiness.getPairingReadiness(snake({
+        weightHistory: [
+            { date: "2026-09-20", weight: 1600 },
+            { date: "2026-09-27", weight: 1620 },
+            { date: "2026-10-20", weight: 1690 }
+        ]
+    }), TODAY);
+
+    assert.equal(result.weightGain.state, "rising");
+    assert.equal(result.weightGain.days, 30);
+    assert.equal(result.weightGain.gain, 90);
+    assert.equal(result.weightGain.gramsPerWeek, 21);
+
+    const check = result.checks.find(item => item.code === "weight-trend");
+
+    assert.equal(check.state, "pass");
+    assert.equal(check.label, "Weight up 90g since 20 Sep");
+    assert.match(check.detail, /\+21g\/week/);
+    assert.match(check.detail, /follicular development/);
+    assert.equal(result.ready, true);
+});
+
+test("the follicular trend is a female check and ignores stale or short records", () => {
+    const male = readiness.getPairingReadiness(snake({
+        sex: "Male",
+        weight: 800,
+        hatchDate: "2023-06-01",
+        weightHistory: [
+            { date: "2026-09-20", weight: 800 },
+            { date: "2026-10-20", weight: 860 }
+        ]
+    }), TODAY);
+
+    assert.equal(male.weightGain, null);
+    assert.equal(male.checks.some(item => item.code === "weight-trend"), false);
+
+    // Last season's card is not this season's growth.
+    const stale = readiness.getPairingReadiness(snake({
+        weightHistory: [
+            { date: "2026-08-01", weight: 1600 },
+            { date: "2026-09-01", weight: 1700 }
+        ]
+    }), TODAY);
+
+    assert.equal(stale.weightGain, null);
+
+    // Ten days apart is a fluctuation, not a follicular run.
+    const tooShort = readiness.getPairingReadiness(snake({
+        weightHistory: [
+            { date: "2026-10-10", weight: 1600 },
+            { date: "2026-10-20", weight: 1690 }
+        ]
+    }), TODAY);
+
+    assert.equal(tooShort.weightGain, null);
+});
+
+test("a flat line reads as steady, and a small drop is a note", () => {
+    const steady = readiness.getPairingReadiness(snake({
+        weightHistory: [
+            { date: "2026-09-20", weight: 1600 },
+            { date: "2026-10-20", weight: 1612 }
+        ]
+    }), TODAY);
+
+    assert.equal(steady.weightGain.state, "steady");
+    assert.equal(steady.checks.find(item => item.code === "weight-trend").state, "pass");
+    assert.match(steady.weightGain.summary, /steady/);
+
+    const dropping = readiness.getPairingReadiness(snake({
+        weightHistory: [
+            { date: "2026-09-20", weight: 1800 },
+            { date: "2026-10-20", weight: 1740 }
+        ]
+    }), TODAY);
+
+    assert.equal(dropping.weightGain.state, "falling");
+    assert.ok(dropping.warnings.some(item => item.code === "weight-trend"));
+    // A drop of 5% or more is already the health warning; it is not repeated.
+    assert.equal(dropping.warnings.some(item => item.code === "weight-loss"), false);
+    assert.equal(dropping.ready, true);
+});
+
 test("a female is blocked for six months after her latest lay", () => {
     const female = snake({
         id: "female-1",

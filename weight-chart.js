@@ -77,6 +77,52 @@
         return [...byDate.values()].sort((left, right) => left.time - right.time);
     }
 
+    // A chosen window, inclusive at both ends. A missing or unreadable bound
+    // means "no limit on that side", so a half-open range works too.
+    function filterSeries(series, range) {
+        const from = parseDate(range && range.from);
+        const to = parseDate(range && range.to);
+        const fromTime = from ? from.getTime() : -Infinity;
+        const toTime = to ? to.getTime() : Infinity;
+
+        return (Array.isArray(series) ? series : []).filter(point =>
+            point && Number.isFinite(point.time) &&
+            point.time >= fromTime && point.time <= toTime
+        );
+    }
+
+    // The x axis of a chosen window. A keeper looking at the run-up to a clutch
+    // wants the quiet weeks before the first weigh-in shown as a gap, not
+    // cropped away.
+    function rangeTimes(range) {
+        const from = parseDate(range && range.from);
+        const to = parseDate(range && range.to);
+
+        return {
+            startTime: from ? from.getTime() : null,
+            endTime: to ? to.getTime() : null
+        };
+    }
+
+    // Overlay last season on this season: move each weigh-in forward a year on
+    // the calendar while keeping the date it was actually taken for the label.
+    function shiftSeries(series, days) {
+        const shift = Number(days) || 0;
+
+        return (Array.isArray(series) ? series : []).map(point => {
+            const date = new Date(point.time);
+
+            date.setDate(date.getDate() + shift);
+
+            return {
+                ...point,
+                time: date.getTime(),
+                date: dateText(date),
+                originalDate: point.date
+            };
+        });
+    }
+
     function growthSummary(series) {
         if (!Array.isArray(series) || series.length < 2) {
             return null;
@@ -161,29 +207,40 @@
 
     function layout(series, options = {}) {
         const list = Array.isArray(series) ? series : [];
+        // A comparison line shares the axis and the dates, so both animals are
+        // read against the same frame rather than a second, misleading scale.
+        const secondary = (Array.isArray(options.secondary) ? options.secondary : [])
+            .filter(item => item && Number.isFinite(item.time) && Number.isFinite(item.weight));
         const width = Number(options.width) || 440;
         const height = Number(options.height) || 180;
         const padding = Number(options.padding) || 34;
 
-        if (list.length === 0) {
-            return { points: [], ticks: [], width, height, padding, min: 0, max: 0 };
+        if (list.length === 0 && secondary.length === 0) {
+            return { points: [], secondaryPoints: [], ticks: [], width, height, padding, min: 0, max: 0 };
         }
 
-        const range = axisRange(list.map(item => item.weight));
+        const range = axisRange(list.map(item => item.weight).concat(secondary.map(item => item.weight)));
         const innerWidth = width - padding * 2;
         const innerHeight = height - padding * 2;
-        const firstTime = list[0].time;
-        const span = list[list.length - 1].time - firstTime;
+        const times = list.map(item => item.time).concat(secondary.map(item => item.time));
+        const firstTime = Number.isFinite(options.startTime) ? options.startTime : Math.min(...times);
+        const lastTime = Number.isFinite(options.endTime) ? options.endTime : Math.max(...times);
+        const span = Math.max(0, lastTime - firstTime);
         const spanGrams = Math.max(1, range.max - range.min);
-
-        const points = list.map(item => ({
+        const position = item => ({
             ...item,
-            x: span > 0 ? padding + ((item.time - firstTime) / span) * innerWidth : padding + innerWidth / 2,
+            // Points stay inside the frame even if a caller passes a window
+            // that does not quite contain its data.
+            x: span > 0
+                ? Math.min(width - padding, Math.max(padding, padding + ((item.time - firstTime) / span) * innerWidth))
+                : padding + innerWidth / 2,
             y: height - padding - ((item.weight - range.min) / spanGrams) * innerHeight
-        }));
+        });
+        const points = list.map(position);
 
         return {
             points,
+            secondaryPoints: secondary.map(position),
             ticks: pickTicks(list, points, options.maxTicks || 4),
             width,
             height,
@@ -198,6 +255,9 @@
         dateText,
         normalizeEntry,
         buildSeries,
+        filterSeries,
+        shiftSeries,
+        rangeTimes,
         growthSummary,
         axisRange,
         shortDate,

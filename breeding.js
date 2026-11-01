@@ -264,6 +264,10 @@ function getReadinessCardHtml(snake) {
     const attentionHtml = attentionChecks.length > 0
         ? `<ul class="readiness-attention-list">${attentionChecks.map(getReadinessCheckHtml).join("")}</ul>`
         : `<p class="readiness-clear">All readiness checks pass.</p>`;
+    // The rise is good news, so it is not buried behind "View all checks".
+    const weightTrendHtml = readiness.weightGain
+        ? `<p class="readiness-weight-trend"><strong>${escapePairText(readiness.weightGain.summary)}</strong> \u00b7 ${escapePairText(readiness.weightGain.detail)}</p>`
+        : "";
 
     return `
         <div class="readiness-card ${readiness.ready ? "is-ready" : "is-not-ready"}">
@@ -276,6 +280,8 @@ function getReadinessCardHtml(snake) {
                     ${escapePairText(readiness.label)}
                 </span>
             </div>
+
+            ${weightTrendHtml}
 
             ${attentionHtml}
 
@@ -354,6 +360,32 @@ function getPairReadinessLine(pair) {
     return badges.length > 0
         ? `<p class="pair-readiness-line">${badges.join(" \u00b7 ")}</p>`
         : "";
+}
+
+// The shed, ovulation and egg estimate, when the pair has a pre-lay shed on
+// record. The calendar carries the same dates as tasks; this line is the view
+// a keeper sees while working the pair.
+function getPairTimelineLine(pair) {
+    const timeline = window.BreedingTimeline;
+
+    // Once eggs are on record the clutch's own dates take over.
+    if (!timeline || pair.clutchId || pair.eggsLaidDate) {
+        return "";
+    }
+
+    const female = getPairParentSnake(pair.femaleSnakeId, pair.femaleIndex);
+    const estimate = timeline.estimate(pair, female);
+
+    if (!estimate) {
+        return "";
+    }
+
+    const ovulation = estimate.ovulationObserved
+        ? `Ovulation recorded ${estimate.ovulationDate}`
+        : `Ovulation est. ${estimate.ovulationDate} (${estimate.ovulationFrom} to ${estimate.ovulationTo})`;
+    const climb = timeline.describeClimb(estimate.weightClimb);
+
+    return `<p class="pair-readiness-line">Timeline: ${escapePairText(ovulation)} \u00b7 eggs due est. ${escapePairText(estimate.layDate)} (${escapePairText(estimate.layFrom)} to ${escapePairText(estimate.layTo)}) \u00b7 ${escapePairText(climb)}</p>`;
 }
 
 function renderPairCheck() {
@@ -679,6 +711,7 @@ function renderBreedingPairs() {
                 <p>Status: ${getPairStatus(pair)}</p>
                 <p>Pairings: ${getPairings(pair).length || "None recorded"}</p>
                 ${getPairReadinessLine(pair)}
+                ${getPairTimelineLine(pair)}
             </div>
 
             ${retiredParentText ? `
@@ -817,8 +850,17 @@ function renderClutches() {
         return;
     }
 
-    list.innerHTML = clutches.map(clutch => `
-        <div class="breeding-card">
+    list.innerHTML = clutches.map(clutch => {
+        const isHatched = Boolean(clutch.convertedToSnakes || clutch.hatchedDate);
+        // The number to expect before hatching, the number that actually came
+        // out afterwards. Twins mean the second can be larger than the eggs.
+        const expected = clutch.expectedHatchlings;
+        const hatchlingValue = isHatched
+            ? String(clutch.hatchlingCount || 0)
+            : (expected === undefined || expected === null || expected === "" ? "" : String(expected));
+
+        return `
+        <div class="breeding-card" id="clutchCard-${clutch.id}">
             <div>
                 <h4>${clutch.id}</h4>
                 <p>${getSnakeLabel(clutch.femaleSnakeId || clutch.femaleIndex)} x ${getSnakeLabel(clutch.maleSnakeId || clutch.maleIndex)}</p>
@@ -841,10 +883,12 @@ function renderClutches() {
                 </label>
 
                 <label class="form-field">
-                    <span>Hatchling Count</span>
+                    <span>${isHatched ? "Hatchling Count" : "Hatchlings Expected"}</span>
                     <input type="number" min="0" id="hatchCount-${clutch.id}"
-                        value="${clutch.hatchlingCount || clutch.eggCount || ""}"
-                        ${clutch.convertedToSnakes ? "disabled" : ""}>
+                        placeholder="${clutch.eggCount || 0} eggs"
+                        value="${hatchlingValue}"
+                        onchange="updateClutchHatchlingCount('${clutch.id}', this.value)">
+                    <small class="empty-message">${isHatched ? "More than the eggs means twins." : "Leave blank to use the egg count."}</small>
                 </label>
             </div>
 
@@ -852,9 +896,99 @@ function renderClutches() {
                 <button type="button" class="edit-button" onclick="goToBreedingOutcomes('${clutch.id}')">
                     ${clutch.convertedToSnakes ? "View Outcomes" : "Record Hatch"}
                 </button>
+
+                <button type="button" class="archive-button" onclick="deleteClutch('${clutch.id}')">
+                    Delete Clutch
+                </button>
             </div>
         </div>
-    `).join("");
+    `;
+    }).join("");
+}
+
+// A converted pair is linked by clutchId, so deleting the clutch hands the pair
+// back to the active list instead of leaving it pointing at a missing record.
+function releasePairFromClutch(clutch) {
+    let changed = false;
+
+    breedingPairs.forEach(pair => {
+        if (pair.clutchId && pair.clutchId === clutch.id) {
+            pair.clutchId = "";
+            changed = true;
+        }
+    });
+
+    if (changed) {
+        saveStorageArray("breedingPairs", breedingPairs);
+    }
+}
+
+function updateClutchHatchlingCount(clutchId, value) {
+    const clutch = clutches.find(item => item.id === clutchId);
+
+    if (!clutch) {
+        return;
+    }
+
+    const count = Math.min(60, Math.max(0, Math.round(Number(value)) || 0));
+
+    if (clutch.convertedToSnakes || clutch.hatchedDate) {
+        clutch.hatchlingCount = count;
+    } else {
+        clutch.expectedHatchlings = count;
+    }
+
+    saveStorageArray("clutches", clutches);
+    renderClutches();
+}
+
+function deleteClutch(clutchId) {
+    const clutch = clutches.find(item => item.id === clutchId);
+
+    if (!clutch) {
+        return;
+    }
+
+    const hatchlings = snakes.filter(snake => snake.clutchId === clutch.id);
+    const lines = [
+        `Delete clutch ${clutch.id}?`,
+        "The clutch record is removed and its pair goes back to the active list.",
+        "This cannot be undone."
+    ];
+
+    if (hatchlings.length > 0) {
+        lines.splice(2, 0, `${hatchlings.length} hatchling record${hatchlings.length === 1 ? "" : "s"} came from this clutch.`);
+    }
+
+    if (!confirm(lines.join("\n\n"))) {
+        return;
+    }
+
+    let removeHatchlings = false;
+
+    if (hatchlings.length > 0) {
+        removeHatchlings = confirm(
+            `Also delete the ${hatchlings.length} hatchling record${hatchlings.length === 1 ? "" : "s"} from your collection?\n\n` +
+            "OK deletes them. Cancel keeps them as animals in the collection."
+        );
+    }
+
+    clutches = clutches.filter(item => item !== clutch);
+    releasePairFromClutch(clutch);
+
+    saveStorageArray("clutches", clutches);
+
+    if (removeHatchlings) {
+        const remaining = snakes.filter(snake => !hatchlings.includes(snake));
+
+        snakes.length = 0;
+        remaining.forEach(snake => snakes.push(snake));
+        window.SnakeData.saveStorageArray("snakes", snakes);
+    }
+
+    renderBreedingPairs();
+    renderPairHistory();
+    renderClutches();
 }
 
 window.saveBreedingPair = saveBreedingPair;
@@ -868,6 +1002,8 @@ window.closeClosePairModal = closeClosePairModal;
 window.confirmClosePair = confirmClosePair;
 window.reopenPair = reopenPair;
 window.goToBreedingOutcomes = goToBreedingOutcomes;
+window.updateClutchHatchlingCount = updateClutchHatchlingCount;
+window.deleteClutch = deleteClutch;
 
 const closePairModal = document.getElementById("closePairModal");
 

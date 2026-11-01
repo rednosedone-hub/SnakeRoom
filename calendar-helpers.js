@@ -6,7 +6,8 @@
 // Every task is something the keeper can act on that day:
 //   feeding  - a snake's next meal (and the meals after it, inside the window)
 //   health   - quarantine release, or a follow-up on a health event
-//   breeding - a clutch's hatch window, and its first candling around day 21
+//   breeding - a clutch's hatch window and first candling, plus a pair's
+//              estimated ovulation and egg date after a pre-lay shed
 //   order    - a feeder size that has reached its re-order date
 //
 // Overdue work is pinned to today: the app treats "was due last week" as "do it
@@ -312,6 +313,82 @@
         });
     }
 
+    function findSnakeByReference(snakes, reference) {
+        const wanted = text(reference);
+
+        if (!wanted) {
+            return null;
+        }
+
+        if (window.SnakeData && typeof window.SnakeData.getSnakeByReference === "function") {
+            const found = window.SnakeData.getSnakeByReference(snakes, wanted);
+
+            if (found) {
+                return found;
+            }
+        }
+
+        return (Array.isArray(snakes) ? snakes : []).find(snake => snake && text(snake.id) === wanted) || null;
+    }
+
+    // A pair with a pre-lay shed but no eggs yet gets two markers: the
+    // estimated ovulation (a day in the past, shown where it happened) and the
+    // eggs due date (the job still ahead). Once eggs, or a clutch, are on
+    // record the clutch's own hatch tasks take over.
+    function collectPairTasks(pairs, snakes, options, push) {
+        const timeline = window.BreedingTimeline;
+
+        if (!timeline) {
+            return;
+        }
+
+        (Array.isArray(pairs) ? pairs : []).forEach(pair => {
+            if (!pair || pair.clutchId || parseDate(pair.eggsLaidDate)) {
+                return;
+            }
+
+            const female = pair.femaleSnakeId
+                ? findSnakeByReference(snakes, pair.femaleSnakeId)
+                : (Array.isArray(snakes) ? snakes[Number(pair.femaleIndex)] || null : null);
+            const estimate = timeline.estimate(pair, female, { today: options.today });
+
+            if (!estimate) {
+                return;
+            }
+
+            const label = snakeLabel(female) || "Female";
+            const climbText = timeline.describeClimb(estimate.weightClimb);
+
+            if (!estimate.ovulationObserved) {
+                push({
+                    date: estimate.ovulationDate,
+                    type: "breeding",
+                    title: `Ovulation (est.): ${label}`,
+                    detail: `Pre-lay shed ${estimate.shedDate} · ${timeline.OVULATION_WINDOW[0]}-${timeline.OVULATION_WINDOW[1]} days before it · ${climbText}`,
+                    href: "breeding.html#clutches"
+                });
+            }
+
+            const overdue = estimate.layDate < options.today;
+            const staleAfter = timeline.addDays(estimate.layTo, 14);
+
+            // Two weeks past the end of the lay window the estimate is history,
+            // not a job; keeping it pinned to today would be permanent noise.
+            if (overdue && options.today > staleAfter) {
+                return;
+            }
+
+            push({
+                date: overdue ? options.today : estimate.layDate,
+                type: "breeding",
+                title: overdue ? `Eggs overdue (est.): ${label}` : `Eggs due (est.): ${label}`,
+                detail: `${estimate.layFrom} to ${estimate.layTo} (${timeline.LAY_WINDOW[0]}-${timeline.LAY_WINDOW[1]} days after the shed)`,
+                href: "breeding.html#clutches",
+                overdue
+            });
+        });
+    }
+
     function collectOrderTasks(forecast, options, push) {
         if (!forecast || !Array.isArray(forecast.sizes)) {
             return;
@@ -381,6 +458,7 @@
         collectFeedingTasks(opts.snakes, context, push);
         collectHealthTasks(opts.snakes, context, push);
         collectBreedingTasks(opts.clutches, context, push);
+        collectPairTasks(opts.pairs, opts.snakes, context, push);
         collectOrderTasks(opts.forecast, context, push);
 
         return tasks.sort(compareTasks);

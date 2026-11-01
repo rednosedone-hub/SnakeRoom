@@ -7,6 +7,8 @@
 
 const snakes = window.SnakeData.loadSnakesWithIds([]);
 let clutches = window.SnakeData.readStorageArray("clutches", []);
+// Deleting a clutch frees its pair again, so the pairs are read here too.
+let breedingPairs = window.SnakeData.readStorageArray("breedingPairs", []);
 
 const OUTCOMES_DEFAULT_STATUS = "Hatchling";
 const hatchlingPreparation = {};
@@ -435,9 +437,8 @@ function prepareHatchlings(clutch) {
         // If the eggs were candled, the fertile count is the honest number of
         // hatchlings to expect: slugs are eggs that never had a snake in them.
         const incubation = incubationTool();
-        const summary = incubation ? incubation.candlingSummary(clutch) : null;
-        const count = summary && summary.fertile !== null && summary.fertile > 0
-            ? summary.fertile
+        const count = incubation
+            ? incubation.expectedHatchlingCount(clutch)
             : Number(clutch.eggCount) || 0;
 
         hatchlingPreparation[clutch.clutchToken] = Array.from({ length: count }, (_, offset) => {
@@ -525,13 +526,38 @@ function applyMorphChoice(clutchToken, row, value) {
     return outcome;
 }
 
-function rememberHatchlingChoices() {
+// A re-render throws the editor away, so whatever was typed — names, bins,
+// sexes, statuses and morphs — is copied back onto the rows first. A row that
+// has no inputs yet (just added by a count change) keeps its defaults instead
+// of being overwritten with blanks.
+function rememberHatchlingEdits() {
     Object.entries(hatchlingPreparation).forEach(([token, rows]) => {
         rows.forEach(row => {
-            const select = document.getElementById(`hatchMorph-${token}-${row.index}`);
+            const suffix = `${token}-${row.index}`;
+            const morphSelect = document.getElementById(`hatchMorph-${suffix}`);
+            const nameInput = document.getElementById(`hatchName-${suffix}`);
+            const binInput = document.getElementById(`hatchBin-${suffix}`);
+            const sexSelect = document.getElementById(`hatchSex-${suffix}`);
+            const statusSelect = document.getElementById(`hatchStatus-${suffix}`);
 
-            if (select) {
-                applyMorphChoice(token, row, select.value);
+            if (morphSelect) {
+                applyMorphChoice(token, row, morphSelect.value);
+            }
+
+            if (nameInput) {
+                row.name = nameInput.value;
+            }
+
+            if (binInput) {
+                row.binNumber = binInput.value;
+            }
+
+            if (sexSelect) {
+                row.sex = sexSelect.value;
+            }
+
+            if (statusSelect) {
+                row.status = statusSelect.value;
             }
         });
     });
@@ -720,6 +746,69 @@ function saveHatchlings(token) {
     renderBreedingOutcomes();
 }
 
+function clampHatchlingCount(value) {
+    const count = Math.round(Number(value));
+
+    if (!Number.isFinite(count)) {
+        return 0;
+    }
+
+    const max = incubationTool() ? incubationTool().MAX_HATCHLINGS : 60;
+
+    return Math.min(max, Math.max(0, count));
+}
+
+function syncPreparedHatchlings(clutch, count) {
+    const rows = hatchlingPreparation[clutch.clutchToken];
+
+    if (!rows) {
+        return;
+    }
+
+    while (rows.length > count) {
+        rows.pop();
+    }
+
+    while (rows.length < count) {
+        const index = rows.length + 1;
+
+        rows.push({ index, ...buildHatchlingDefaults(clutch, index) });
+    }
+
+    rows.forEach((row, offset) => {
+        row.index = offset + 1;
+    });
+}
+
+// How many hatchlings came out is the keeper's call: one egg can produce twins,
+// and a failed egg means fewer snakes than eggs.
+function setExpectedHatchlings(token, value) {
+    const clutch = clutches.find(item => item.clutchToken === token);
+
+    if (!clutch) {
+        return;
+    }
+
+    const count = clampHatchlingCount(value);
+
+    clutch.expectedHatchlings = count;
+    syncPreparedHatchlings(clutch, count);
+    saveClutches();
+    renderBreedingOutcomes();
+}
+
+function setHatchlingCount(token, value) {
+    const clutch = clutches.find(item => item.clutchToken === token);
+
+    if (!clutch) {
+        return;
+    }
+
+    clutch.hatchlingCount = clampHatchlingCount(value);
+    saveClutches();
+    renderBreedingOutcomes();
+}
+
 function addHatchling(clutchId) {
     const clutch = clutches.find(item => item.id === clutchId);
 
@@ -764,6 +853,80 @@ function removePreparedHatchling(token, index) {
     renderBreedingOutcomes();
 }
 
+function relatedHatchlings(clutch) {
+    return snakes.filter(snake =>
+        snake.clutchId === clutch.id &&
+        (!snake.clutchToken || snake.clutchToken === clutch.clutchToken)
+    );
+}
+
+// A converted pair points at its clutch; deleting the clutch must hand the pair
+// back to the active list rather than leaving it linked to a missing record.
+function releasePair(clutch) {
+    let changed = false;
+
+    breedingPairs.forEach(pair => {
+        if (pair.clutchId && pair.clutchId === clutch.id) {
+            pair.clutchId = "";
+            changed = true;
+        }
+    });
+
+    if (changed) {
+        window.SnakeData.saveStorageArray("breedingPairs", breedingPairs);
+    }
+}
+
+function deleteClutch(token) {
+    const clutch = clutches.find(item => item.clutchToken === token);
+
+    if (!clutch) {
+        return;
+    }
+
+    const hatchlings = relatedHatchlings(clutch);
+    const lines = [
+        `Delete clutch ${clutch.id}?`,
+        "The clutch record is removed and its pair goes back to the active list.",
+        "This cannot be undone."
+    ];
+
+    if (hatchlings.length > 0) {
+        lines.splice(2, 0, `${hatchlings.length} hatchling record${hatchlings.length === 1 ? "" : "s"} came from this clutch.`);
+    }
+
+    if (!confirm(lines.join("\n\n"))) {
+        return;
+    }
+
+    let removeHatchlings = false;
+
+    if (hatchlings.length > 0) {
+        removeHatchlings = confirm(
+            `Also delete the ${hatchlings.length} hatchling record${hatchlings.length === 1 ? "" : "s"} from your collection?\n\n` +
+            "OK deletes them. Cancel keeps them as animals in the collection."
+        );
+    }
+
+    clutches = clutches.filter(item => item !== clutch);
+    releasePair(clutch);
+
+    if (removeHatchlings) {
+        for (let index = snakes.length - 1; index >= 0; index -= 1) {
+            if (hatchlings.includes(snakes[index])) {
+                snakes.splice(index, 1);
+            }
+        }
+
+        saveSnakes();
+    }
+
+    delete hatchlingPreparation[clutch.clutchToken];
+    clutchOutcomeCache[clutch.clutchToken] = null;
+    saveClutches();
+    renderBreedingOutcomes();
+}
+
 function updateOutcomesStatus() {
     const status = document.getElementById("outcomesStatus");
     const activeCount = getBreedingOutcomes().filter(clutch => !clutch.convertedToSnakes).length;
@@ -776,6 +939,11 @@ function updateOutcomesStatus() {
 function renderOutcomeCard(clutch) {
     const token = clutch.clutchToken;
     const rows = prepareHatchlings(clutch);
+    const incubation = incubationTool();
+    const expectedCount = incubation
+        ? incubation.expectedHatchlingCount(clutch)
+        : Number(clutch.eggCount) || 0;
+    const maxHatchlings = incubation ? incubation.MAX_HATCHLINGS : 60;
 
     return `
         <div class="breeding-card outcome-card" id="outcomeCard-${token}">
@@ -793,12 +961,29 @@ function renderOutcomeCard(clutch) {
                     <input type="date" id="hatchDate-${token}" value="${escapeHtml(clutch.hatchedDate || getTodayText())}">
                 </label>
 
+                <label class="form-field">
+                    <span>Hatchlings</span>
+                    <input type="number" id="expectedHatchlings-${token}" min="0"
+                        max="${maxHatchlings}" step="1" value="${expectedCount}"
+                        onchange="setExpectedHatchlings('${token}', this.value)">
+                    <small class="empty-message">Twins count as two: one egg, two snakes.</small>
+                </label>
+
                 ${rows.map(row => renderHatchlingEditorRow(clutch, row)).join("")}
             </div>
 
+            ${rows.length === 0
+                ? `<p class="empty-message">No hatchlings expected. Raise the count if eggs are still due.</p>`
+                : ""}
+
             <div class="card-buttons">
-                <button type="button" class="edit-button" onclick="saveHatchlings('${token}')">
+                <button type="button" class="edit-button" onclick="saveHatchlings('${token}')"
+                    ${rows.length === 0 ? "disabled" : ""}>
                     Create ${rows.length} Hatchling${rows.length === 1 ? "" : "s"}
+                </button>
+
+                <button type="button" class="archive-button" onclick="deleteClutch('${token}')">
+                    Delete Clutch
                 </button>
             </div>
         </div>
@@ -882,11 +1067,14 @@ function renderHatchedIncubationLine(clutch) {
 
     const incubated = incubation.incubatedDays(clutch);
     const stats = incubation.hatchStats(clutch);
+    const twins = stats.eggs > 0 && stats.hatched > stats.eggs;
     const parts = [
         incubated === null ? "" : `Incubated ${incubated} days`,
         clutch.pipDate ? `pipped ${escapeHtml(clutch.pipDate)}` : "",
         stats.eggs > 0
-            ? `${stats.hatched} of ${stats.eggs} egg${stats.eggs === 1 ? "" : "s"} hatched${stats.percent === null ? "" : ` (${stats.percent}%)`}`
+            ? twins
+                ? `${stats.hatched} hatchlings from ${stats.eggs} eggs — ${stats.hatched - stats.eggs} more than eggs (twins?)`
+                : `${stats.hatched} of ${stats.eggs} egg${stats.eggs === 1 ? "" : "s"} hatched${stats.percent === null ? "" : ` (${stats.percent}%)`}`
             : ""
     ].filter(Boolean);
 
@@ -912,6 +1100,17 @@ function renderHatchedCard(clutch) {
                 ${renderHatchedIncubationLine(clutch)}
             </div>
 
+            <div class="form-grid" style="margin-top:12px;">
+                <label class="form-field">
+                    <span>Hatchlings</span>
+                    <input type="number" min="0" max="${incubationTool() ? incubationTool().MAX_HATCHLINGS : 60}" step="1"
+                        id="hatchlingCount-${clutch.clutchToken}"
+                        value="${clutch.hatchlingCount || 0}"
+                        onchange="setHatchlingCount('${clutch.clutchToken}', this.value)">
+                    <small class="empty-message">More than the eggs means twins.</small>
+                </label>
+            </div>
+
             ${rows ? `
                 <div class="form-grid hatchling-editor-grid">
                     ${rows.map(row => renderHatchlingEditorRow(clutch, row)).join("")}
@@ -921,11 +1120,19 @@ function renderHatchedCard(clutch) {
                     <button type="button" class="edit-button" onclick="saveHatchlings('${clutch.clutchToken}')">
                         Add Hatchling
                     </button>
+
+                    <button type="button" class="archive-button" onclick="deleteClutch('${clutch.clutchToken}')">
+                        Delete Clutch
+                    </button>
                 </div>
             ` : `
                 <div class="card-buttons">
                     <button type="button" class="gene-action-button" onclick="addHatchling('${clutch.id}')">
                         Add Hatchling
+                    </button>
+
+                    <button type="button" class="archive-button" onclick="deleteClutch('${clutch.clutchToken}')">
+                        Delete Clutch
                     </button>
                 </div>
             `}
@@ -937,9 +1144,9 @@ function renderBreedingOutcomes() {
     const outcomesList = document.getElementById("outcomesList");
     const hatchedList = document.getElementById("hatchedList");
 
-    // Keep whatever morph each hatchling was labelled with before the lists are
-    // rebuilt; the selects are about to be thrown away.
-    rememberHatchlingChoices();
+    // Keep whatever was typed into the hatchling editor before the lists are
+    // rebuilt; the inputs are about to be thrown away.
+    rememberHatchlingEdits();
 
     const outcomes = getBreedingOutcomes();
     const active = outcomes.filter(clutch => !clutch.convertedToSnakes);
@@ -961,6 +1168,9 @@ const hashClutchId = decodeURIComponent((window.location.hash.match(/^#clutch-(.
 window.saveHatchlings = saveHatchlings;
 window.addHatchling = addHatchling;
 window.removePreparedHatchling = removePreparedHatchling;
+window.setExpectedHatchlings = setExpectedHatchlings;
+window.setHatchlingCount = setHatchlingCount;
+window.deleteClutch = deleteClutch;
 window.previewHatchlingMorph = previewHatchlingMorph;
 window.updateClutchField = updateClutchField;
 window.addCandling = addCandling;

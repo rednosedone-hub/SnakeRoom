@@ -102,6 +102,19 @@ test("candling is suggested three weeks after the eggs were laid", () => {
     assert.ok(incubation.latestCandle(clutch({ candleLog: [{ date: "2026-10-11", fertile: 6 }] })));
 });
 
+test("the expected hatchling count follows candling unless the keeper says otherwise", () => {
+    assert.equal(incubation.expectedHatchlingCount(clutch()), 6);
+    assert.equal(incubation.expectedHatchlingCount(clutch({ candleLog: [{ date: "2026-10-11", fertile: 4, slugs: 2 }] })), 4);
+    // Twins: one egg can hold two snakes, so the count may exceed the eggs.
+    assert.equal(incubation.expectedHatchlingCount(clutch({ expectedHatchlings: 7 })), 7);
+    assert.equal(incubation.expectedHatchlingCount(clutch({ eggCount: 0 })), 0);
+    assert.equal(incubation.expectedHatchlingCount(clutch({ expectedHatchlings: 0 })), 0);
+    assert.equal(incubation.expectedHatchlingCount(clutch({ expectedHatchlings: 500 })), incubation.MAX_HATCHLINGS);
+    assert.equal(incubation.expectedHatchlingCount(null), 0);
+    // A candling with no fertile count says nothing about the expectation.
+    assert.equal(incubation.expectedHatchlingCount(clutch({ candleLog: [{ date: "2026-10-11", fertile: 0, slugs: 6 }] })), 6);
+});
+
 test("hatch stats compare what hatched with what was laid", () => {
     assert.deepEqual(
         JSON.parse(JSON.stringify(incubation.hatchStats({ eggCount: 7, hatchlingCount: 6 }))),

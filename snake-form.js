@@ -1601,6 +1601,7 @@ function renderPairingReadiness() {
     const checks = document.getElementById("snakeReadinessChecks");
     const actions = document.getElementById("snakeReadinessActions");
     const allChecks = document.getElementById("snakeReadinessAllChecks");
+    const weightTrendLine = document.getElementById("snakeReadinessWeightTrend");
 
     if (!panel || !summary || !badge || !checks || !actions || !allChecks) {
         return;
@@ -1635,6 +1636,14 @@ function renderPairingReadiness() {
         : `<p class="readiness-clear">All readiness checks pass.</p>`;
     actions.innerHTML = getFormReadinessActionsHtml(readiness);
     allChecks.innerHTML = readiness.checks.map(getFormReadinessCheckHtml).join("");
+
+    // The follicular rise belongs next to the badge, not in a collapsed list.
+    if (weightTrendLine) {
+        weightTrendLine.hidden = !readiness.weightGain;
+        weightTrendLine.innerHTML = readiness.weightGain
+            ? `<strong>${escapeMoneyText(readiness.weightGain.summary)}</strong> \u00b7 ${escapeMoneyText(readiness.weightGain.detail)}`
+            : "";
+    }
 }
 
 function schedulePairingReadinessRender() {
@@ -2015,6 +2024,326 @@ function formatSignedGrams(value) {
     return `${rounded > 0 ? "+" : "−"}${Math.abs(rounded)}`;
 }
 
+// ---- Growth chart range --------------------------------------------------
+//
+// A whole year of weigh-ins flattens the weeks that matter. The keeper picks a
+// window — usually the run-up to a clutch, when follicular growth is the thing
+// worth watching — and the chart, its gain-per-week line and its summary all
+// follow that window. The choice is remembered per snake, so reopening her
+// record during the season lands on the same weeks.
+
+const WEIGHT_RANGE_STORAGE_PREFIX = "weightChartRange:";
+
+const WEIGHT_RANGE_PRESETS = [
+    { value: "all", label: "All weigh-ins" },
+    { value: "30", label: "Last 30 days", days: 30 },
+    { value: "90", label: "Last 90 days", days: 90 },
+    { value: "180", label: "Last 6 months", days: 182 },
+    { value: "365", label: "Last 12 months", days: 365 },
+    { value: "custom", label: "Custom range" }
+];
+
+let weightChartRange = null;
+
+function weightRangePreset(value) {
+    return WEIGHT_RANGE_PRESETS.find(item => item.value === value) || WEIGHT_RANGE_PRESETS[0];
+}
+
+function weightRangeStorageKey() {
+    const snake = editingIndex === null ? null : snakes[editingIndex];
+
+    return snake && snake.id ? `${WEIGHT_RANGE_STORAGE_PREFIX}${snake.id}` : "";
+}
+
+function cleanRangeDate(value) {
+    const chart = window.WeightChart;
+    const clean = String(value || "").slice(0, 10);
+
+    return chart && chart.parseDate(clean) ? clean : "";
+}
+
+function getWeightChartRange() {
+    if (weightChartRange) {
+        return weightChartRange;
+    }
+
+    weightChartRange = { preset: "all", from: "", to: "" };
+
+    const key = weightRangeStorageKey();
+
+    if (!key) {
+        return weightChartRange;
+    }
+
+    try {
+        const stored = JSON.parse(localStorage.getItem(key) || "null");
+
+        if (stored && typeof stored === "object" && weightRangePreset(stored.preset).value === stored.preset) {
+            weightChartRange = {
+                preset: stored.preset,
+                from: cleanRangeDate(stored.from),
+                to: cleanRangeDate(stored.to)
+            };
+        }
+    } catch (error) {
+        // An unreadable preference simply means "show everything".
+    }
+
+    return weightChartRange;
+}
+
+function saveWeightChartRange() {
+    const key = weightRangeStorageKey();
+
+    if (!key) {
+        return;
+    }
+
+    try {
+        localStorage.setItem(key, JSON.stringify(getWeightChartRange()));
+    } catch (error) {
+        // A full disk must not stop the chart drawing.
+    }
+}
+
+function weightPresetWindow(days) {
+    const chart = window.WeightChart;
+    const end = new Date();
+
+    end.setHours(0, 0, 0, 0);
+
+    const start = new Date(end);
+    start.setDate(start.getDate() - (days - 1));
+
+    return {
+        from: chart ? chart.dateText(start) : "",
+        to: chart ? chart.dateText(end) : ""
+    };
+}
+
+function getWeightChartHistory() {
+    const history = getCurrentWeightHistory();
+
+    if (history.length > 0) {
+        return history;
+    }
+
+    const weight = document.getElementById("weightInput")?.value || "";
+
+    return weight
+        ? [{ date: new Date().toISOString().slice(0, 10), weight: Number(weight) }]
+        : [];
+}
+
+function syncWeightChartControls() {
+    const select = document.getElementById("weightRangePreset");
+    const fromInput = document.getElementById("weightRangeFrom");
+    const toInput = document.getElementById("weightRangeTo");
+
+    if (!select) {
+        return;
+    }
+
+    if (select.options.length === 0) {
+        select.innerHTML = WEIGHT_RANGE_PRESETS
+            .map(item => `<option value="${item.value}">${item.label}</option>`)
+            .join("");
+    }
+
+    const range = getWeightChartRange();
+
+    select.value = weightRangePreset(range.preset).value;
+
+    if (fromInput) {
+        fromInput.value = range.from;
+    }
+
+    if (toInput) {
+        toInput.value = range.to;
+    }
+}
+
+function refreshWeightChart() {
+    renderWeightChart(getWeightChartHistory());
+}
+
+function setWeightChartPreset(value) {
+    const preset = weightRangePreset(value);
+    const range = getWeightChartRange();
+
+    range.preset = preset.value;
+
+    if (preset.value === "all") {
+        range.from = "";
+        range.to = "";
+    } else if (preset.days) {
+        const presetWindow = weightPresetWindow(preset.days);
+
+        range.from = presetWindow.from;
+        range.to = presetWindow.to;
+    } else if (!range.from && !range.to) {
+        // Custom with nothing chosen yet starts on the latest weigh-in, so the
+        // date boxes are not blank the moment they matter.
+        const series = window.WeightChart
+            ? window.WeightChart.buildSeries(getCurrentWeightHistory())
+            : [];
+
+        if (series.length > 0) {
+            range.from = series[series.length - 1].date;
+            range.to = series[series.length - 1].date;
+        }
+    }
+
+    saveWeightChartRange();
+    refreshWeightChart();
+}
+
+function setWeightChartRangeDate(edge, value) {
+    const range = getWeightChartRange();
+    const field = edge === "to" ? "to" : "from";
+
+    range[field] = cleanRangeDate(value);
+    range.preset = "custom";
+
+    // Typing the dates the wrong way round should not produce an empty chart.
+    if (range.from && range.to && range.from > range.to) {
+        const swap = range.from;
+
+        range.from = range.to;
+        range.to = swap;
+    }
+
+    saveWeightChartRange();
+    refreshWeightChart();
+}
+
+window.setWeightChartPreset = setWeightChartPreset;
+window.setWeightChartRangeDate = setWeightChartRangeDate;
+
+// ---- Chart comparison -----------------------------------------------------
+//
+// A season only means something beside another one. The overlay shares the
+// chart's dates and grams, so a second snake or last year's run is read on the
+// same scale instead of a second axis nobody would trust.
+
+const weightCompare = { mode: "", snakeId: "" };
+
+function getComparableSnakes() {
+    const current = editingIndex === null ? null : snakes[editingIndex];
+
+    return snakes.filter(snake => snake && snake !== current && (snake.name || snake.ID));
+}
+
+function syncWeightCompareControls() {
+    const modeSelect = document.getElementById("weightCompareMode");
+    const snakeSelect = document.getElementById("weightCompareSnake");
+    const snakeField = document.getElementById("weightCompareSnakeField");
+
+    if (!modeSelect) {
+        return;
+    }
+
+    modeSelect.value = weightCompare.mode;
+
+    if (!snakeSelect) {
+        return;
+    }
+
+    const options = getComparableSnakes();
+
+    if (!options.some(snake => snake.id === weightCompare.snakeId)) {
+        weightCompare.snakeId = "";
+
+        if (weightCompare.mode === "snake") {
+            weightCompare.mode = "";
+        }
+    }
+
+    snakeSelect.innerHTML = options
+        .map(snake => `<option value="${escapeMoneyText(snake.id || "")}">${escapeMoneyText(snake.name || snake.ID || "Unnamed")}</option>`)
+        .join("");
+    snakeSelect.value = weightCompare.snakeId;
+
+    if (snakeField) {
+        const showSnakePicker = weightCompare.mode === "snake";
+
+        // .form-field sets its own display, which beats the hidden attribute.
+        snakeField.hidden = !showSnakePicker;
+        snakeField.style.display = showSnakePicker ? "" : "none";
+    }
+}
+
+function getWeightComparison(series, visible, range) {
+    const chart = window.WeightChart;
+
+    if (!chart || !weightCompare.mode) {
+        return null;
+    }
+
+    const from = range.from || (visible[0] ? visible[0].date : "");
+    const to = range.to || (visible[visible.length - 1] ? visible[visible.length - 1].date : "");
+    const chartWindow = { from, to };
+
+    if (weightCompare.mode === "snake") {
+        const other = snakes.find(snake => snake && snake.id === weightCompare.snakeId);
+
+        if (!other) {
+            return null;
+        }
+
+        const points = chart.filterSeries(chart.buildSeries(other.weightHistory), chartWindow);
+        const latest = points[points.length - 1];
+
+        return {
+            label: other.name || other.ID || "Other snake",
+            note: latest ? `${latest.weight} g` : "no weigh-ins in this range",
+            points
+        };
+    }
+
+    if (weightCompare.mode === "last-year") {
+        // Last season moves forward a year; this season's own points land in
+        // next year's dates and fall outside the window, so only the old run
+        // remains on the chart.
+        const points = chart.filterSeries(chart.shiftSeries(series, 364), chartWindow);
+        const latest = points[points.length - 1];
+        const year = from ? Number(from.slice(0, 4)) - 1 : new Date().getFullYear() - 1;
+
+        return {
+            label: `Last year (${year})`,
+            note: latest ? `${latest.weight} g` : "no weigh-ins in this range",
+            points
+        };
+    }
+
+    return null;
+}
+
+function setWeightCompareMode(value) {
+    weightCompare.mode = value === "snake" || value === "last-year" ? value : "";
+
+    if (weightCompare.mode === "snake" && !weightCompare.snakeId) {
+        const options = getComparableSnakes();
+        // Start on a snake that actually has weigh-ins, or the first overlay is
+        // an empty line and looks broken rather than honest.
+        const choice = options.find(snake => Array.isArray(snake.weightHistory) && snake.weightHistory.length > 0)
+            || options[0];
+
+        weightCompare.snakeId = choice ? choice.id || "" : "";
+    }
+
+    refreshWeightChart();
+}
+
+function setWeightCompareSnake(value) {
+    weightCompare.snakeId = String(value || "");
+    weightCompare.mode = weightCompare.snakeId ? "snake" : "";
+    refreshWeightChart();
+}
+
+window.setWeightCompareMode = setWeightCompareMode;
+window.setWeightCompareSnake = setWeightCompareSnake;
+
 // The chart maths live in weight-chart.js (dates decide the x axis), so this
 // function only turns its layout into SVG and says what the trend is.
 function renderWeightChart(history) {
@@ -2029,16 +2358,39 @@ function renderWeightChart(history) {
     }
 
     const series = chart.buildSeries(history);
+    const range = getWeightChartRange();
+    const visible = chart.filterSeries(series, range);
+    const windowTimes = chart.rangeTimes(range);
+    const comparison = getWeightComparison(series, visible, range);
+    const note = document.getElementById("weightRangeNote");
 
-    if (series.length === 0) {
-        container.innerHTML = `<p class="empty-message">No chart data yet.</p>`;
+    syncWeightChartControls();
+    syncWeightCompareControls();
+
+    if (note) {
+        note.textContent = series.length === 0
+            ? ""
+            : `Showing ${visible.length} of ${series.length} weigh-in${series.length === 1 ? "" : "s"}`;
+    }
+
+    if (visible.length === 0) {
+        container.innerHTML = series.length === 0
+            ? `<p class="empty-message">No chart data yet.</p>`
+            : `<p class="empty-message">No weigh-ins between ${range.from || "the first record"} and ${range.to || "today"}. Choose "All weigh-ins" to see all ${series.length}.</p>`;
         return;
     }
 
-    const laidOut = chart.layout(series, { width: 440, height: 180, padding: 34 });
-    const growth = chart.growthSummary(series);
-    const latest = series[series.length - 1];
-    const first = series[0];
+    const laidOut = chart.layout(visible, {
+        width: 440,
+        height: 180,
+        padding: 34,
+        startTime: windowTimes.startTime,
+        endTime: windowTimes.endTime,
+        secondary: comparison ? comparison.points : []
+    });
+    const growth = chart.growthSummary(visible);
+    const latest = visible[visible.length - 1];
+    const first = visible[0];
     const summary = growth
         ? `<strong>${latest.weight} g</strong> on ${latest.date} · ${formatSignedGrams(growth.gain)} g over ${growth.days} day${growth.days === 1 ? "" : "s"} (${formatSignedGrams(growth.gramsPerWeek)} g/week since ${chart.shortDate(first.date)})`
         : `<strong>${latest.weight} g</strong> on ${latest.date} · add one more weigh-in to see the trend`;
@@ -2073,14 +2425,30 @@ function renderWeightChart(history) {
             <title>${point.weight} g on ${point.date}</title>
         </circle>
     `).join("");
+    const comparePoints = comparison ? laidOut.secondaryPoints : [];
+    const comparePath = comparePoints.map(point => `${point.x},${point.y}`).join(" ");
+    const compareDots = comparePoints.map(point => `
+        <circle class="weight-chart-dot is-compare" cx="${point.x}" cy="${point.y}" r="3.2">
+            <title>${escapeMoneyText(comparison.label)}: ${point.weight} g on ${point.originalDate || point.date}</title>
+        </circle>
+    `).join("");
+    const compareLegend = comparison
+        ? `<p class="weight-chart-legend">
+                <span><i class="weight-chart-key"></i>${escapeMoneyText(document.getElementById("nameInput")?.value.trim() || "This snake")}</span>
+                <span><i class="weight-chart-key is-compare"></i>${escapeMoneyText(comparison.label)} · ${escapeMoneyText(comparison.note)}</span>
+            </p>`
+        : "";
 
     container.innerHTML = `
+        ${compareLegend}
         <p class="weight-chart-summary">${summary}</p>
         <svg viewBox="0 0 ${laidOut.width} ${laidOut.height}" width="100%" height="180"
             role="img" aria-label="Weight growth chart for ${laidOut.points.length} weigh-in${laidOut.points.length === 1 ? "" : "s"}">
             ${gridLines}
             ${yLabels}
+            ${comparePoints.length > 1 ? `<polyline class="weight-chart-line is-compare" points="${comparePath}" />` : ""}
             ${laidOut.points.length > 1 ? `<polyline class="weight-chart-line" points="${linePath}" />` : ""}
+            ${compareDots}
             ${dots}
             ${xLabels}
         </svg>

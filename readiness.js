@@ -30,6 +30,17 @@
     // month range; adjust this constant if your program uses a shorter rest.
     const POST_LAY_HOLD_MONTHS = 6;
 
+    // Follicular development usually shows as a steady weight climb in the six
+    // to eight weeks before ovulation. The window is wide enough to catch the
+    // start of the rise, stale cards are ignored, and the rise is measured over
+    // at least a fortnight so a full belly is not mistaken for follicles.
+    const FOLLICULAR_WINDOW_DAYS = 60;
+    const FOLLICULAR_STALE_DAYS = 21;
+    const FOLLICULAR_MIN_SPAN_DAYS = 14;
+    const FOLLICULAR_MIN_GAIN_GRAMS = 25;
+    const FOLLICULAR_MIN_GAIN_PERCENT = 1.5;
+    const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
     function text(value) {
         return String(value === undefined || value === null ? "" : value).trim();
     }
@@ -92,6 +103,18 @@
         return dateText(date);
     }
 
+    function addDays(value, days) {
+        const date = parseDate(value);
+
+        if (!date) {
+            return "";
+        }
+
+        date.setDate(date.getDate() + Number(days || 0));
+
+        return dateText(date);
+    }
+
     function formatAge(days) {
         const value = Number(days);
 
@@ -114,6 +137,19 @@
         const value = Number(weight);
 
         return Number.isFinite(value) && value > 0 ? `${value}g` : "No weight";
+    }
+
+    function formatSignedGrams(value) {
+        const amount = Number(value);
+        const rounded = Math.round(Math.abs(Number.isFinite(amount) ? amount : 0) * 10) / 10;
+
+        return `${Number.isFinite(amount) && amount < 0 ? "-" : "+"}${rounded}g`;
+    }
+
+    function shortDate(value) {
+        const date = parseDate(value);
+
+        return date ? `${date.getDate()} ${MONTHS[date.getMonth()]}` : "";
     }
 
     function isActiveSnake(snake) {
@@ -203,6 +239,69 @@
             daysLeft,
             active,
             months: POST_LAY_HOLD_MONTHS
+        };
+    }
+
+    function getFollicularWeightGain(snake, todayValue) {
+        const today = text(todayValue).slice(0, 10) || todayText();
+        const history = (Array.isArray(snake && snake.weightHistory) ? snake.weightHistory : [])
+            .map(entry => ({
+                date: text(entry && entry.date).slice(0, 10),
+                weight: Number(entry && entry.weight)
+            }))
+            .filter(entry => parseDate(entry.date) && Number.isFinite(entry.weight) && entry.weight > 0)
+            .sort((left, right) => left.date.localeCompare(right.date));
+        const cutoff = addDays(today, -FOLLICULAR_WINDOW_DAYS);
+        const recent = history.filter(entry => entry.date >= cutoff && entry.date <= today);
+
+        if (recent.length < 2) {
+            return null;
+        }
+
+        const latest = recent[recent.length - 1];
+        const latestAge = daysBetween(latest.date, today);
+
+        // A card left over from last season must not read as growth today.
+        if (latestAge === null || latestAge > FOLLICULAR_STALE_DAYS) {
+            return null;
+        }
+
+        const baseline = recent.find(entry => daysBetween(entry.date, latest.date) >= FOLLICULAR_MIN_SPAN_DAYS);
+
+        if (!baseline) {
+            return null;
+        }
+
+        const days = daysBetween(baseline.date, latest.date);
+        const gain = latest.weight - baseline.weight;
+        const threshold = Math.max(FOLLICULAR_MIN_GAIN_GRAMS, baseline.weight * (FOLLICULAR_MIN_GAIN_PERCENT / 100));
+        const state = gain >= threshold ? "rising" : (gain <= -threshold ? "falling" : "steady");
+        const changePercent = (gain / baseline.weight) * 100;
+        const gramsPerWeek = Math.round((gain / days) * 7 * 10) / 10;
+        const rateText = `${days} days at ${formatSignedGrams(gramsPerWeek)}/week`;
+        const since = shortDate(baseline.date);
+        const summary = state === "rising"
+            ? `Weight up ${Math.round(gain)}g since ${since}`
+            : state === "falling"
+                ? `Weight down ${Math.round(Math.abs(gain))}g since ${since}`
+                : `Weight steady since ${since}`;
+        const detail = state === "rising"
+            ? `${rateText} · a steady rise is what follicular development looks like.`
+            : state === "falling"
+                ? `${rateText} · check feeding and temperatures; a drop can also mean follicles were reabsorbed.`
+                : `${rateText} · keep weighing weekly to catch the climb.`;
+
+        return {
+            state,
+            baseline,
+            latest,
+            days,
+            gain,
+            changePercent,
+            gramsPerWeek,
+            threshold,
+            summary,
+            detail
         };
     }
 
@@ -389,6 +488,21 @@
             }
         }
 
+        // The follicular rise is the keeper's main signal before ovulation, so
+        // the panel reports the trend itself rather than making her open the
+        // weight chart. A fall of 5% or more is already a health warning, so it
+        // is not repeated as a second note here.
+        const weightGain = sex === "Female" ? getFollicularWeightGain(subject, today) : null;
+
+        if (weightGain && !(weightGain.state === "falling" && weightGain.changePercent <= -5)) {
+            checks.push(check(
+                "weight-trend",
+                weightGain.summary,
+                weightGain.state === "falling" ? "warn" : "pass",
+                weightGain.detail
+            ));
+        }
+
         if (window.SnakeHealth) {
             const health = window.SnakeHealth;
             const quarantine = health.getQuarantineStatus(subject, today);
@@ -489,6 +603,7 @@
             hatchYear: hasHatchYear ? hatchYear : null,
             weight: Number.isFinite(weight) && weight > 0 ? weight : null,
             postLay,
+            weightGain,
             checks,
             blockers,
             warnings
@@ -524,6 +639,11 @@
     window.SnakeReadiness = {
         READINESS_RULES,
         POST_LAY_HOLD_MONTHS,
+        FOLLICULAR_WINDOW_DAYS,
+        FOLLICULAR_STALE_DAYS,
+        FOLLICULAR_MIN_SPAN_DAYS,
+        FOLLICULAR_MIN_GAIN_GRAMS,
+        FOLLICULAR_MIN_GAIN_PERCENT,
         todayText,
         parseDate,
         daysBetween,
@@ -533,6 +653,7 @@
         normalizeSex,
         getLatestLayDate,
         getPostLayRecovery,
+        getFollicularWeightGain,
         getPairingReadiness,
         getReadinessBadge
     };

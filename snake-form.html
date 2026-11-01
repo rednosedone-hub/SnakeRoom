@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Snake Record</title>
-    <link rel="stylesheet" href="style.css?v=56">
+    <link rel="stylesheet" href="style.css?v=62">
 </head>
 
 <body>
@@ -52,6 +52,8 @@
                     </div>
                     <span class="readiness-badge" id="snakeReadinessBadge"></span>
                 </div>
+
+                <p class="readiness-weight-trend" id="snakeReadinessWeightTrend" hidden></p>
 
                 <div id="snakeReadinessChecks" class="readiness-record-checks"></div>
                 <div id="snakeReadinessActions" class="readiness-record-actions"></div>
@@ -324,8 +326,47 @@
                 </div>
 
                 <div class="weight-chart-frame">
-                    <h4>Weight Growth</h4>
-                    <div id="weightChartContainer" class="weight-chart-container">
+                    <div class="section-heading-row">
+                        <h4>Weight Growth</h4>
+                        <span class="empty-message" id="weightRangeNote"></span>
+                    </div>
+
+                    <div class="form-grid" style="margin-top:12px;">
+                        <label class="form-field">
+                            <span>Range</span>
+                            <select id="weightRangePreset" onchange="setWeightChartPreset(this.value)"></select>
+                        </label>
+
+                        <label class="form-field">
+                            <span>From</span>
+                            <input type="date" id="weightRangeFrom"
+                                onchange="setWeightChartRangeDate('from', this.value)">
+                        </label>
+
+                        <label class="form-field">
+                            <span>To</span>
+                            <input type="date" id="weightRangeTo"
+                                onchange="setWeightChartRangeDate('to', this.value)">
+                        </label>
+                    </div>
+
+                    <div class="form-grid" style="margin-top:12px;">
+                        <label class="form-field">
+                            <span>Compare</span>
+                            <select id="weightCompareMode" onchange="setWeightCompareMode(this.value)">
+                                <option value="">No comparison</option>
+                                <option value="snake">Another snake</option>
+                                <option value="last-year">This snake last year</option>
+                            </select>
+                        </label>
+
+                        <label class="form-field" id="weightCompareSnakeField" hidden style="display:none;">
+                            <span>Snake to compare</span>
+                            <select id="weightCompareSnake" onchange="setWeightCompareSnake(this.value)"></select>
+                        </label>
+                    </div>
+
+                    <div id="weightChartContainer" class="weight-chart-container" style="margin-top:12px;">
                         <p class="empty-message">No chart data yet.</p>
                     </div>
                 </div>
@@ -658,11 +699,11 @@
     <script src="finance-helpers.js?v=2"></script>
     <script src="feeder-inventory.js?v=8"></script>
     <script src="health-helpers.js?v=1"></script>
-    <script src="readiness.js?v=1"></script>
+    <script src="readiness.js?v=2"></script>
     <script src="morphCalculator.js?v=8"></script>
     <script src="morph-gallery.js?v=7"></script>
-    <script src="weight-chart.js?v=1"></script>
-    <script src="snake-form.js?v=23"></script>
+    <script src="weight-chart.js?v=3"></script>
+    <script src="snake-form.js?v=29"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>
