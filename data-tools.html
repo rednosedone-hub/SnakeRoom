@@ -37,16 +37,17 @@
 
                 <div class="data-action-grid">
                     <button type="button" class="main-button" id="exportSnakesButton">
-                        Export CSV
+                        Export Snakes CSV
                     </button>
 
                     <button type="button" class="secondary-button" id="templateButton">
-                        CSV Template
+                        Blank Snake Template
                     </button>
                 </div>
 
                 <p class="empty-message">
-                    CSV files open cleanly in LibreOffice Calc. Keep the header row when editing.
+                    CSV files open cleanly in LibreOffice Calc. The blank template has only the
+                    header row; keep those headings when filling it in.
                 </p>
             </section>
 
@@ -73,16 +74,82 @@
 
                 <div class="import-report" id="importReport"></div>
             </section>
+
+            <section class="form-section">
+                <h3>Gene Catalog</h3>
+
+                <p class="empty-message">
+                    Add genes the starter catalog does not have. Download the blank sheet, fill in
+                    one gene per row, then import it. Existing starter and custom genes are never
+                    replaced. Columns: name, type (codom or recessive), superType (viable, lethal
+                    or none), allelicGroup, health and superName. Only name is required.
+                </p>
+
+                <div class="data-action-grid">
+                    <button type="button" class="secondary-button" id="geneTemplateButton">
+                        Blank Gene Template
+                    </button>
+                </div>
+
+                <div class="form-grid">
+                    <label class="form-field">
+                        <span>Genes CSV File</span>
+                        <input type="file" id="geneCsvFileInput" accept=".csv,text/csv">
+                    </label>
+                </div>
+
+                <div class="form-page-actions">
+                    <button type="button" class="main-button" id="geneImportButton">
+                        Import Genes CSV
+                    </button>
+                </div>
+
+                <div class="import-report" id="geneImportReport"></div>
+            </section>
+
+            <section class="form-section">
+                <h3>Gene Shortcuts</h3>
+
+                <p class="empty-message">
+                    Import the abbreviations you use, one per row. If a row names one of your own
+                    genes, import the gene sheet first. Existing shortcuts are kept; importing the
+                    same shortcut again updates which gene it points to. Columns: alias, gene.
+                    Example: YB, Yellow Belly.
+                </p>
+
+                <div class="data-action-grid">
+                    <button type="button" class="secondary-button" id="aliasTemplateButton">
+                        Blank Shortcut Template
+                    </button>
+                </div>
+
+                <div class="form-grid">
+                    <label class="form-field">
+                        <span>Shortcuts CSV File</span>
+                        <input type="file" id="aliasCsvFileInput" accept=".csv,text/csv">
+                    </label>
+                </div>
+
+                <div class="form-page-actions">
+                    <button type="button" class="main-button" id="aliasImportButton">
+                        Import Shortcuts CSV
+                    </button>
+                </div>
+
+                <div class="import-report" id="aliasImportReport"></div>
+            </section>
         </main>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="data-helpers.js"></script>
     <script src="backup-helpers.js?v=1"></script>
-    <script src="cloud-sync.js?v=18"></script>
-    <script src="auto-sync.js?v=8"></script>
+    <script src="cloud-sync.js?v=20"></script>
+    <script src="auto-sync.js?v=9"></script>
     <script src="account-gate.js?v=1"></script>
-    <script src="data-tools.js?v=5"></script>
+    <script src="geneCatalog.js?v=4"></script>
+    <script src="genes.js?v=11"></script>
+    <script src="data-tools.js?v=8"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

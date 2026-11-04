@@ -166,20 +166,38 @@
             : null;
     }
 
+    // The defect catalog is optional here: the season review must still read a
+    // record without the defect helpers on the page.
+    function defectLabels(snake) {
+        if (window.SnakeDefects) {
+            return window.SnakeDefects.labels(snake);
+        }
+
+        return (Array.isArray(snake && snake.defects) ? snake.defects : [])
+            .map(value => text(value))
+            .filter(Boolean);
+    }
+
     function summarizeHatchling(snake) {
         const name = text(snake.name) || "Unnamed";
         const morph = text(snake.morph);
+        const identity = text(snake.ID);
+        const clutch = text(snake.clutchId);
+        const defects = defectLabels(snake);
 
         return {
             id: text(snake.id),
             name,
-            // A hatchling's morph field defaults to its name, which is not a
-            // morph worth printing twice.
-            morph: morph && morph !== name ? morph : "",
+            // The morph field now carries a hatchling's clutch id, and older
+            // records repeated the name there. Neither is a morph worth showing
+            // under that heading; the genes hold the real morph.
+            morph: morph && morph !== name && morph !== identity && morph !== clutch ? morph : "",
             sex: text(snake.sex) || "Unknown",
             status: text(snake.status) || "No status",
             hatchDate: text(snake.hatchDate).slice(0, 10),
-            bin: text(snake.binNumber)
+            bin: text(snake.binNumber),
+            defects,
+            defective: defects.length > 0
         };
     }
 
@@ -207,6 +225,14 @@
         const eggs = Math.max(0, Math.round(Number(clutch.eggCount) || 0));
         const declared = Math.max(0, Math.round(Number(clutch.hatchlingCount) || 0));
         const hatched = isHatched ? Math.max(declared, hatchlings.length) : 0;
+        const summarized = hatchlings.map(summarizeHatchling);
+        // A clutch that hatched but produced deformed animals did not really
+        // hatch as well as the raw count says. Both numbers stay on the row so
+        // the scorecard never hides the difference.
+        const defective = isHatched
+            ? summarized.filter(hatchling => hatchling.defective).length
+            : 0;
+        const healthy = Math.max(0, hatched - defective);
 
         return {
             id: text(clutch.id),
@@ -218,9 +244,13 @@
             eggs,
             hatched,
             hatchRate: isHatched && eggs > 0 ? roundPercent((hatched / eggs) * 100) : null,
+            healthy,
+            defective,
+            cleanRate: isHatched && eggs > 0 ? roundPercent((healthy / eggs) * 100) : null,
+            defectRate: isHatched && hatched > 0 ? roundPercent((defective / hatched) * 100) : null,
             unhatched: isHatched ? Math.max(0, eggs - hatched) : 0,
             counts,
-            hatchlings: hatchlings.map(summarizeHatchling),
+            hatchlings: summarized,
             revenue: roundMoney(revenue),
             saleCount,
             soldWithoutPrice

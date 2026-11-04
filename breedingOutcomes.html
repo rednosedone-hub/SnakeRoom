@@ -34,6 +34,61 @@
 
         <main class="snake-form-page">
             <section class="form-section">
+                <h3>Record a Past Clutch</h3>
+
+                <p class="gene-help">
+                    For a clutch that hatched before you logged it. The parents and the hatch
+                    date are enough; the laid date and egg count can stay blank. Hatchlings
+                    already in your collection whose ID carries this clutch's code
+                    (SS-C25-1-01 and so on) are linked to it automatically, so lineage and
+                    Season Review see the family. Purchased animals keep their own SS-###
+                    codes and are never renumbered.
+                </p>
+
+                <div class="form-grid">
+                    <label class="form-field">
+                        <span>Female</span>
+                        <select id="pastClutchFemaleSelect"></select>
+                    </label>
+
+                    <label class="form-field">
+                        <span>Male</span>
+                        <select id="pastClutchMaleSelect"></select>
+                    </label>
+
+                    <label class="form-field">
+                        <span>Hatch Date</span>
+                        <input type="date" id="pastClutchHatchDate">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Eggs Laid (optional)</span>
+                        <input type="date" id="pastClutchLaidDate">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Egg Count (optional)</span>
+                        <input type="number" id="pastClutchEggCount" min="0" placeholder="Number of eggs">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Hatchling ID Prefix</span>
+                        <input type="text" id="hatchlingIdPrefixInput" maxlength="8"
+                            placeholder="SS" onchange="setHatchlingIdPrefix(this.value)">
+                        <small class="empty-message">SS for Soulless Serpents.</small>
+                    </label>
+                </div>
+
+                <div class="form-page-actions">
+                    <button type="button" class="main-button" onclick="createPastClutch()">
+                        Save Past Clutch
+                    </button>
+                </div>
+
+                <p id="pastClutchStatus" class="outcomes-status"></p>
+            </section>
+
+            <section class="form-section">
                 <h3>Clutches To Hatch</h3>
 
                 <p class="gene-help">
@@ -69,15 +124,17 @@
 
     <script src="data-helpers.js"></script>
     <script src="backup-helpers.js?v=1"></script>
-    <script src="cloud-sync.js?v=18"></script>
-    <script src="auto-sync.js?v=8"></script>
+    <script src="cloud-sync.js?v=20"></script>
+    <script src="auto-sync.js?v=9"></script>
     <script src="account-gate.js?v=1"></script>
-    <script src="geneCatalog.js?v=3"></script>
-    <script src="genes.js?v=8"></script>
+    <script src="geneCatalog.js?v=4"></script>
+    <script src="genes.js?v=11"></script>
     <script src="morphCalculator.js?v=8"></script>
     <script src="morph-gallery.js?v=7"></script>
     <script src="incubation-helpers.js?v=2"></script>
-    <script src="breedingOutcomes.js?v=6"></script>
+    <script src="defect-helpers.js?v=1"></script>
+    <script src="hatchling-id-helpers.js?v=1"></script>
+    <script src="breedingOutcomes.js?v=9"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

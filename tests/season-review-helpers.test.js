@@ -119,6 +119,23 @@ test("hatchlings are grouped into kept, for sale, growing, sold and lost", () =>
     assert.equal(result.kept[0].morph, "Pastel");
 });
 
+test("a hatchling's clutch code is not shown as its morph", () => {
+    const data = dataset();
+
+    data.snakes.push(hatchling({
+        id: "h7",
+        name: "Hatchling 01",
+        ID: "2026-01",
+        morph: "2026-01",
+        status: "Holdback"
+    }));
+
+    const result = season.review({ ...data, year: 2026 });
+    const summarized = result.kept.find(hatchlingEntry => hatchlingEntry.name === "Hatchling 01");
+
+    assert.equal(summarized.morph, "");
+});
+
 test("a price on an Available animal is not counted as a sale", () => {
     const result = season.review({ ...dataset(), year: 2026 });
 

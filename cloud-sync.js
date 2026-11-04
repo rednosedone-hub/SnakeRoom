@@ -12,9 +12,10 @@
 //
 // Storage keys that make up a snapshot:
 //   snakes, breedingPairs, clutches, breedingGoals, customGeneCatalog,
-//   financeSettings, financeExpenses, financeExpos, feederSettings,
-//   feederInventory, buyers
-// (Gene catalog is starter + custom; only custom genes need backup.)
+//   customGeneAliases, financeSettings, financeExpenses, financeExpos,
+//   feederSettings, feederInventory, buyers
+// (Gene catalog is starter + custom; only custom genes need backup. Shortcuts
+// are the keeper's own, so they travel with the collection too.)
 
 (function () {
     const SNAPSHOT_KEYS = [
@@ -23,6 +24,7 @@
         "clutches",
         "breedingGoals",
         "customGeneCatalog",
+        "customGeneAliases",
         "financeSettings",
         "financeExpenses",
         "financeExpos",
@@ -398,6 +400,12 @@
 
         if (collection === "customGeneCatalog" && record && record.name) {
             return `name:${String(record.name).trim().toLowerCase()}`;
+        }
+
+        // One row per shortcut, so editing its meaning on one device merges
+        // with (rather than duplicates) the same shortcut from another.
+        if (collection === "customGeneAliases" && record && record.alias) {
+            return `alias:${String(record.alias).trim().toLowerCase()}`;
         }
 
         if (record && record.name && (record.ID || record.morph)) {

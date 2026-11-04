@@ -13,6 +13,341 @@ let breedingPairs = window.SnakeData.readStorageArray("breedingPairs", []);
 const OUTCOMES_DEFAULT_STATUS = "Hatchling";
 const hatchlingPreparation = {};
 
+// New hatchlings get one ID per animal, built from the keeper's prefix and the
+// clutch: SS-C26-1-01 for the first hatchling of clutch 2026-01. The prefix is
+// remembered on this device; the clutch part is what groups them in ID sort.
+// The format itself lives in hatchling-id-helpers.js so it can be tested.
+const HATCHLING_ID_PREFIX_KEY = "hatchlingIdPrefix";
+const DEFAULT_HATCHLING_ID_PREFIX = "SS";
+
+function hatchlingIds() {
+    if (!window.HatchlingIds) {
+        throw new Error("hatchling-id-helpers.js is not loaded.");
+    }
+
+    return window.HatchlingIds;
+}
+
+function getHatchlingIdPrefix() {
+    return hatchlingIds().normalizePrefix(localStorage.getItem(HATCHLING_ID_PREFIX_KEY));
+}
+
+function setHatchlingIdPrefix(value) {
+    const prefix = hatchlingIds().normalizePrefix(value);
+    const typed = readPastClutchForm();
+
+    localStorage.setItem(HATCHLING_ID_PREFIX_KEY, prefix);
+
+    const input = document.getElementById("hatchlingIdPrefixInput");
+
+    if (input) {
+        input.value = prefix;
+    }
+
+    // The next-ID hints on the clutch cards follow the prefix, so re-render
+    // them; the past clutch form keeps whatever was already typed.
+    renderBreedingOutcomes();
+    populatePastClutchSelects(typed);
+}
+
+// 2026-01 -> SS-C26-1. A clutch with an imported custom id keeps it readable
+// instead of inventing a number.
+function getHatchlingIdBase(clutch) {
+    return hatchlingIds().baseFor(clutch && clutch.id, getHatchlingIdPrefix());
+}
+
+// Continue after the highest suffix already linked to this clutch, so adding a
+// late hatchling never reuses SS-C26-1-03.
+function getNextHatchlingNumber(clutch) {
+    return hatchlingIds().nextNumber(clutch, getHatchlingIdPrefix(), snakes);
+}
+
+// ---- Recording a clutch that hatched before it was logged ---------------
+// A clutch from before the app, or one whose female has since passed, may only
+// be known by its parents and hatch date. That is enough: the laid date and egg
+// count are optional, and any hatchling already in the collection whose ID
+// carries this clutch's code (SS-C25-1-01 and so on) is linked to it, so lineage,
+// the scorecard and Season Review see the family.
+
+function getNextClutchIdForYear(yearText) {
+    const year = String(yearText || getTodayText()).slice(0, 4);
+    const usedIds = new Set([
+        ...clutches.map(clutch => String(clutch.id || "")),
+        ...breedingPairs.map(pair => String(pair.clutchId || ""))
+    ]);
+    let clutchNumber = 1;
+
+    while (usedIds.has(`${year}-${String(clutchNumber).padStart(2, "0")}`)) {
+        clutchNumber += 1;
+    }
+
+    return `${year}-${String(clutchNumber).padStart(2, "0")}`;
+}
+
+function readPastClutchForm() {
+    const read = id => {
+        const input = document.getElementById(id);
+
+        return input ? input.value : "";
+    };
+
+    return {
+        femaleSnakeId: read("pastClutchFemaleSelect"),
+        maleSnakeId: read("pastClutchMaleSelect"),
+        hatchedDate: read("pastClutchHatchDate"),
+        laidDate: read("pastClutchLaidDate"),
+        eggCount: read("pastClutchEggCount")
+    };
+}
+
+function populatePastClutchSelects(prefill = {}) {
+    const fields = [
+        ["pastClutchFemaleSelect", "Female", prefill.femaleSnakeId],
+        ["pastClutchMaleSelect", "Male", prefill.maleSnakeId]
+    ];
+
+    fields.forEach(([selectId, label, selected]) => {
+        const select = document.getElementById(selectId);
+
+        if (!select) {
+            return;
+        }
+
+        // Deceased and archived parents still belong on a past clutch, so this
+        // list is every animal on record rather than only the active ones. An
+        // animal with no sex recorded stays selectable for either side.
+        const options = [...snakes]
+            .filter(snake => !snake.sex || snake.sex === label || snake.sex === "Unknown")
+            .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
+            .map(snake => {
+                const status = window.SnakeData.isInactiveSnake(snake) && snake.status
+                    ? ` (${snake.status})`
+                    : "";
+
+                return `<option value="${escapeHtml(snake.id)}">${escapeHtml(`${getSnakeLabelByRef(snake.id)}${status}`)}</option>`;
+            })
+            .join("");
+
+        select.innerHTML = `<option value="">-- Select ${label} --</option>${options}`;
+
+        if (selected && select.querySelector(`option[value="${CSS.escape(selected)}"]`)) {
+            select.value = selected;
+        }
+    });
+
+    const hatchDate = document.getElementById("pastClutchHatchDate");
+    const laidDate = document.getElementById("pastClutchLaidDate");
+    const eggCount = document.getElementById("pastClutchEggCount");
+    const prefixInput = document.getElementById("hatchlingIdPrefixInput");
+
+    if (hatchDate && prefill.hatchedDate) {
+        hatchDate.value = prefill.hatchedDate;
+    }
+
+    if (laidDate && prefill.laidDate) {
+        laidDate.value = prefill.laidDate;
+    }
+
+    if (eggCount && prefill.eggCount) {
+        eggCount.value = prefill.eggCount;
+    }
+
+    if (prefixInput) {
+        prefixInput.value = getHatchlingIdPrefix();
+    }
+}
+
+function setPastClutchStatus(message) {
+    const status = document.getElementById("pastClutchStatus");
+
+    if (status) {
+        status.textContent = message;
+    }
+}
+
+function getLinkableHatchlings(clutch) {
+    return hatchlingIds().unlinkedCandidates(
+        clutch.id,
+        getHatchlingIdPrefix(),
+        snakes,
+        clutches.map(item => item.id)
+    );
+}
+
+// Sets the clutch link on every ungrouped animal carrying the clutch code and
+// fills in the details it can know from the clutch. Returns the names linked.
+function linkHatchlingsToClutch(clutchId) {
+    const clutch = clutches.find(item => item.id === clutchId);
+
+    if (!clutch) {
+        return [];
+    }
+
+    const candidates = getLinkableHatchlings(clutch);
+
+    candidates.forEach(snake => {
+        snake.clutchId = clutch.id;
+        snake.clutchToken = clutch.clutchToken;
+        snake.hatchlingToken = snake.hatchlingToken
+            || `th-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+        // Old records sometimes kept the code only in morph; the collection
+        // sorts on ID, so put it there too.
+        if (!String(snake.ID || "").trim()) {
+            snake.ID = String(snake.morph || "").trim();
+        }
+
+        if (!snake.hatchedDate && clutch.hatchedDate) {
+            snake.hatchedDate = clutch.hatchedDate;
+        }
+
+        if (!snake.laidDate && clutch.laidDate) {
+            snake.laidDate = clutch.laidDate;
+        }
+
+        if (!snake.dam) {
+            snake.dam = getSnakeLabelByRef(clutch.femaleSnakeId);
+        }
+
+        if (!snake.sire) {
+            snake.sire = getSnakeLabelByRef(clutch.maleSnakeId);
+        }
+    });
+
+    if (candidates.length > 0) {
+        clutch.hatchlingCount = Math.max(
+            Number(clutch.hatchlingCount) || 0,
+            snakes.filter(snake => snake.clutchId === clutch.id).length
+        );
+        saveSnakes();
+        saveClutches();
+    }
+
+    return candidates.map(snake => snake.name || `Unnamed ${snake.ID || ""}`.trim());
+}
+
+function linkHatchlingsFromCard(token) {
+    const clutch = clutches.find(item => item.clutchToken === token);
+
+    if (!clutch) {
+        return;
+    }
+
+    const candidates = getLinkableHatchlings(clutch);
+
+    if (candidates.length === 0) {
+        alert(`No ungrouped animals carry the ${getHatchlingIdBase(clutch)} code.`);
+        return;
+    }
+
+    const ok = confirm(
+        `Link ${candidates.length} animal${candidates.length === 1 ? "" : "s"} to clutch ${clutch.id}?\n\n` +
+        candidates.map(snake => `- ${getSnakeLabelByRef(snake.id)}`).join("\n")
+    );
+
+    if (!ok) {
+        return;
+    }
+
+    const names = linkHatchlingsToClutch(clutch.id);
+
+    renderBreedingOutcomes();
+    alert(`Linked ${names.length}: ${names.join(", ")}.`);
+}
+
+function createPastClutch() {
+    const form = readPastClutchForm();
+
+    if (!form.femaleSnakeId || !form.maleSnakeId) {
+        alert("Choose both parents for the clutch.");
+        return;
+    }
+
+    if (form.femaleSnakeId === form.maleSnakeId) {
+        alert("A clutch needs two different parents.");
+        return;
+    }
+
+    if (!form.hatchedDate) {
+        alert("Enter the date the eggs hatched.");
+        return;
+    }
+
+    if (form.laidDate && form.laidDate > form.hatchedDate) {
+        alert("The hatch date cannot be before the eggs were laid.");
+        return;
+    }
+
+    const year = (form.laidDate || form.hatchedDate).slice(0, 4);
+    const clutchId = getNextClutchIdForYear(year);
+    const clutch = {
+        id: clutchId,
+        clutchToken: `tc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+        year,
+        femaleSnakeId: form.femaleSnakeId,
+        maleSnakeId: form.maleSnakeId,
+        pairingDate: "",
+        pairings: [],
+        ovulationObserved: false,
+        ovulationDate: "",
+        preLayShedDate: "",
+        laidDate: form.laidDate,
+        eggCount: Number(form.eggCount) || 0,
+        hatchedDate: form.hatchedDate,
+        hatchlingCount: 0,
+        convertedToSnakes: true,
+        historical: true
+    };
+
+    clutches.push(clutch);
+
+    // Reuse the pair for this couple so the clutch shows up in pair history
+    // instead of creating a second record for the same two animals.
+    const existingPair = breedingPairs.find(pair =>
+        String(pair.femaleSnakeId || "") === form.femaleSnakeId &&
+        String(pair.maleSnakeId || "") === form.maleSnakeId &&
+        !pair.clutchId
+    );
+
+    if (existingPair) {
+        existingPair.clutchId = clutchId;
+        window.SnakeData.saveStorageArray("breedingPairs", breedingPairs);
+    }
+
+    saveClutches();
+
+    const linked = linkHatchlingsToClutch(clutchId);
+    const hatched = document.getElementById("pastClutchHatchDate");
+    const laid = document.getElementById("pastClutchLaidDate");
+    const eggs = document.getElementById("pastClutchEggCount");
+
+    ["pastClutchFemaleSelect", "pastClutchMaleSelect"].forEach(id => {
+        const select = document.getElementById(id);
+
+        if (select) {
+            select.value = "";
+        }
+    });
+
+    if (hatched) {
+        hatched.value = "";
+    }
+
+    if (laid) {
+        laid.value = "";
+    }
+
+    if (eggs) {
+        eggs.value = "";
+    }
+
+    renderBreedingOutcomes();
+
+    setPastClutchStatus(linked.length > 0
+        ? `Saved clutch ${clutchId}. Linked ${linked.length} hatchling${linked.length === 1 ? "" : "s"}: ${linked.join(", ")}.`
+        : `Saved clutch ${clutchId}. No ungrouped animals carry the ${getHatchlingIdBase(clutch)} code yet; use Link Hatchlings on the clutch if you add them later.`);
+}
+
 function saveSnakes() {
     window.SnakeData.saveStorageArray("snakes", snakes);
 }
@@ -423,12 +758,20 @@ function migrateClutchTokens() {
     }
 }
 
+function defaultHatchlingName(index) {
+    return `Hatchling ${String(index).padStart(2, "0")}`;
+}
+
+// The clutch id is carried by the snake's identity fields, not its name. Names
+// stay friendly placeholders the keeper can replace; every hatchling from one
+// clutch sorts together because its ID is that clutch.
 function buildHatchlingDefaults(clutch, index) {
     return {
-        name: `${clutch.id}-${String(index).padStart(2, "0")}`,
+        name: defaultHatchlingName(index),
         binNumber: "",
         sex: "Unknown",
-        status: OUTCOMES_DEFAULT_STATUS
+        status: OUTCOMES_DEFAULT_STATUS,
+        defects: []
     };
 }
 
@@ -463,6 +806,22 @@ function getSnakeByName(name) {
     const searchName = name.toLowerCase();
 
     return snakes.find(snake => String(snake.name || "").trim().toLowerCase() === searchName);
+}
+
+// Default names repeat across clutches (every clutch has a "Hatchling 01"), so
+// a taken name gets a numbered suffix instead of the hatchling being dropped.
+function getAvailableSnakeName(desiredName) {
+    if (!getSnakeByName(desiredName)) {
+        return desiredName;
+    }
+
+    let attempt = 2;
+
+    while (getSnakeByName(`${desiredName} (${attempt})`)) {
+        attempt += 1;
+    }
+
+    return `${desiredName} (${attempt})`;
 }
 
 // The pairing's possible outcomes, so a hatchling can be labelled with the one
@@ -539,6 +898,11 @@ function rememberHatchlingEdits() {
             const binInput = document.getElementById(`hatchBin-${suffix}`);
             const sexSelect = document.getElementById(`hatchSex-${suffix}`);
             const statusSelect = document.getElementById(`hatchStatus-${suffix}`);
+            const defects = readHatchlingDefects(token, row.index);
+
+            if (defects) {
+                row.defects = defects;
+            }
 
             if (morphSelect) {
                 applyMorphChoice(token, row, morphSelect.value);
@@ -612,12 +976,16 @@ function readHatchlingRow(clutch, row) {
     const outcome = morphSelect ? applyMorphChoice(clutch.clutchToken, row, morphSelect.value) : null;
 
     return {
-        name: String(document.getElementById(`hatchName-${token}`).value || "").trim(),
+        index: row.index,
+        name: String(document.getElementById(`hatchName-${token}`).value || "").trim()
+            || defaultHatchlingName(row.index),
         binNumber: String(document.getElementById(`hatchBin-${token}`).value || "").trim(),
         sex: document.getElementById(`hatchSex-${token}`).value || "Unknown",
         status: document.getElementById(`hatchStatus-${token}`).value || OUTCOMES_DEFAULT_STATUS,
         genes: Array.isArray(row.genes) ? row.genes : [],
-        morphName: outcome ? outcome.morphName : ""
+        morphName: outcome ? outcome.morphName : "",
+        defects: readHatchlingDefects(clutch.clutchToken, row.index)
+            || (Array.isArray(row.defects) ? row.defects : [])
     };
 }
 
@@ -625,14 +993,16 @@ function createHatchlingRecord(clutch, row, hatchDate) {
     const stamp = Date.now().toString(36);
     const random = Math.random().toString(36).slice(2, 8);
     const hatchlingId = `snake-hatch-${stamp}-${random}`;
+    const animalId = String(row.hatchlingId || clutch.id || "").trim();
 
     return {
         id: hatchlingId,
         name: row.name,
-        // The owner-assigned ID stays the hatchling's name; the morph field only
-        // takes over once the predicted morph was picked for this animal.
-        ID: row.name,
-        morph: row.morphName || row.name,
+        // The form stores the ID in both fields. A new hatchling gets its own
+        // SS-C26-1-01 code, whose clutch part sorts the siblings together; the
+        // actual morph lives in genes.
+        ID: animalId,
+        morph: animalId,
         sex: row.sex,
         weight: "",
         binNumber: row.binNumber,
@@ -643,6 +1013,8 @@ function createHatchlingRecord(clutch, row, hatchDate) {
         feederSize: "",
         status: row.status,
         genes: Array.isArray(row.genes) ? row.genes : [],
+        defects: Array.isArray(row.defects) ? [...row.defects] : [],
+        defectNote: "",
         feedingHistory: [],
         weightHistory: [],
         shedHistory: [],
@@ -673,7 +1045,12 @@ function saveHatchlings(token) {
     }
 
     const hatchDateInput = document.getElementById(`hatchDate-${token}`);
-    const hatchDate = hatchDateInput ? hatchDateInput.value : getTodayText();
+    // A card with no date field (a past clutch, or a clutch already hatched)
+    // keeps the clutch's own hatch date instead of stamping today on a late
+    // hatchling.
+    const hatchDate = (hatchDateInput && hatchDateInput.value)
+        || clutch.hatchedDate
+        || getTodayText();
     const rows = (hatchlingPreparation[token] || []).map(row => readHatchlingRow(clutch, row));
 
     if (rows.length === 0) {
@@ -701,32 +1078,43 @@ function saveHatchlings(token) {
         }
     }
 
-    let addMiddleSafeguard = false;
-    const names = rows.map(row => row.name);
     if (rows.length > 1) {
         // Allow middle inserts, but tell the user when they are using defaults.
-        addMiddleSafeguard = rows.some(row => row.name === `${clutch.id}-${String(row.index).padStart(2, "0")}`);
-        if (addMiddleSafeguard) {
+        const usesDefaultNames = rows.some(row => row.name === defaultHatchlingName(row.index));
+
+        if (usesDefaultNames) {
             const ok = confirm("Some hatchlings still use default names. Add them anyway?");
+
             if (!ok) {
                 return;
             }
         }
     }
 
-    const midNames = [];
-    for (let index = 0; index < rows.length; index += 1) {
-        let nextName = rows[index].name;
+    const idBase = getHatchlingIdBase(clutch);
+    let nextAnimalNumber = getNextHatchlingNumber(clutch);
+    const renamed = [];
 
-        if (getSnakeByName(nextName)) {
-            if (!addMiddleSafeguard) {
-                continue;
-            }
-            nextName = `${nextName}-mid-${index + 1}`;
-            midNames.push(nextName);
+    for (let index = 0; index < rows.length; index += 1) {
+        const row = rows[index];
+        // An untouched default follows the animal's ID number, so adding a late
+        // hatchling to a clutch gives it Hatchling 04 and SS-C26-1-04 together.
+        const desiredName = row.name === defaultHatchlingName(row.index)
+            ? defaultHatchlingName(nextAnimalNumber)
+            : row.name;
+        const nextName = getAvailableSnakeName(desiredName);
+        const animalId = `${idBase}-${String(nextAnimalNumber).padStart(2, "0")}`;
+
+        if (nextName !== desiredName) {
+            renamed.push(`${desiredName} \u2192 ${nextName}`);
         }
 
-        snakes.push(createHatchlingRecord(clutch, { ...rows[index], name: nextName }, hatchDate));
+        nextAnimalNumber += 1;
+        snakes.push(createHatchlingRecord(
+            clutch,
+            { ...row, name: nextName, hatchlingId: animalId },
+            hatchDate
+        ));
     }
 
     clutch.hatchedDate = clutch.hatchedDate || hatchDate || getTodayText();
@@ -738,8 +1126,8 @@ function saveHatchlings(token) {
     saveSnakes();
     saveClutches();
 
-    if (midNames.length > 0) {
-        alert(`Some names were already taken, so they were saved as: ${midNames.join(", ")}.`);
+    if (renamed.length > 0) {
+        alert(`Some names were already taken, so they were saved as: ${renamed.join(", ")}.`);
         return;
     }
 
@@ -944,11 +1332,13 @@ function renderOutcomeCard(clutch) {
         ? incubation.expectedHatchlingCount(clutch)
         : Number(clutch.eggCount) || 0;
     const maxHatchlings = incubation ? incubation.MAX_HATCHLINGS : 60;
+    const nextId = `${getHatchlingIdBase(clutch)}-${String(getNextHatchlingNumber(clutch)).padStart(2, "0")}`;
 
     return `
         <div class="breeding-card outcome-card" id="outcomeCard-${token}">
             <div>
                 <h4>Clutch ${escapeHtml(clutch.id)}</h4>
+                <p class="empty-message">Next hatchling ID: ${escapeHtml(nextId)}</p>
                 <p>${escapeHtml(getSnakeLabelByRef(clutch.femaleSnakeId))} x ${escapeHtml(getSnakeLabelByRef(clutch.maleSnakeId))}</p>
                 <p>Laid: ${escapeHtml(clutch.laidDate || "Not recorded")} / ${escapeHtml(formatCount(clutch))}</p>
             </div>
@@ -990,10 +1380,50 @@ function renderOutcomeCard(clutch) {
     `;
 }
 
+// A deformity is visible on the day the egg pips, which is the only moment a
+// keeper fills this row in, so the defects sit right on it. They ride along to
+// the snake record and the scorecard counts the hatchling as healthy or not.
+function hatchlingDefectBoxes(token, index) {
+    return [...document.querySelectorAll(`[id^="hatchDefect-${token}-${index}-"]`)];
+}
+
+// Returns null when this row has no defect inputs at all, so a re-render that
+// happened before the row was painted cannot wipe a recorded defect.
+function readHatchlingDefects(token, index) {
+    const boxes = hatchlingDefectBoxes(token, index);
+
+    return boxes.length > 0
+        ? boxes.filter(box => box.checked).map(box => box.value)
+        : null;
+}
+
+function renderHatchlingDefects(token, row) {
+    if (!window.SnakeDefects) {
+        return "";
+    }
+
+    const selected = window.SnakeDefects.keys(row);
+
+    return `
+        <div class="hatchling-defects">
+            <span class="hatchling-defects-label">Defects</span>
+            <div class="hatchling-defect-options">
+                ${window.SnakeDefects.DEFECTS.map(defect => `
+                    <label class="hatchling-defect-chip" title="${escapeHtml(defect.note)}">
+                        <input type="checkbox" id="hatchDefect-${token}-${row.index}-${defect.key}"
+                            value="${defect.key}" ${selected.includes(defect.key) ? "checked" : ""}>
+                        <span>${escapeHtml(defect.label)}</span>
+                    </label>
+                `).join("")}
+            </div>
+            <small class="empty-message">Leave every box clear if the hatchling is clean.</small>
+        </div>
+    `;
+}
+
 function renderHatchlingEditorRow(clutch, row) {
     const token = `${clutch.clutchToken}-${row.index}`;
     const outcomes = getClutchOutcomes(clutch);
-
     return `
         <div class="hatchling-editor-row">
             <div class="hatchling-editor-heading">
@@ -1008,7 +1438,7 @@ function renderHatchlingEditorRow(clutch, row) {
             <label class="form-field">
                 <span>Name</span>
                 <input type="text" id="hatchName-${token}"
-                    placeholder="Leave blank to use ${escapeHtml(clutch.id)}-${String(row.index).padStart(2, "0")}"
+                    placeholder="Leave blank to use ${escapeHtml(defaultHatchlingName(row.index))}"
                     value="${escapeHtml(row.name)}">
             </label>
 
@@ -1054,6 +1484,8 @@ function renderHatchlingEditorRow(clutch, row) {
                     ? `<small class="empty-message">Add genes to both parents to list this clutch's morphs.</small>`
                     : ""}
             </label>
+
+            ${renderHatchlingDefects(token, row)}
         </div>
     `;
 }
@@ -1088,6 +1520,12 @@ function renderHatchedIncubationLine(clutch) {
 function renderHatchedCard(clutch) {
     const relatedCount = snakes.filter(snake => snake.clutchId === clutch.id).length;
     const rows = hatchlingPreparation[clutch.clutchToken];
+    const linkableCount = getLinkableHatchlings(clutch).length;
+    const linkButton = linkableCount > 0
+        ? `<button type="button" class="gene-action-button" onclick="linkHatchlingsFromCard('${clutch.clutchToken}')">
+                Link ${linkableCount} Hatchling${linkableCount === 1 ? "" : "s"}
+            </button>`
+        : "";
 
     return `
         <div class="breeding-card outcome-card hatched-card" id="hatchedCard-${clutch.clutchToken}">
@@ -1121,6 +1559,8 @@ function renderHatchedCard(clutch) {
                         Add Hatchling
                     </button>
 
+                    ${linkButton}
+
                     <button type="button" class="archive-button" onclick="deleteClutch('${clutch.clutchToken}')">
                         Delete Clutch
                     </button>
@@ -1130,6 +1570,8 @@ function renderHatchedCard(clutch) {
                     <button type="button" class="gene-action-button" onclick="addHatchling('${clutch.id}')">
                         Add Hatchling
                     </button>
+
+                    ${linkButton}
 
                     <button type="button" class="archive-button" onclick="deleteClutch('${clutch.clutchToken}')">
                         Delete Clutch
@@ -1171,12 +1613,16 @@ window.removePreparedHatchling = removePreparedHatchling;
 window.setExpectedHatchlings = setExpectedHatchlings;
 window.setHatchlingCount = setHatchlingCount;
 window.deleteClutch = deleteClutch;
+window.createPastClutch = createPastClutch;
+window.linkHatchlingsFromCard = linkHatchlingsFromCard;
+window.setHatchlingIdPrefix = setHatchlingIdPrefix;
 window.previewHatchlingMorph = previewHatchlingMorph;
 window.updateClutchField = updateClutchField;
 window.addCandling = addCandling;
 window.removeCandling = removeCandling;
 
 migrateClutchTokens();
+populatePastClutchSelects();
 renderBreedingOutcomes();
 
 if (hashClutchId) {

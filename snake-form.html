@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Snake Record</title>
-    <link rel="stylesheet" href="style.css?v=72">
+    <link rel="stylesheet" href="style.css?v=74">
 </head>
 
 <body>
@@ -139,6 +139,23 @@
                     history, but remove the snake from active cards, feeding lists and new
                     breeding pairings.
                 </p>
+
+                <div class="defect-block">
+                    <h4>Physical defects</h4>
+                    <p class="empty-message">
+                        Tick what you can see. A defect stays on the record, is printed on the
+                        animal's card, and makes the scorecard count this animal as a healthy
+                        hatchling or not.
+                    </p>
+
+                    <div class="defect-options" id="defectOptions"></div>
+
+                    <label class="form-field">
+                        <span>Defect note</span>
+                        <input type="text" id="defectNoteInput"
+                            placeholder="e.g. kink two-thirds down the spine">
+                    </label>
+                </div>
 
                 <div class="retirement-block" id="retirementFields" hidden>
                     <h4>Retirement details</h4>
@@ -695,14 +712,14 @@
                     <input
                         type="text"
                         id="geneInput"
-                        placeholder="Type gene name"
+                        placeholder="Gene name or shortcut (YB, OD, SN)"
                         list="geneOptions"
                         oninput="updateGeneButtons()">
 
                     <datalist id="geneOptions"></datalist>
 
                     <p class="gene-help" id="geneHelp">
-                        Type a gene name to add calculator-ready genetics.
+                        Type a gene name or a shortcut (YB, OD, SN). Add several at once: YB OD SN.
                     </p>
 
                     <div class="custom-gene-panel" id="customGenePanel">
@@ -725,6 +742,52 @@
 
                     <div class="gene-button-row" id="geneButtonRow"></div>
                     <div class="gene-list" id="geneList"></div>
+
+                    <details class="gene-shortcuts" id="geneShortcutsPanel">
+                        <summary>Your gene shortcuts</summary>
+
+                        <p class="gene-help">
+                            Add the abbreviations you write, and every gene input will understand
+                            them: this form, the Morph Calculator and the Goal Planner. Built-in
+                            shortcuts such as YB, OD and SN stay available.
+                        </p>
+
+                        <div class="gene-shortcut-form">
+                            <input
+                                type="text"
+                                id="geneShortcutInput"
+                                placeholder="Shortcut (e.g. YB)"
+                                autocomplete="off">
+
+                            <input
+                                type="text"
+                                id="geneShortcutGeneInput"
+                                list="geneOptions"
+                                placeholder="Full gene name"
+                                autocomplete="off">
+
+                            <button
+                                type="button"
+                                class="gene-action-button"
+                                id="geneShortcutSaveButton"
+                                onclick="saveGeneShortcut()">
+                                Add Shortcut
+                            </button>
+
+                            <button
+                                type="button"
+                                class="gene-action-button"
+                                id="geneShortcutCancelButton"
+                                style="display:none"
+                                onclick="cancelGeneShortcutEdit()">
+                                Cancel
+                            </button>
+                        </div>
+
+                        <p class="gene-help" id="geneShortcutStatus" role="status"></p>
+
+                        <div class="gene-shortcut-list" id="geneShortcutList"></div>
+                    </details>
                 </div>
             </section>
 
@@ -749,11 +812,11 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="data-helpers.js"></script>
     <script src="backup-helpers.js?v=1"></script>
-    <script src="cloud-sync.js?v=18"></script>
-    <script src="auto-sync.js?v=8"></script>
+    <script src="cloud-sync.js?v=20"></script>
+    <script src="auto-sync.js?v=9"></script>
     <script src="account-gate.js?v=1"></script>
-    <script src="geneCatalog.js?v=3"></script>
-    <script src="genes.js?v=8"></script>
+    <script src="geneCatalog.js?v=4"></script>
+    <script src="genes.js?v=11"></script>
     <script src="feed-helpers.js?v=4"></script>
     <script src="finance-helpers.js?v=6"></script>
     <script src="sales-helpers.js?v=5"></script>
@@ -764,7 +827,8 @@
     <script src="morphCalculator.js?v=8"></script>
     <script src="morph-gallery.js?v=7"></script>
     <script src="weight-chart.js?v=3"></script>
-    <script src="snake-form.js?v=34"></script>
+    <script src="defect-helpers.js?v=1"></script>
+    <script src="snake-form.js?v=37"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

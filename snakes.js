@@ -213,6 +213,21 @@ function escapeHealthText(value) {
         .replace(/'/g, "&#39;");
 }
 
+// A recorded defect stays on the collection card so an animal is never sold,
+// traded or paired without the keeper seeing it. The scorecard reads the same
+// field and counts the animal as an unhealthy hatchling.
+function getDefectBadgeHtml(snake) {
+    const labels = window.SnakeDefects ? window.SnakeDefects.labels(snake) : [];
+
+    if (labels.length === 0) {
+        return "";
+    }
+
+    const text = labels.join(", ");
+
+    return `<span class="defect-badge" title="Recorded defect: ${escapeHealthText(text)}">${escapeHealthText(text)}</span>`;
+}
+
 function getGeneDescription(geneRecord) {
     if (window.GeneTools) {
         return window.GeneTools.describeGene(geneRecord);
@@ -602,6 +617,7 @@ function renderSnakes() {
                     <span>${feederText}</span>
                     <span>${snake.status || "No status"}${getSaleBadgeHtml(snake)}</span>
                     ${getReadinessBadgeHtml(snake)}
+                    ${getDefectBadgeHtml(snake)}
                     ${healthBadge ? `<span class="health-badge ${healthBadge.className}" title="${escapeHealthText(healthBadge.title)}">${escapeHealthText(healthBadge.label)}</span>` : ""}
                     ${retirementDetail ? `<span>${retirementDetail}</span>` : ""}
                 </div>
@@ -685,7 +701,7 @@ function renderSnakeTable(snakeList) {
                 <td>${snake.lastFed || ""}</td>
                 <td>${feedingInterval}</td>
                 <td>${snake.feederSize || ""}</td>
-                <td>${snake.status || ""}${getSaleBadgeHtml(snake)}${healthBadgeHtml}</td>
+                <td>${snake.status || ""}${getSaleBadgeHtml(snake)}${getDefectBadgeHtml(snake)}${healthBadgeHtml}</td>
                 <td>${getReadinessBadgeHtml(snake, true)}</td>
                 <td>
                     <a href="${window.SnakeData.getSnakeQrImageUrl(snake, 220)}" target="_blank" rel="noopener">

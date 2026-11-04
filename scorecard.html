@@ -39,10 +39,13 @@
                         <h3>Pair &amp; Clutch Scorecard</h3>
                         <p class="empty-message fin-panel-lead">
                             Every pairing graded on what it has actually produced: eggs laid, eggs that
-                            hatched, hatchlings worth keeping and sales. The grade is the pooled hatch
-                            rate                            across all of that pairing's hatched clutches &mdash; eggs in, hatchlings
-                            out, nothing weighted behind the scenes. A pairing with a single clutch is
-                            marked as a first result, not a settled reputation.
+                            hatched, hatchlings worth keeping and sales. The grade is the pooled
+                            <strong>healthy</strong> hatch rate across all of that pairing's hatched
+                            clutches &mdash; eggs in, clean hatchlings out, nothing weighted behind the
+                            scenes. A hatchling with a recorded defect (shark mouth, no eyes, kink, bug
+                            eyes, small eyes) still counts as hatched, but it does not count toward the
+                            grade. A pairing with a single clutch is marked as a first result, not a
+                            settled reputation.
                         </p>
                         <p class="empty-message fin-panel-lead">
                             Sales per clutch is the money side: realised sales divided by hatched
@@ -114,7 +117,8 @@
                                 <th>Hatched</th>
                                 <th class="fin-amount-cell">Eggs</th>
                                 <th class="fin-amount-cell">Hatchlings</th>
-                                <th class="fin-amount-cell">Rate</th>
+                                <th class="fin-amount-cell">Defects</th>
+                                <th class="fin-amount-cell">Healthy</th>
                                 <th class="fin-amount-cell">Grade</th>
                                 <th class="fin-amount-cell">Sales</th>
                             </tr>
@@ -139,13 +143,14 @@
 
     <script src="data-helpers.js"></script>
     <script src="backup-helpers.js?v=1"></script>
-    <script src="cloud-sync.js?v=18"></script>
-    <script src="auto-sync.js?v=8"></script>
+    <script src="cloud-sync.js?v=20"></script>
+    <script src="auto-sync.js?v=9"></script>
     <script src="account-gate.js?v=1"></script>
     <script src="finance-helpers.js?v=6"></script>
-    <script src="season-review-helpers.js?v=4"></script>
-    <script src="pair-scorecard-helpers.js?v=1"></script>
-    <script src="pair-scorecard.js?v=1"></script>
+    <script src="defect-helpers.js?v=1"></script>
+    <script src="season-review-helpers.js?v=5"></script>
+    <script src="pair-scorecard-helpers.js?v=2"></script>
+    <script src="pair-scorecard.js?v=2"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

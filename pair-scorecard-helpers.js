@@ -7,17 +7,19 @@
 // on two pages. It is all-time by design: a pairing earns its grade from every
 // clutch on record, not just the current season.
 //
-// A grade is only ever the hatch rate. Nothing here invents a score from
-// weights: eggs in, hatchlings out, and both numbers stay on the card so the
-// keeper can see what the grade is built on. A pairing with one clutch says so,
-// because one clutch is a hint, not proof.
+// A grade is only ever the healthy hatch rate: eggs in, healthy hatchlings out.
+// Nothing here invents a score from weights, and both the raw hatch count and
+// the defect count stay on the card so the keeper can see what the grade is
+// built on. A hatchling with a recorded defect (shark mouth, no eyes, kink, bug
+// eyes, small eyes) did hatch, but it is not an animal the pairing produced
+// cleanly, so it does not count toward the grade.
 
 (function () {
     const GRADES = [
-        { key: "a", label: "A", min: 85, note: "85% or more of the eggs hatched." },
-        { key: "b", label: "B", min: 70, note: "70% to 84% of the eggs hatched." },
-        { key: "c", label: "C", min: 50, note: "50% to 69% of the eggs hatched." },
-        { key: "d", label: "D", min: 0, note: "Fewer than half the eggs hatched." }
+        { key: "a", label: "A", min: 85, note: "85% or more of the eggs produced a healthy hatchling." },
+        { key: "b", label: "B", min: 70, note: "70% to 84% of the eggs produced a healthy hatchling." },
+        { key: "c", label: "C", min: 50, note: "50% to 69% of the eggs produced a healthy hatchling." },
+        { key: "d", label: "D", min: 0, note: "Fewer than half the eggs produced a healthy hatchling." }
     ];
     // The line between a pairing that is earning its food and one that needs a
     // decision. It is the same 70% that earns a B.
@@ -275,13 +277,67 @@
         return pairings || (parseDate(pair && pair.pairingDate) ? 1 : 0);
     }
 
+    // "Kinked x2, Shark mouth" for a card or note line. Counted from the
+    // hatchling summaries, so the same animal is never counted twice.
+    function defectBreakdown(rows) {
+        const counts = new Map();
+
+        rows.forEach(row => {
+            (row.hatchlings || []).forEach(hatchling => {
+                (hatchling.defects || []).forEach(label => {
+                    counts.set(label, (counts.get(label) || 0) + 1);
+                });
+            });
+        });
+
+        return [...counts.entries()]
+            .map(([label, count]) => ({ label, count }))
+            .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
+    }
+
+    function defectText(breakdown, separator = ", ") {
+        return (breakdown || [])
+            .map(item => (item.count > 1 ? `${item.label} x${item.count}` : item.label))
+            .join(separator);
+    }
+
+    function defectSentence(rows) {
+        const defective = rows.reduce((sum, row) => sum + (row.defective || 0), 0);
+
+        if (defective <= 0) {
+            return "";
+        }
+
+        const hatched = rows.reduce((sum, row) => sum + row.hatched, 0);
+        const names = defectText(defectBreakdown(rows));
+
+        return ` ${defective} of ${hatched} hatchling${hatched === 1 ? "" : "s"} had a recorded defect (${names}); the grade counts healthy hatchlings only.`;
+    }
+
     function clutchRow(clutch, snakes) {
         const R = window.SeasonReview;
         const row = R.summarizeClutch(clutch, snakes);
+        // cleanRate comes from the season review when it is there. The fallback
+        // keeps an older cached script scoring the same way rather than
+        // grading a clutch on hatchlings it now knows are defective.
+        const defective = row.defective === undefined
+            ? (row.hatchlings || []).filter(hatchling => hatchling.defective).length
+            : row.defective;
+        const healthy = Math.max(0, row.hatched - defective);
+        const cleanRate = row.cleanRate === undefined
+            ? (row.isHatched && row.eggs > 0 ? roundPercent((healthy / row.eggs) * 100) : null)
+            : row.cleanRate;
 
         return {
             ...row,
-            grade: gradeFor(row.hatchRate),
+            healthy,
+            defective,
+            cleanRate,
+            defectRate: row.defectRate === undefined
+                ? (row.hatched > 0 ? roundPercent((defective / row.hatched) * 100) : null)
+                : row.defectRate,
+            defectBreakdown: defectBreakdown([row]),
+            grade: gradeFor(cleanRate),
             unhatched: row.unhatched,
             valuePerHatchling: row.isHatched && row.hatched > 0 ? roundMoney(row.revenue / row.hatched) : null
         };
@@ -400,9 +456,13 @@
             };
         }
 
+        // Only healthy hatchlings count: a deformed animal still hatched, but
+        // the pairing did not produce a usable one.
+        const defective = completed.reduce((sum, row) => sum + (row.defective || 0), 0);
+        const healthy = Math.max(0, completed.reduce((sum, row) => sum + row.hatched, 0) - defective);
         const score = completed.length > 0 && completed.some(row => row.eggs > 0)
             ? roundPercent(
-                (completed.reduce((sum, row) => sum + row.hatched, 0)
+                (healthy
                     / completed.reduce((sum, row) => sum + row.eggs, 0)) * 100
             )
             : null;
@@ -418,20 +478,21 @@
         const sample = completed.length === 1
             ? " One clutch is a hint, not proof; the grade gets firmer with a second."
             : ` Across ${completed.length} hatched clutches.`;
+        const defects = defectSentence(completed);
 
         if (score >= 85) {
-            return { key: "working", label: "Working", note: `${GRADES[0].note}${sample} Repeat this pairing.` };
+            return { key: "working", label: "Working", note: `${GRADES[0].note}${defects}${sample} Repeat this pairing.` };
         }
 
         if (score >= WORKING_SCORE) {
-            return { key: "working", label: "Working", note: `${GRADES[1].note}${sample} Worth another season.` };
+            return { key: "working", label: "Working", note: `${GRADES[1].note}${defects}${sample} Worth another season.` };
         }
 
         if (score >= 50) {
-            return { key: "patchy", label: "Patchy", note: `${GRADES[2].note}${sample} Check incubation and pairing timing before repeating it.` };
+            return { key: "patchy", label: "Patchy", note: `${GRADES[2].note}${defects}${sample} Check incubation and pairing timing before repeating it.` };
         }
 
-        return { key: "weak", label: "Not working", note: `${GRADES[3].note}${sample} Look at the incubator, the parents and the pairing dates before trying again.` };
+        return { key: "weak", label: "Not working", note: `${GRADES[3].note}${defects}${sample} Look at the incubator, the parents and the pairing dates before trying again.` };
     }
 
     function pairRow(pair, rows, snakes) {
@@ -441,8 +502,12 @@
         const eggs = rows.reduce((sum, row) => sum + row.eggs, 0);
         const completedEggs = completed.reduce((sum, row) => sum + row.eggs, 0);
         const hatched = completed.reduce((sum, row) => sum + row.hatched, 0);
+        const defective = completed.reduce((sum, row) => sum + (row.defective || 0), 0);
+        const healthy = Math.max(0, hatched - defective);
         const revenue = roundMoney(completed.reduce((sum, row) => sum + row.revenue, 0));
-        const score = completedEggs > 0 ? roundPercent((hatched / completedEggs) * 100) : null;
+        const hatchScore = completedEggs > 0 ? roundPercent((hatched / completedEggs) * 100) : null;
+        const score = completedEggs > 0 ? roundPercent((healthy / completedEggs) * 100) : null;
+        const defectRate = hatched > 0 ? roundPercent((defective / hatched) * 100) : null;
         const female = findSnake(snakes, pair && (pair.femaleSnakeId || pair.femaleIndex));
         const male = findSnake(snakes, pair && (pair.maleSnakeId || pair.maleIndex));
         const lastLaid = rows
@@ -461,6 +526,11 @@
         const keeperSnake = keeperId ? findSnake(snakes, keeperId) : null;
         const nextKeeper = text(keeperHatchling && keeperHatchling.name)
             || text(keeperSnake && keeperSnake.name);
+        // The keeper still carries the project, but the defect travels with it:
+        // a kinked keeper is a decision, not an oversight.
+        const nextKeeperDefects = keeperHatchling && Array.isArray(keeperHatchling.defects)
+            ? keeperHatchling.defects
+            : (keeperSnake && window.SnakeDefects ? window.SnakeDefects.labels(keeperSnake) : []);
 
         return {
             id: text(pair && pair.id),
@@ -484,6 +554,7 @@
             nextNote: step.nextNote,
             nextKeeperId: keeperId,
             nextKeeper,
+            nextKeeperDefects,
             nextNeeds: text(pair && pair.nextNeeds),
             project: step,
             status: text(pair && pair.closedAt) ? "closed" : "active",
@@ -496,7 +567,12 @@
             eggs,
             completedEggs,
             hatched,
-            hatchRate: score,
+            healthy,
+            defective,
+            defectRate,
+            defectBreakdown: defectBreakdown(completed),
+            hatchRate: hatchScore,
+            cleanRate: score,
             hatchlingsPerClutch: completed.length > 0 ? roundOne(hatched / completed.length) : null,
             counts,
             revenue,
@@ -540,8 +616,13 @@
             eggs: 0,
             completedEggs: 0,
             hatched: 0,
+            healthy: 0,
+            defective: 0,
+            defectBreakdown: [],
             unhatched: 0,
             hatchRate: null,
+            cleanRate: null,
+            defectRate: null,
             hatchlingsPerClutch: null,
             counts: { retained: 0, forSale: 0, growing: 0, sold: 0, lost: 0 },
             revenue: 0,
@@ -588,6 +669,7 @@
                 steps,
                 count: steps.length,
                 keepers: steps.reduce((sum, step) => sum + step.counts.retained, 0),
+                defective: steps.reduce((sum, step) => sum + (step.defective || 0), 0),
                 hits,
                 partials,
                 misses,
@@ -605,15 +687,15 @@
     }
 
     function buildInsights(pairRows, totals) {
-        const scored = pairRows.filter(row => row.hatchRate !== null);
+        const scored = pairRows.filter(row => row.cleanRate !== null);
         const bestPair = [...scored].sort((left, right) =>
-            right.hatchRate - left.hatchRate
-            || right.hatched - left.hatched
+            right.cleanRate - left.cleanRate
+            || right.healthy - left.healthy
             || String(right.lastLaidDate).localeCompare(String(left.lastLaidDate))
         )[0] || null;
         const weakestPair = [...scored].sort((left, right) =>
-            left.hatchRate - right.hatchRate
-            || left.hatched - right.hatched
+            left.cleanRate - right.cleanRate
+            || left.healthy - right.healthy
         )[0] || null;
         const waitingPairs = pairRows.filter(row => row.verdict.key === "waiting").length;
         const noClutchPairs = pairRows.filter(row => row.verdict.key === "none" || row.verdict.key === "closed").length;
@@ -654,10 +736,13 @@
             || null;
         const parts = [
             bestPair
-                ? `Best: ${bestPair.label} at ${bestPair.hatchRate}% (${bestPair.hatched} hatched from ${bestPair.completedEggs} eggs).`
+                ? `Best: ${bestPair.label} at ${bestPair.cleanRate}% healthy (${bestPair.healthy} healthy from ${bestPair.completedEggs} eggs).`
                 : "",
-            weakestPair && weakestPair.hatchRate < WORKING_SCORE
-                ? `Weakest: ${weakestPair.label} at ${weakestPair.hatchRate}% — the pairing to question first.`
+            weakestPair && weakestPair.cleanRate < WORKING_SCORE
+                ? `Weakest: ${weakestPair.label} at ${weakestPair.cleanRate}% healthy — the pairing to question first.`
+                : "",
+            totals.defective > 0
+                ? `${totals.defective} of ${totals.hatched} hatchlings had a recorded defect (${defectText(totals.defectBreakdown)}); the grade counts healthy hatchlings only.`
                 : "",
             projectPair
                 ? (projectPair.judged
@@ -669,7 +754,7 @@
 
         return {
             tone: working === 0 ? "down" : (working === scored.length ? "positive" : "mixed"),
-            headline: `${working} of ${scored.length} scored pairing${scored.length === 1 ? "" : "s"} hatch at ${WORKING_SCORE}% or better.`,
+            headline: `${working} of ${scored.length} scored pairing${scored.length === 1 ? "" : "s"} ${working === 1 ? "produces" : "produce"} healthy hatchlings at ${WORKING_SCORE}% or better.`,
             detail: parts.join(" "),
             bestPair,
             weakestPair,
@@ -719,6 +804,7 @@
         rows.forEach(row => {
             totals.eggs += row.eggs;
             totals.hatched += row.hatched;
+            totals.defective += row.defective || 0;
             totals.unhatched += row.unhatched;
             totals.revenue += row.revenue;
 
@@ -734,8 +820,10 @@
         });
 
         totals.revenue = roundMoney(totals.revenue);
-        totals.scoredPairs = pairRows.filter(row => row.hatchRate !== null).length;
-        totals.workingPairs = pairRows.filter(row => row.hatchRate !== null && row.hatchRate >= WORKING_SCORE).length;
+        totals.healthy = Math.max(0, totals.hatched - totals.defective);
+        totals.defectBreakdown = defectBreakdown(rows);
+        totals.scoredPairs = pairRows.filter(row => row.cleanRate !== null).length;
+        totals.workingPairs = pairRows.filter(row => row.cleanRate !== null && row.cleanRate >= WORKING_SCORE).length;
         totals.salesPairs = pairRows.filter(row => row.purpose === "sales").length;
         totals.projectPairs = pairRows.filter(row => row.purpose === "project").length;
         totals.projectSteps = pairRows.filter(row => row.purpose === "project" && row.judged).length;
@@ -748,6 +836,12 @@
             : null;
         totals.hatchRate = totals.completedEggs > 0
             ? roundPercent((totals.hatched / totals.completedEggs) * 100)
+            : null;
+        totals.cleanRate = totals.completedEggs > 0
+            ? roundPercent((totals.healthy / totals.completedEggs) * 100)
+            : null;
+        totals.defectRate = totals.hatched > 0
+            ? roundPercent((totals.defective / totals.hatched) * 100)
             : null;
         totals.hatchlingsPerClutch = totals.clutches - totals.incubating > 0
             ? roundOne(totals.hatched / (totals.clutches - totals.incubating))
@@ -779,6 +873,8 @@
         normalizeOutcome,
         normalizeNext,
         projectStep,
+        defectBreakdown,
+        defectText,
         buildProjects,
         gradeFor,
         pairRow,

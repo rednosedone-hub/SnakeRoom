@@ -1853,6 +1853,62 @@ p {
     padding: 0;
 }
 
+.gene-shortcuts {
+    border-top: 1px dashed var(--goldenrod-color);
+    padding-top: 12px;
+}
+
+.gene-shortcuts summary {
+    cursor: pointer;
+    color: var(--gold-color);
+    font-weight: bold;
+}
+
+.gene-shortcut-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.gene-shortcut-form input {
+    flex: 1 1 160px;
+}
+
+.gene-shortcut-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.gene-shortcut-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.gene-shortcut-row .gene-remove-button {
+    font-size: 17px;
+    padding: 0 4px;
+}
+
+.gene-shortcut-alias {
+    min-width: 70px;
+    font-weight: bold;
+    color: var(--gold-color);
+}
+
+.gene-shortcut-gene {
+    flex: 1 1 150px;
+    color: var(--text-color);
+}
+
+.gene-shortcut-error {
+    color: #ffb4a2;
+}
+
 .modal-actions {
     display: flex;
     gap: 15px;
@@ -7220,4 +7276,124 @@ body.has-sync-banner .collection-notice {
     #scorecardClutchTableWrap {
         display: none;
     }
+}
+
+/* Physical defects
+   Recorded on the animal form, on each hatchling in Breeding Outcomes, and
+   counted by the scorecard as healthy or not. */
+.defect-block {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid #2c2820;
+}
+
+.defect-block h4 {
+    margin: 0 0 6px;
+    font-size: 15px;
+    font-weight: normal;
+    color: var(--text-color);
+}
+
+.defect-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0 12px;
+}
+
+.defect-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px solid #363024;
+    border-radius: 999px;
+    background: #141312;
+    color: var(--silver-color);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.defect-option input,
+.hatchling-defect-chip input {
+    margin: 0;
+    accent-color: #b85c5c;
+}
+
+.defect-option:has(input:checked),
+.hatchling-defect-chip:has(input:checked) {
+    border-color: #b85c5c;
+    background: #221414;
+    color: #ffd9d9;
+}
+
+.hatchling-defects {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.hatchling-defects-label {
+    color: var(--silver-color);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.hatchling-defect-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.hatchling-defect-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    border: 1px solid #363024;
+    border-radius: 999px;
+    background: #141312;
+    color: #b9b096;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.hatchling-defects .empty-message {
+    flex-basis: 100%;
+    margin: 0;
+}
+
+.scorecard-defects {
+    margin: 10px 0 0;
+    padding: 8px 10px;
+    border-left: 2px solid #b85c5c;
+    background: #1a1313;
+    color: #e6b9b9;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.scorecard-defects strong {
+    color: #ffd9d9;
+    font-weight: normal;
+}
+
+.season-clutch-card .scorecard-defects {
+    margin-top: 6px;
+}
+
+.defect-badge {
+    display: inline-block;
+    margin: 0 4px;
+    padding: 3px 9px;
+    border: 1px solid #b85c5c;
+    border-radius: 999px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11px;
+    line-height: 1.25;
+    color: #ffb3b3;
+    background-color: rgba(0, 0, 0, 0.28);
 }

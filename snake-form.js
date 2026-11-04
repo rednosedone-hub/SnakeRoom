@@ -111,9 +111,176 @@ function setupGeneOptions() {
         return;
     }
 
+    // Shortcuts are offered next to the full names, so typing "YB" completes
+    // to Yellow Belly instead of needing to know the whole name.
+    const aliasOptions = window.GeneTools.getGeneAliasEntries
+        ? window.GeneTools.getGeneAliasEntries().map(entry => `
+            <option value="${entry.alias}">${entry.gene}</option>
+        `).join("")
+        : "";
+
     geneOptions.innerHTML = window.GeneTools.catalog.map(gene => `
         <option value="${gene.name}"></option>
+    `).join("") + aliasOptions;
+}
+
+// ---- Your own gene shortcuts -------------------------------------------
+// The editor writes to customGeneAliases, which genes.js merges ahead of the
+// built-in shortcuts. Every gene input reads that one lookup, so a shortcut
+// saved here is also understood by the calculator and the goal planner.
+
+let editingGeneShortcut = "";
+
+function setGeneShortcutStatus(message, isError) {
+    const status = document.getElementById("geneShortcutStatus");
+
+    if (!status) {
+        return;
+    }
+
+    status.textContent = message || "";
+    status.classList.toggle("gene-shortcut-error", Boolean(isError));
+}
+
+function resetGeneShortcutForm() {
+    editingGeneShortcut = "";
+
+    const aliasInput = document.getElementById("geneShortcutInput");
+    const geneInput = document.getElementById("geneShortcutGeneInput");
+    const saveButton = document.getElementById("geneShortcutSaveButton");
+    const cancelButton = document.getElementById("geneShortcutCancelButton");
+
+    if (aliasInput) aliasInput.value = "";
+    if (geneInput) geneInput.value = "";
+    if (saveButton) saveButton.textContent = "Add Shortcut";
+    if (cancelButton) cancelButton.style.display = "none";
+}
+
+function renderGeneShortcuts() {
+    const list = document.getElementById("geneShortcutList");
+
+    if (!list || !window.GeneTools || !window.GeneTools.getCustomGeneAliases) {
+        return;
+    }
+
+    const entries = window.GeneTools.getCustomGeneAliases();
+
+    if (entries.length === 0) {
+        list.innerHTML = `
+            <p class="gene-help">No shortcuts of your own yet.</p>
+        `;
+        return;
+    }
+
+    // encodeURIComponent keeps the alias safe inside the onclick attribute; the
+    // editor only accepts letters, numbers and spaces, so no quote can appear.
+    list.innerHTML = entries.map(entry => `
+        <div class="gene-shortcut-row">
+            <span class="gene-shortcut-alias">${escapeMoneyText(entry.alias)}</span>
+            <span class="gene-shortcut-gene">${escapeMoneyText(entry.gene)}</span>
+            <button
+                type="button"
+                class="gene-action-button"
+                onclick="editGeneShortcut('${encodeURIComponent(entry.alias)}')">
+                Edit
+            </button>
+            <button
+                type="button"
+                class="gene-remove-button"
+                title="Delete shortcut"
+                onclick="deleteGeneShortcut('${encodeURIComponent(entry.alias)}')">
+                &#10005;
+            </button>
+        </div>
     `).join("");
+}
+
+function editGeneShortcut(encodedAlias) {
+    const alias = decodeURIComponent(encodedAlias);
+    const entry = window.GeneTools.getCustomGeneAliases()
+        .find(item => item.alias === alias);
+
+    if (!entry) {
+        return;
+    }
+
+    editingGeneShortcut = entry.alias;
+    document.getElementById("geneShortcutInput").value = entry.alias;
+    document.getElementById("geneShortcutGeneInput").value = entry.gene;
+    document.getElementById("geneShortcutSaveButton").textContent = "Save Changes";
+    document.getElementById("geneShortcutCancelButton").style.display = "inline-block";
+    setGeneShortcutStatus(`Editing ${entry.alias} \u2192 ${entry.gene}.`, false);
+    document.getElementById("geneShortcutInput").focus();
+}
+
+function cancelGeneShortcutEdit() {
+    resetGeneShortcutForm();
+    setGeneShortcutStatus("", false);
+}
+
+function saveGeneShortcut() {
+    if (!window.GeneTools || !window.GeneTools.setGeneAlias) {
+        return;
+    }
+
+    const alias = document.getElementById("geneShortcutInput").value;
+    const geneName = document.getElementById("geneShortcutGeneInput").value;
+    const result = window.GeneTools.setGeneAlias(alias, geneName, editingGeneShortcut);
+
+    if (!result.ok) {
+        setGeneShortcutStatus(result.error, true);
+        return;
+    }
+
+    resetGeneShortcutForm();
+    setupGeneOptions();
+    renderGeneShortcuts();
+    updateGeneButtons();
+    setGeneShortcutStatus(
+        result.replacedBuiltIn
+            ? `Saved: ${result.alias} \u2192 ${result.gene} (replaces the built-in ${result.replacedBuiltIn}).`
+            : `Saved: ${result.alias} \u2192 ${result.gene}.`,
+        false
+    );
+}
+
+function deleteGeneShortcut(encodedAlias) {
+    const alias = decodeURIComponent(encodedAlias);
+
+    if (!window.confirm(`Delete the shortcut "${alias}"?`)) {
+        return;
+    }
+
+    window.GeneTools.removeGeneAlias(alias);
+    setupGeneOptions();
+    renderGeneShortcuts();
+    updateGeneButtons();
+
+    if (editingGeneShortcut === alias) {
+        resetGeneShortcutForm();
+    }
+
+    setGeneShortcutStatus(`Deleted the shortcut ${alias}.`, false);
+}
+
+// Enter in either field saves, the way the gene box itself behaves.
+function setupGeneShortcutEditor() {
+    renderGeneShortcuts();
+
+    ["geneShortcutInput", "geneShortcutGeneInput"].forEach(id => {
+        const input = document.getElementById(id);
+
+        if (!input) {
+            return;
+        }
+
+        input.addEventListener("keydown", event => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                saveGeneShortcut();
+            }
+        });
+    });
 }
 
 function getGeneDescription(geneRecord) {
@@ -139,13 +306,31 @@ function updateGeneButtons() {
     hideCustomGenePanel();
 
     if (geneName === "") {
-        geneHelp.textContent = "Type a gene name to add calculator-ready genetics.";
+        geneHelp.textContent = "Type a gene name or a shortcut (YB, OD, SN). Add several at once: YB OD SN.";
         return;
     }
 
     const gene = window.GeneTools.findGene(geneName);
+    const parsed = window.GeneTools.parseGeneInput
+        ? window.GeneTools.parseGeneInput(geneName)
+        : { genes: [], unknown: [] };
+    const unknownNote = parsed.unknown.length > 0
+        ? ` Not recognised: ${parsed.unknown.join(", ")}.`
+        : "";
 
     if (!gene) {
+        // "YB OD SN" is not one gene name, so the whole entry is read as a
+        // genotype and added in one go.
+        if (parsed.genes.length > 0) {
+            geneHelp.textContent = `Will add ${parsed.genes.length} gene${parsed.genes.length === 1 ? "" : "s"}: ${parsed.genes.map(item => item.label).join(", ")}.${unknownNote}`;
+            geneButtonRow.innerHTML = `
+                <button type="button" class="gene-action-button" onclick="addParsedGenes()">
+                    Add ${parsed.genes.length} Gene${parsed.genes.length === 1 ? "" : "s"}
+                </button>
+            `;
+            return;
+        }
+
         geneHelp.textContent = "This gene is not in the catalog yet.";
         showCustomGenePanel();
         geneButtonRow.innerHTML = `
@@ -213,6 +398,34 @@ function addGene(mode) {
         type: gene.type,
         copies: copies,
         ...(hetOdds ? { hetOdds: hetOdds } : {})
+    });
+
+    geneInput.value = "";
+    renderGeneList();
+    updateGeneButtons();
+}
+
+// Adds every gene read from one entry. Repeating a gene replaces it, and the
+// parser has already worked out copies and het odds, so "Super Pastel, 66% Het
+// Clown" lands as Super Pastel plus a 66% het Clown.
+function addParsedGenes() {
+    const geneInput = document.getElementById("geneInput");
+    const parsed = window.GeneTools.parseGeneInput
+        ? window.GeneTools.parseGeneInput(geneInput.value)
+        : { genes: [] };
+
+    if (parsed.genes.length === 0) {
+        return;
+    }
+
+    parsed.genes.forEach(parsedGene => {
+        currentGenes = currentGenes.filter(currentGene => currentGene.name !== parsedGene.name);
+        currentGenes.push({
+            name: parsedGene.name,
+            type: parsedGene.type,
+            copies: parsedGene.copies,
+            ...(parsedGene.hetOdds ? { hetOdds: parsedGene.hetOdds } : {})
+        });
     });
 
     geneInput.value = "";
@@ -1027,6 +1240,47 @@ function updateRetirementFields(fillDate = false) {
     }
 }
 
+// ---- Physical defects -----------------------------------------------------
+//
+// The catalog lives in defect-helpers.js so the snake form, the hatchling
+// editor and the scorecard agree on the names. Ticking a box is how a defect is
+// recorded, so an animal with no tick is treated as clean.
+
+function setupDefectOptions() {
+    const container = document.getElementById("defectOptions");
+
+    if (!container || !window.SnakeDefects) {
+        return;
+    }
+
+    container.innerHTML = window.SnakeDefects.DEFECTS.map(defect => `
+        <label class="defect-option" title="${escapeMoneyText(defect.note)}">
+            <input type="checkbox" value="${defect.key}">
+            <span>${escapeMoneyText(defect.label)}</span>
+        </label>
+    `).join("");
+}
+
+function setSelectedDefects(snake) {
+    const selected = window.SnakeDefects ? window.SnakeDefects.keys(snake || {}) : [];
+
+    document.querySelectorAll("#defectOptions input[type=\"checkbox\"]").forEach(input => {
+        input.checked = selected.includes(input.value);
+    });
+
+    const noteInput = document.getElementById("defectNoteInput");
+
+    if (noteInput) {
+        noteInput.value = (snake && snake.defectNote) || "";
+    }
+}
+
+function getSelectedDefects() {
+    return [...document.querySelectorAll("#defectOptions input[type=\"checkbox\"]:checked")]
+        .map(input => input.value)
+        .filter(Boolean);
+}
+
 function fillFormForEdit() {
     const photoFileInput = document.getElementById("photoFileInput");
 
@@ -1049,6 +1303,7 @@ function fillFormForEdit() {
         document.getElementById("retiredDateInput").value = "";
         document.getElementById("retiredReasonInput").value = "";
         document.getElementById("retiredNoteInput").value = "";
+        setSelectedDefects({});
         currentGenes = [];
         currentWeightHistory = [];
         currentFeedingHistory = [];
@@ -1103,6 +1358,7 @@ function fillFormForEdit() {
     document.getElementById("retiredDateInput").value = snake.retiredDate || "";
     document.getElementById("retiredReasonInput").value = snake.retiredReason || "";
     document.getElementById("retiredNoteInput").value = snake.retiredNote || "";
+    setSelectedDefects(snake);
 
     currentGenes = Array.isArray(snake.genes) ? [...snake.genes] : [];
     currentWeightHistory = Array.isArray(snake.weightHistory) ? [...snake.weightHistory] : [];
@@ -3320,6 +3576,15 @@ async function saveSnakeFromPage() {
                 || (existingSnake.status && existingSnake.status !== status ? existingSnake.status : ""))
             : "",
         genes: currentGenes,
+        // A defect is a permanent fact about the animal, so it is read from the
+        // form on every save. If the catalog failed to load, keep what the
+        // record already had instead of silently clearing it.
+        defects: window.SnakeDefects
+            ? getSelectedDefects()
+            : (Array.isArray(existingSnake.defects) ? existingSnake.defects : []),
+        defectNote: document.getElementById("defectNoteInput")
+            ? document.getElementById("defectNoteInput").value.trim()
+            : existingSnake.defectNote || "",
         acquisitionSource: source,
         purchasedFrom: source === "produced"
             ? ""
@@ -3383,6 +3648,7 @@ window.updateFeederSuggestion = updateFeederSuggestion;
 window.useSuggestedFeederSize = useSuggestedFeederSize;
 window.updateGeneButtons = updateGeneButtons;
 window.addGene = addGene;
+window.addParsedGenes = addParsedGenes;
 window.addCustomGene = addCustomGene;
 window.removeGene = removeGene;
 window.updateImagePreview = updateImagePreview;
@@ -3410,7 +3676,9 @@ window.uploadPhotoFromForm = uploadPhotoFromForm;
 window.saveSnakeFromPage = saveSnakeFromPage;
 
 setupCollapsibleSections();
+setupDefectOptions();
 setupGeneOptions();
+setupGeneShortcutEditor();
 setupFeedingReasonOptions();
 setupHealthOptions();
 fillFormForEdit();

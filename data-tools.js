@@ -45,6 +45,47 @@ const csvHeaders = [
     "shedHistoryJson"
 ];
 
+// The gene catalog and shortcut sheets are intentionally small: a keeper fills
+// in what the catalog does not already know. Blank cells fall back to the same
+// defaults the snake form uses.
+const geneCsvHeaders = [
+    "name",
+    "type",
+    "superType",
+    "allelicGroup",
+    "health",
+    "superName"
+];
+
+const aliasCsvHeaders = ["alias", "gene"];
+
+// Spreadsheet column names are matched without case, spaces or punctuation, so
+// "Gene Name", "gene_name" and "name" all land on the same field.
+const GENE_COLUMN_NAMES = {
+    name: "name",
+    gene: "name",
+    genename: "name",
+    morph: "name",
+    type: "type",
+    genetype: "type",
+    supertype: "superType",
+    allelicgroup: "allelicGroup",
+    complex: "allelicGroup",
+    health: "health",
+    supername: "superName"
+};
+
+const ALIAS_COLUMN_NAMES = {
+    alias: "alias",
+    shortcut: "alias",
+    abbreviation: "alias",
+    shortname: "alias",
+    gene: "gene",
+    name: "gene",
+    genename: "gene",
+    fullname: "gene"
+};
+
 function csvEscape(value) {
     const text = value === undefined || value === null ? "" : String(value);
 
@@ -194,10 +235,10 @@ function snakeToRow(snake) {
     };
 }
 
-function rowsToCsv(rows) {
-    const headerLine = csvHeaders.map(csvEscape).join(",");
+function rowsToCsv(rows, headers = csvHeaders) {
+    const headerLine = headers.map(csvEscape).join(",");
     const bodyLines = rows.map(row =>
-        csvHeaders.map(header => csvEscape(row[header])).join(",")
+        headers.map(header => csvEscape(row[header])).join(",")
     );
 
     return [headerLine, ...bodyLines].join("\r\n");
@@ -215,29 +256,24 @@ function exportSnakesCsv() {
     );
 }
 
+// A blank sheet with only the header row, so a keeper can open it in Calc,
+// type their rows and import it without deleting examples first.
 function downloadTemplateCsv() {
-    const csv = rowsToCsv([
-        {
-            name: "Example",
-            binNumber: "A1",
-            ID: "2026-01",
-            morph: "Pastel Enchi",
-            sex: "Female",
-            status: "Holdback",
-            hatchDate: "2026-01-15",
-            acquiredDate: "2026-03-01",
-            acquisitionSource: "purchased",
-            purchasedFrom: "Example Breeder",
-            purchasePrice: "250",
-            purchaseDate: "2026-03-01",
-            salePrice: "400",
-            feedingIntervalDays: "7",
-            image: "Images/TheSnakeRoom.jpg",
-            genes: "Pastel:codom:1;Enchi:codom:1"
-        }
-    ]);
+    const csv = rowsToCsv([]);
 
-    downloadTextFile("snake-room-import-template.csv", csv, "text/csv;charset=utf-8");
+    downloadTextFile("snake-room-collection-template.csv", csv, "text/csv;charset=utf-8");
+}
+
+function downloadGeneTemplateCsv() {
+    const csv = rowsToCsv([], geneCsvHeaders);
+
+    downloadTextFile("snake-room-genes-template.csv", csv, "text/csv;charset=utf-8");
+}
+
+function downloadAliasTemplateCsv() {
+    const csv = rowsToCsv([], aliasCsvHeaders);
+
+    downloadTextFile("snake-room-shortcuts-template.csv", csv, "text/csv;charset=utf-8");
 }
 
 function parseCsv(text) {
@@ -295,13 +331,78 @@ function parseCsv(text) {
 }
 
 function normalizeHeader(header) {
-    return header.trim();
+    // Excel and some editors save a UTF-8 BOM before the first heading; left in
+    // place it would make the first CSV column invisible to the importer.
+    return String(header || "").replace(/^\uFEFF/, "").trim();
 }
 
 function getCell(rowObject, key) {
     return rowObject[key] === undefined || rowObject[key] === null
         ? ""
         : String(rowObject[key]).trim();
+}
+
+function headerKey(header) {
+    return String(header || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+// Turns the parsed grid into one object per data row. With a column map, loose
+// headings such as "Gene Name" or "super type" are folded onto the canonical
+// field before the import sees them; without one, headings are kept as written
+// (the snake export's own camelCase names).
+function buildRowsByHeader(parsedRows, columnNames) {
+    const headers = parsedRows[0].map(header => {
+        const clean = normalizeHeader(header);
+
+        return columnNames ? columnNames[headerKey(clean)] || clean : clean;
+    });
+
+    return parsedRows.slice(1).map(row =>
+        headers.reduce((record, header, index) => {
+            record[header] = row[index] || "";
+            return record;
+        }, {})
+    );
+}
+
+function readCsvRows(file, onRows, onError) {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+        try {
+            const parsedRows = parseCsv(String(reader.result || ""));
+
+            if (parsedRows.length < 2) {
+                onError("CSV needs a header row and at least one data row.");
+                return;
+            }
+
+            onRows(parsedRows);
+        } catch (error) {
+            onError("Could not read the CSV. Check the format and try again.");
+            console.error(error);
+        }
+    };
+
+    reader.onerror = () => onError("The file could not be read.");
+    reader.readAsText(file);
+}
+
+function countLabel(count, one, many) {
+    return `${count} ${count === 1 ? one : many}`;
+}
+
+// A sentence of the first few reasons, plus how many rows the report does not
+// spell out. Every skipped row contributes exactly one reason.
+function importDetails(result, action = "skipped") {
+    if (!result || result[action] === 0 || !result.reasons || result.reasons.length === 0) {
+        return "";
+    }
+
+    const shown = result.reasons.slice(0, 3);
+    const hidden = result[action] - shown.length;
+
+    return ` ${shown.join(" ")}${hidden > 0 ? ` ${countLabel(hidden, "more row", "more rows")} not shown.` : ""}`;
 }
 
 function rowToSnake(rowObject, index) {
@@ -361,7 +462,12 @@ function rowToSnake(rowObject, index) {
     return baseSnake;
 }
 
-function findMatchingSnakeIndex(snakes, importedSnake) {
+function sameSnakeName(left, right) {
+    return Boolean(left && right)
+        && String(left).trim().toLowerCase() === String(right).trim().toLowerCase();
+}
+
+function findMatchingSnakeIndex(snakes, importedSnake, identityIsShared) {
     if (importedSnake.id) {
         const byId = snakes.findIndex(snake => snake.id === importedSnake.id);
         if (byId >= 0) {
@@ -369,18 +475,34 @@ function findMatchingSnakeIndex(snakes, importedSnake) {
         }
     }
 
-    if (importedSnake.ID) {
-        const byIdentity = snakes.findIndex(snake => snake.ID && snake.ID === importedSnake.ID);
-        if (byIdentity >= 0) {
-            return byIdentity;
+    if (importedSnake.ID && !identityIsShared) {
+        // A clutch's hatchlings share its ID, so an ID match is only this snake
+        // when there is exactly one. With several, the name decides; failing
+        // that the row is a new hatchling rather than an edit to a sibling.
+        const identityMatches = snakes
+            .map((snake, index) => ({ snake, index }))
+            .filter(entry => snakeHasIdentity(entry.snake, importedSnake.ID));
+
+        if (identityMatches.length === 1) {
+            return identityMatches[0].index;
+        }
+
+        if (identityMatches.length > 1) {
+            const named = identityMatches.find(entry => sameSnakeName(entry.snake.name, importedSnake.name));
+
+            return named ? named.index : -1;
         }
     }
 
-    return snakes.findIndex(snake =>
-        snake.name
-        && importedSnake.name
-        && snake.name.toLowerCase() === importedSnake.name.toLowerCase()
-    );
+    return snakes.findIndex(snake => sameSnakeName(snake.name, importedSnake.name));
+}
+
+function snakeHasIdentity(snake, identity) {
+    const target = String(identity || "").trim();
+
+    return Boolean(target)
+        && [snake.ID, snake.morph]
+            .some(value => String(value || "").trim() === target);
 }
 
 function mergeImportedSnake(existingSnake, importedSnake, rowObject) {
@@ -443,19 +565,35 @@ function mergeImportedSnake(existingSnake, importedSnake, rowObject) {
 
 function importRows(rows, shouldReplace) {
     const existingSnakes = shouldReplace ? [] : window.SnakeData.loadSnakesWithIds([]);
+    const imported = rows.map((rowObject, index) => ({
+        rowObject,
+        snake: rowToSnake(rowObject, index)
+    }));
+    // Two rows in one sheet with the same ID (the hatchlings of a clutch) must
+    // never match each other by ID; their names tell them apart.
+    const identityCounts = new Map();
+
+    imported.forEach(entry => {
+        const identity = String(entry.snake.ID || "").trim();
+
+        if (identity) {
+            identityCounts.set(identity, (identityCounts.get(identity) || 0) + 1);
+        }
+    });
+
     let added = 0;
     let updated = 0;
     let skipped = 0;
 
-    rows.forEach((rowObject, index) => {
-        const importedSnake = rowToSnake(rowObject, index);
-
+    imported.forEach(({ rowObject, snake: importedSnake }) => {
         if (!importedSnake.name && !importedSnake.ID && !importedSnake.morph) {
             skipped += 1;
             return;
         }
 
-        const existingIndex = findMatchingSnakeIndex(existingSnakes, importedSnake);
+        const identity = String(importedSnake.ID || "").trim();
+        const identityIsShared = Boolean(identity) && identityCounts.get(identity) > 1;
+        const existingIndex = findMatchingSnakeIndex(existingSnakes, importedSnake, identityIsShared);
 
         if (existingIndex >= 0) {
             existingSnakes[existingIndex] = mergeImportedSnake(
@@ -476,8 +614,13 @@ function importRows(rows, shouldReplace) {
     return { added, updated, skipped, total: existingSnakes.length };
 }
 
-function showReport(message, isError = false) {
-    const report = document.getElementById("importReport");
+function showReport(message, isError = false, reportId = "importReport") {
+    const report = document.getElementById(reportId);
+
+    if (!report) {
+        return;
+    }
+
     report.textContent = message;
     report.classList.toggle("import-error", isError);
 }
@@ -491,39 +634,80 @@ function importCsvFile() {
         return;
     }
 
-    const reader = new FileReader();
+    readCsvRows(file, parsedRows => {
+        const rowObjects = buildRowsByHeader(parsedRows);
+        const shouldReplace = document.getElementById("replaceCollectionInput").checked;
+        const result = importRows(rowObjects, shouldReplace);
 
-    reader.onload = () => {
-        try {
-            const parsedRows = parseCsv(String(reader.result || ""));
+        showReport(
+            `Import complete. Added ${result.added}, updated ${result.updated}, skipped ${result.skipped}. Collection now has ${result.total} snakes.`
+        );
+    }, message => showReport(message, true));
+}
 
-            if (parsedRows.length < 2) {
-                showReport("CSV needs a header row and at least one data row.", true);
-                return;
-            }
+function importGenesCsv() {
+    const input = document.getElementById("geneCsvFileInput");
+    const file = input.files[0];
+    const reportId = "geneImportReport";
 
-            const headers = parsedRows[0].map(normalizeHeader);
-            const rowObjects = parsedRows.slice(1).map(row => {
-                return headers.reduce((record, header, index) => {
-                    record[header] = row[index] || "";
-                    return record;
-                }, {});
-            });
-            const shouldReplace = document.getElementById("replaceCollectionInput").checked;
-            const result = importRows(rowObjects, shouldReplace);
+    if (!file) {
+        showReport("Choose a genes CSV file first.", true, reportId);
+        return;
+    }
 
-            showReport(
-                `Import complete. Added ${result.added}, updated ${result.updated}, skipped ${result.skipped}. Collection now has ${result.total} snakes.`
-            );
-        } catch (error) {
-            showReport("Import failed. Check the CSV format and try again.", true);
-            console.error(error);
-        }
-    };
+    if (!window.GeneTools || !window.GeneTools.importCustomGenes) {
+        showReport("Gene tools did not load. Reload the page and try again.", true, reportId);
+        return;
+    }
 
-    reader.readAsText(file);
+    readCsvRows(file, parsedRows => {
+        const result = window.GeneTools.importCustomGenes(
+            buildRowsByHeader(parsedRows, GENE_COLUMN_NAMES)
+        );
+
+        showReport(
+            `Gene import complete. Added ${countLabel(result.added, "gene", "genes")}, skipped ${result.skipped}.${importDetails(result)}`,
+            false,
+            reportId
+        );
+    }, message => showReport(message, true, reportId));
+}
+
+// Shortcuts point at genes, so a sheet that adds both should import the genes
+// first; a row naming a gene that is not in the catalog is reported instead of
+// being saved as a shortcut that can never resolve.
+function importAliasesCsv() {
+    const input = document.getElementById("aliasCsvFileInput");
+    const file = input.files[0];
+    const reportId = "aliasImportReport";
+
+    if (!file) {
+        showReport("Choose a shortcuts CSV file first.", true, reportId);
+        return;
+    }
+
+    if (!window.GeneTools || !window.GeneTools.importCustomGeneAliases) {
+        showReport("Gene tools did not load. Reload the page and try again.", true, reportId);
+        return;
+    }
+
+    readCsvRows(file, parsedRows => {
+        const result = window.GeneTools.importCustomGeneAliases(
+            buildRowsByHeader(parsedRows, ALIAS_COLUMN_NAMES)
+        );
+
+        showReport(
+            `Shortcut import complete. Imported ${countLabel(result.imported, "shortcut", "shortcuts")}, skipped ${result.skipped}.${importDetails(result)}`,
+            false,
+            reportId
+        );
+    }, message => showReport(message, true, reportId));
 }
 
 document.getElementById("exportSnakesButton").addEventListener("click", exportSnakesCsv);
 document.getElementById("templateButton").addEventListener("click", downloadTemplateCsv);
 document.getElementById("importButton").addEventListener("click", importCsvFile);
+document.getElementById("geneTemplateButton").addEventListener("click", downloadGeneTemplateCsv);
+document.getElementById("geneImportButton").addEventListener("click", importGenesCsv);
+document.getElementById("aliasTemplateButton").addEventListener("click", downloadAliasTemplateCsv);
+document.getElementById("aliasImportButton").addEventListener("click", importAliasesCsv);

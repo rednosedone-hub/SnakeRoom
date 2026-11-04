@@ -107,10 +107,10 @@
                 note: `${totals.scoredPairs} scored · ${totals.workingPairs} working`
             },
             {
-                label: "Hatch rate",
-                value: totals.hatchRate === null ? "—" : `${totals.hatchRate}%`,
+                label: "Healthy hatch",
+                value: totals.cleanRate === null ? "—" : `${totals.cleanRate}%`,
                 note: totals.completedEggs > 0
-                    ? `${totals.hatched} of ${totals.completedEggs} eggs`
+                    ? `${totals.healthy} of ${totals.completedEggs} eggs${totals.defective > 0 ? ` · ${totals.defective} with defects` : ""}`
                     : "No hatched clutch yet"
             },
             {
@@ -123,7 +123,7 @@
             {
                 label: "Hatchlings",
                 value: String(totals.hatched),
-                note: `${totals.counts.sold} sold · ${totals.counts.retained} kept`
+                note: `${totals.counts.sold} sold · ${totals.counts.retained} kept${totals.defective > 0 ? ` · ${totals.defective} defective` : ""}`
             },
             {
                 label: "Value / clutch",
@@ -170,7 +170,14 @@
 
     function pairCard(row) {
         const grade = row.grade;
-        const percentage = row.hatchRate === null ? 0 : Math.max(0, Math.min(100, row.hatchRate));
+        const percentage = row.cleanRate === null ? 0 : Math.max(0, Math.min(100, row.cleanRate));
+        const defectLine = row.defective > 0
+            ? `<p class="scorecard-defects">
+                    <strong>${row.defective} of ${row.hatched} hatchlings</strong> had a recorded defect
+                    ${row.defectBreakdown.length > 0 ? `(${row.defectBreakdown.map(item => `${escapeHtml(item.label)}${item.count > 1 ? ` x${item.count}` : ""}`).join(", ")})` : ""}.
+                    The grade counts healthy hatchlings only.
+                </p>`
+            : "";
         const clutchNote = row.incubating > 0
             ? `${row.completed} hatched · ${row.incubating} incubating`
             : `${row.completed} hatched`;
@@ -208,7 +215,9 @@
                         ` : ""}
                         ${row.purpose === "project" && (row.nextKeeper || row.nextNeeds) ? `
                             <p class="scorecard-target">
-                                ${row.nextKeeper ? `Keeper: ${escapeHtml(row.nextKeeper)}` : ""}${row.nextKeeper && row.nextNeeds ? " \u00b7 " : ""}${row.nextNeeds ? `Next step needs: ${escapeHtml(row.nextNeeds)}` : ""}
+                                ${row.nextKeeper
+                                    ? `Keeper: ${escapeHtml(row.nextKeeper)}${row.nextKeeperDefects.length > 0 ? ` (${row.nextKeeperDefects.map(escapeHtml).join(", ")})` : ""}`
+                                    : ""}${row.nextKeeper && row.nextNeeds ? " \u00b7 " : ""}${row.nextNeeds ? `Next step needs: ${escapeHtml(row.nextNeeds)}` : ""}
                             </p>
                         ` : ""}
                     </div>
@@ -221,7 +230,11 @@
                     ${statCell(
                         "Hatch rate",
                         row.hatchRate === null ? "—" : `${row.hatchRate}%`,
-                        row.completedEggs > 0 ? `${row.hatched} of ${row.completedEggs} eggs` : "No eggs counted"
+                        row.completedEggs > 0
+                            ? (row.defective > 0
+                                ? `${row.hatched} hatched · ${row.healthy} healthy`
+                                : `${row.hatched} of ${row.completedEggs} eggs`)
+                            : "No eggs counted"
                     )}
                     ${statCell("Clutches", String(row.clutches), clutchNote)}
                     ${statCell(
@@ -246,8 +259,10 @@
                     )}
                 </div>
 
+                ${defectLine}
+
                 <div class="scorecard-meter" role="img"
-                    aria-label="Hatch rate ${row.hatchRate === null ? "not scored" : `${row.hatchRate} percent`}">
+                    aria-label="Healthy hatch rate ${row.cleanRate === null ? "not scored" : `${row.cleanRate} percent`}">
                     <span class="scorecard-meter-fill is-${escapeHtml(grade.key)}"
                         style="width: ${percentage}%"></span>
                 </div>
@@ -267,7 +282,10 @@
                 <strong>${escapeHtml(step.label)}</strong>
                 ${step.result ? `<p>Hatched: ${escapeHtml(step.result)}</p>` : ""}
                 ${step.missing ? `<p>Missing: ${escapeHtml(step.missing)}</p>` : ""}
-                ${step.nextKeeper ? `<p>Keeper: ${escapeHtml(step.nextKeeper)}</p>` : ""}
+                ${step.nextKeeper
+                    ? `<p>Keeper: ${escapeHtml(step.nextKeeper)}${step.nextKeeperDefects.length > 0 ? ` (${step.nextKeeperDefects.map(escapeHtml).join(", ")})` : ""}</p>`
+                    : ""}
+                ${step.defective > 0 ? `<p>Defects: ${step.defective} of ${step.hatched} hatchlings${step.defectBreakdown.length > 0 ? ` — ${step.defectBreakdown.map(item => `${escapeHtml(item.label)}${item.count > 1 ? ` x${item.count}` : ""}`).join(", ")}` : ""}</p>` : ""}
                 ${step.nextNeeds ? `<p>Next step needs: ${escapeHtml(step.nextNeeds)}</p>` : ""}
                 ${step.nextLabel ? `<p>Next: ${escapeHtml(step.nextLabel)}${step.nextNote ? ` — ${escapeHtml(step.nextNote)}` : ""}</p>` : ""}
             </li>
@@ -279,7 +297,7 @@
                     <div>
                         <h4>${escapeHtml(project.target)}</h4>
                         <p class="scorecard-project-meta">
-                            ${project.count} pairing${project.count === 1 ? "" : "s"} · ${project.keepers} kept
+                            ${project.count} pairing${project.count === 1 ? "" : "s"} · ${project.keepers} kept${project.defective > 0 ? ` · ${project.defective} with defects` : ""}
                         </p>
                     </div>
                     <span class="scorecard-outcome is-${escapeHtml(project.status)}">${escapeHtml(project.statusLabel)}</span>
@@ -325,7 +343,10 @@
                 <td>${hatched}</td>
                 <td class="fin-amount-cell">${clutch.eggs}</td>
                 <td class="fin-amount-cell">${clutch.isHatched ? clutch.hatched : "—"}</td>
-                <td class="fin-amount-cell">${clutch.hatchRate === null ? "—" : `${clutch.hatchRate}%`}</td>
+                <td class="fin-amount-cell">${clutch.defective > 0 ? clutch.defective : "—"}</td>
+                <td class="fin-amount-cell" title="${clutch.hatchRate === null ? "Not hatched" : `${clutch.hatchRate}% of the eggs hatched`}">
+                    ${clutch.cleanRate === null ? "—" : `${clutch.cleanRate}%`}
+                </td>
                 <td class="fin-amount-cell">
                     <span class="scorecard-grade is-${escapeHtml(clutch.grade.key)}"
                         title="${escapeHtml(clutch.grade.note)}">${escapeHtml(clutch.grade.label)}</span>
@@ -342,6 +363,7 @@
         const counts = [
             `${clutch.eggs} egg${clutch.eggs === 1 ? "" : "s"}`,
             clutch.isHatched ? `${clutch.hatched} hatched` : "",
+            clutch.defective > 0 ? `${clutch.defective} with defects` : "",
             clutch.unhatched > 0 ? `${clutch.unhatched} did not hatch` : "",
             `${clutch.counts.retained} kept`,
             `${clutch.counts.sold} sold`
@@ -358,7 +380,11 @@
                 <p>${dates}</p>
                 <p>${counts}</p>
                 <p>${clutch.hatchRate === null ? "No hatch rate yet" : `${clutch.hatchRate}% hatch rate`}
+                    ${clutch.cleanRate === null ? "" : ` · ${clutch.cleanRate}% healthy`}
                     ${clutch.valuePerHatchling ? ` · ${formatMoney(clutch.valuePerHatchling)} per hatchling` : ""}</p>
+                ${clutch.defective > 0
+                    ? `<p class="scorecard-defects">${clutch.defectBreakdown.map(item => `${escapeHtml(item.label)}${item.count > 1 ? ` x${item.count}` : ""}`).join(", ")}</p>`
+                    : ""}
                 ${clutch.revenue > 0 ? `<p class="season-clutch-card-sales">${formatMoney(clutch.revenue)} in sales</p>` : ""}
             </div>
         `;

@@ -283,7 +283,25 @@ function decodeGoalPieces(goalText) {
             }
         });
 
-    // 2. Combo names (Batman, Killer Bee, ...), longest first, so one
+    // 2. Shortcuts keepers type instead of full gene names ("YB OD SN"), and
+    //    their super forms ("Super YB"). Longest first so a shortcut cannot eat
+    //    the start of a longer phrase.
+    Object.entries(window.GeneTools.getAliasCatalog
+        ? window.GeneTools.getAliasCatalog()
+        : window.SnakeGeneCatalog.aliasCatalog || {})
+        .sort((left, right) => right[0].length - left[0].length)
+        .forEach(([alias, geneName]) => {
+            if (!window.GeneTools.findGene(geneName)) {
+                return;
+            }
+
+            // The longer "super YB" has to be claimed first, or the plain
+            // shortcut inside it settles for one copy.
+            scanPhrase(`super ${alias}`, index => addGene(geneName, index, 2));
+            scanPhrase(alias, index => addGene(geneName, index));
+        });
+
+    // 3. Combo names (Batman, Killer Bee, ...), longest first, so one
     //    phrase covers every gene in the combo.
     Object.entries(window.GeneTools.comboNames)
         .sort((a, b) => b[1].length - a[1].length)
@@ -294,7 +312,7 @@ function decodeGoalPieces(goalText) {
             });
         });
 
-    // 3. Full gene names, longest first. This is what makes "orange dream"
+    // 4. Full gene names, longest first. This is what makes "orange dream"
     //    and "yellow belly" work even though each is two words.
     window.GeneTools.catalog
         .map(gene => gene.name)
@@ -303,7 +321,7 @@ function decodeGoalPieces(goalText) {
             scanPhrase(geneName, () => addGene(geneName, text.indexOf(geneName.toLowerCase())));
         });
 
-    // 4. Whatever single words are left: exact match, else a unique prefix
+    // 5. Whatever single words are left: exact match, else a unique prefix
     //    ("pins" -> Pinstripe). Ambiguous prefixes stay unmatched instead of
     //    being guessed at.
     const tokenPattern = /[a-z0-9]+/gi;

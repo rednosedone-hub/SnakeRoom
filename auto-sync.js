@@ -7,8 +7,9 @@
 //
 // New model, once a session exists:
 //   - Every change to app data (snakes, breedingPairs, clutches, breedingGoals,
-//     customGeneCatalog, financeSettings, financeExpenses, financeExpos,
-//     feederSettings, feederInventory) marks its storage key "dirty" instantly.
+//     customGeneCatalog, customGeneAliases, financeSettings, financeExpenses,
+//     financeExpos, feederSettings, feederInventory) marks its storage key
+//     "dirty" instantly.
 //   - If online: a debounced push (8s after the last change) saves to the
 //     cloud. Navigating to another page attempts an immediate push, and any
 //     queue left behind is retried when the next page opens or becomes visible
@@ -40,6 +41,7 @@
         "breedingPairs",
         "clutches",
         "customGeneCatalog",
+        "customGeneAliases",
         "financeSettings",
         "financeExpenses",
         "financeExpos",
@@ -53,6 +55,7 @@
         clutches: "clutches",
         breedingGoals: "breeding plans",
         customGeneCatalog: "custom genes",
+        customGeneAliases: "gene shortcuts",
         financeSettings: "money settings",
         financeExpenses: "costs",
         financeExpos: "shows",

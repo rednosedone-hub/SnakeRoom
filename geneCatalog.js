@@ -160,8 +160,77 @@ const comboNames = {
   "Cinnamon,Pastel,Pinstripe": "Pewter Pinstripe"
 };
 
+// Short names keepers actually write for a gene. They are matched with spaces
+// and punctuation removed, so "Y. Belly", "yb" and "YB" all land on Yellow
+// Belly, and several can be typed at once: "YB OD SN".
+const geneAliases = {
+    "yb": "Yellow Belly",
+    "ybelly": "Yellow Belly",
+    "od": "Orange Dream",
+    "sn": "Spotnose",
+    "pin": "Pinstripe",
+    "en": "Enchi",
+    "cin": "Cinnamon",
+    "cinny": "Cinnamon",
+    "bpastel": "Black Pastel",
+    "hra": "Het Red Axanthic",
+    "hgw": "Hidden Gene Woma",
+    "bh": "Black Head",
+    "champ": "Champagne",
+    "gstripe": "Genetic Stripe",
+    "gs": "Genetic Stripe",
+    "alb": "Albino",
+    "vpi": "Axanthic (VPI)",
+    "mj": "Axanthic (MJ)",
+    "gcr": "Axanthic (GCR)",
+    "lav": "Lavender Albino",
+    "caramel": "Caramel Albino",
+    "ultra": "Ultramel",
+    "um": "Ultramel",
+    "ban": "Banana",
+    "moj": "Mojave",
+    "les": "Lesser",
+    "but": "Butter",
+    "spi": "Spider",
+    "cl": "Clown",
+    "leo": "Leopard",
+    "cal": "Calico",
+    "mys": "Mystic",
+    "phan": "Phantom",
+    "spec": "Special",
+    "sulf": "Sulfur",
+    "van": "Vanilla",
+    "lem": "Lemonback",
+    "cyp": "Cypress",
+    "hur": "Hurricane",
+    "huff": "Huffman",
+    "daddy": "Daddy Gene",
+    "asph": "Asphalt",
+    "grav": "Gravel",
+    "bam": "Bamboo",
+    "choc": "Chocolate",
+    "honey": "Honey",
+    "mocha": "Mocha",
+    "russo": "Russo",
+    "spark": "Spark",
+    "flare": "Flare",
+    "disco": "Disco",
+    "flame": "Flame",
+    "candy": "Candy",
+    "cryptic": "Cryptic",
+    "woma": "Woma",
+    "sable": "Sable",
+    "razor": "Razor",
+    "jolt": "Jolt",
+    "bongo": "Bongo",
+    "woo": "Wookie",
+    "split": "Split",
+    "og": "Orange Ghost"
+};
+
 window.SnakeGeneCatalog = {
     geneCatalog: geneCatalog,
-    comboNames: comboNames
+    comboNames: comboNames,
+    aliasCatalog: geneAliases
 };
 })();

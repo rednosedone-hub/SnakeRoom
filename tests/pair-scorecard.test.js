@@ -9,9 +9,10 @@ const context = { console };
 
 context.window = context;
 vm.createContext(context);
-// The scorecard reuses the clutch maths from the Season Review, so the test
-// loads the same two scripts the page does, in the same order.
-["season-review-helpers.js", "pair-scorecard-helpers.js"].forEach(file => {
+// The scorecard reuses the clutch maths from the Season Review and reads the
+// defect names from defect-helpers.js, so the test loads the same scripts the
+// page does, in the same order.
+["defect-helpers.js", "season-review-helpers.js", "pair-scorecard-helpers.js"].forEach(file => {
     vm.runInContext(
         fs.readFileSync(path.join(projectRoot, file), "utf8"),
         context,
@@ -531,4 +532,78 @@ test("a keeper outside the clutch still resolves by its collection record", () =
     });
 
     assert.equal(result.pairs[0].nextKeeper, "Jade");
+});
+
+function withDefects(defectsById) {
+    return SNAKES.map(snake => (
+        defectsById[snake.id] ? { ...snake, defects: defectsById[snake.id] } : snake
+    ));
+}
+
+test("a defective hatchling still hatched, but the grade counts healthy ones", () => {
+    const snakes = withDefects({
+        h1: ["shark-mouth"],
+        h2: ["kinking", "no-eyes"]
+    });
+    const result = scorecard.scorecard({ snakes, pairs: PAIRS, clutches: CLUTCHES });
+    const pair = pairById(result, "pair-1");
+    const clutch = result.clutches.find(row => row.id === "2026-01");
+
+    // Five hatched from six eggs, but only three are clean: the raw rate and
+    // the graded rate are both kept so the difference is visible.
+    assert.equal(pair.hatched, 5);
+    assert.equal(pair.defective, 2);
+    assert.equal(pair.healthy, 3);
+    assert.equal(pair.hatchRate, 83.3);
+    assert.equal(pair.cleanRate, 50);
+    assert.equal(pair.grade.label, "C");
+    assert.equal(pair.attention, true);
+    assert.equal(pair.defectRate, 40);
+
+    assert.deepEqual(
+        Array.from(pair.defectBreakdown, item => `${item.label}:${item.count}`),
+        ["Kinked:1", "No eyes:1", "Shark mouth:1"]
+    );
+    assert.match(pair.verdict.note, /2 of 5 hatchlings had a recorded defect \(Kinked, No eyes, Shark mouth\)/);
+    assert.match(pair.verdict.note, /the grade counts healthy hatchlings only/);
+
+    assert.equal(clutch.defective, 2);
+    assert.equal(clutch.cleanRate, 50);
+    assert.equal(clutch.grade.label, "C");
+});
+
+test("defects roll into the season totals and the readout", () => {
+    const result = scorecard.scorecard({
+        snakes: withDefects({ h1: ["shark-mouth"], h2: ["kinking"] }),
+        pairs: PAIRS,
+        clutches: CLUTCHES
+    });
+
+    assert.equal(result.totals.hatched, 7);
+    assert.equal(result.totals.defective, 2);
+    assert.equal(result.totals.healthy, 5);
+    assert.equal(result.totals.hatchRate, 70);
+    assert.equal(result.totals.cleanRate, 50);
+    assert.equal(result.totals.defectRate, 28.6);
+    assert.match(result.insights.detail, /2 of 7 hatchlings had a recorded defect \(Kinked, Shark mouth\)/);
+});
+
+test("a keeper with a defect is named with it", () => {
+    const result = scorecard.scorecard({
+        snakes: withDefects({ h4: ["kinking"] }),
+        pairs: [projectPair({ nextKeeperId: "h4" })],
+        clutches: [CLUTCHES[0]]
+    });
+
+    assert.equal(result.pairs[0].nextKeeper, "Hatch Four");
+    assert.deepEqual(Array.from(result.pairs[0].nextKeeperDefects), ["Kinked"]);
+    assert.deepEqual(Array.from(result.projects[0].steps[0].nextKeeperDefects), ["Kinked"]);
+});
+
+test("clean hatchlings score exactly as before", () => {
+    const result = scorecard.scorecard({ snakes: SNAKES, pairs: PAIRS, clutches: CLUTCHES });
+
+    assert.equal(result.totals.defective, 0);
+    assert.equal(result.totals.cleanRate, result.totals.hatchRate);
+    assert.equal(pairById(result, "pair-1").cleanRate, pairById(result, "pair-1").hatchRate);
 });

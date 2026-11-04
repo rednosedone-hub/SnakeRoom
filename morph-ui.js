@@ -73,9 +73,12 @@
             return [];
         }
 
-        return geneCatalog.filter(gene =>
-            gene.name.toLowerCase().includes(search)
-        );
+        // Shortcuts match too: "yb" offers Yellow Belly, "pin" Pinstripe.
+        return window.GeneTools.searchGenes
+            ? window.GeneTools.searchGenes(search)
+            : geneCatalog.filter(gene =>
+                gene.name.toLowerCase().includes(search)
+            );
     }
 
     function getSelectedGene(input) {

@@ -196,8 +196,12 @@ function getPairHatchlings(pair) {
 function hatchlingOptionLabel(snake) {
     const name = snake.name || "Unnamed";
     const morph = snake.morph && snake.morph !== name ? ` - ${snake.morph}` : "";
+    // A defective keeper is still the keeper's call, but not a silent one: the
+    // dropdown names the problem so a kinked animal is not carried forward by
+    // accident.
+    const defects = window.SnakeDefects ? window.SnakeDefects.summary(snake) : "";
 
-    return `${name}${morph}`;
+    return `${name}${morph}${defects ? ` - ${defects}` : ""}`;
 }
 
 // The plan for the next generation, recorded on the step that produced the

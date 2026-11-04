@@ -175,7 +175,16 @@ function getMorphLabels(snake) {
         return displayGenes.map(getGeneLabel).filter(Boolean);
     }
 
-    return [snake.morph || snake.ID || "No morph entered"];
+    const fallback = snake.morph || snake.ID || "";
+
+    // A hatchling's morph field carries its clutch, not a morph; a card with no
+    // genes should say so instead of printing a clutch code under the morph
+    // pills.
+    if (fallback && snake.clutchId && String(fallback) === String(snake.clutchId)) {
+        return ["No morph entered"];
+    }
+
+    return [fallback || "No morph entered"];
 }
 
 function getCardDetails(snake) {
@@ -185,7 +194,11 @@ function getCardDetails(snake) {
             ? `Hatched: ${snake.hatchDate}`
             : snake.hatchYear ? `Hatch year: ${snake.hatchYear}` : "",
         snake.acquiredDate ? `Acquired: ${snake.acquiredDate}` : "",
-        snake.clutchId ? `Clutch: ${snake.clutchId}` : ""
+        // A hatchling's ID is its clutch, so printing both lines would repeat
+        // the same code twice on the card.
+        snake.clutchId && String(snake.clutchId) !== String(snake.ID || "")
+            ? `Clutch: ${snake.clutchId}`
+            : ""
     ].filter(Boolean);
 }
 
