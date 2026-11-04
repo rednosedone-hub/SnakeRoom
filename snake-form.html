@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Snake Record</title>
-    <link rel="stylesheet" href="style.css?v=62">
+    <link rel="stylesheet" href="style.css?v=72">
 </head>
 
 <body>
@@ -29,6 +29,7 @@
             <a href="available.html" class="main-button">Available</a>
             <a href="feeders.html" class="main-button">Feeders</a>
             <a href="finance.html" class="main-button">Finances</a>
+            <a href="buyers.html" class="main-button">Buyers</a>
             <a href="#feedingSection" class="main-button">Log Feeding</a>
         </div>
 
@@ -285,6 +286,64 @@
                             </select>
                         </label>
                     </div>
+                </div>
+
+                <div class="hold-block" id="holdFields" hidden>
+                    <h4>Hold &amp; deposit</h4>
+
+                    <p class="empty-message">
+                        A hold keeps this snake off the market without recording a sale. The deposit
+                        is cash in the ledger while the snake is held; when it sells, the deposit is
+                        part of the sale price, so enter the full agreed price under Sale &mdash; not
+                        just the balance. Release a hold from Finances &rarr; Holds, not by clearing
+                        these fields, so the deposit keeps its place in the ledger.
+                    </p>
+
+                    <div class="form-grid">
+                        <label class="form-field">
+                            <span>Held for</span>
+                            <input type="text" id="holdBuyerInput" list="buyerOptions"
+                                placeholder="Buyer or shop" oninput="updateHoldSummary()">
+                        </label>
+
+                        <label class="form-field">
+                            <span>Agreed price</span>
+                            <input type="number" id="holdPriceInput" min="0" step="0.01"
+                                placeholder="0.00" oninput="updateHoldSummary()">
+                        </label>
+
+                        <label class="form-field">
+                            <span>Deposit received</span>
+                            <input type="number" id="holdDepositInput" min="0" step="0.01"
+                                placeholder="0.00" oninput="updateHoldSummary()">
+                        </label>
+
+                        <label class="form-field">
+                            <span>Deposit date</span>
+                            <input type="date" id="holdDepositDateInput" oninput="updateHoldSummary()">
+                        </label>
+
+                        <label class="form-field">
+                            <span>Pickup or balance due</span>
+                            <input type="date" id="holdDueDateInput" oninput="updateHoldSummary()">
+                        </label>
+
+                        <label class="form-field">
+                            <span>Hold note</span>
+                            <input type="text" id="holdNoteInput"
+                                placeholder="Pickup at the show, balance by e-transfer..."
+                                oninput="updateHoldSummary()">
+                        </label>
+
+                        <label class="form-field checkbox-field">
+                            <span>Payment plan agreed</span>
+                            <input type="checkbox" id="holdPaymentPlanInput"
+                                onchange="updateHoldSummary()">
+                        </label>
+                    </div>
+
+                    <div class="money-summary-line" id="holdSummary"></div>
+                    <div class="hold-history" id="holdHistorySummary" hidden></div>
                 </div>
 
                 <div class="money-summary-line" id="acquisitionSummary"></div>
@@ -696,14 +755,16 @@
     <script src="geneCatalog.js?v=3"></script>
     <script src="genes.js?v=8"></script>
     <script src="feed-helpers.js?v=4"></script>
-    <script src="finance-helpers.js?v=2"></script>
+    <script src="finance-helpers.js?v=6"></script>
+    <script src="sales-helpers.js?v=5"></script>
+    <script src="buyer-helpers.js?v=5"></script>
     <script src="feeder-inventory.js?v=8"></script>
     <script src="health-helpers.js?v=1"></script>
     <script src="readiness.js?v=2"></script>
     <script src="morphCalculator.js?v=8"></script>
     <script src="morph-gallery.js?v=7"></script>
     <script src="weight-chart.js?v=3"></script>
-    <script src="snake-form.js?v=29"></script>
+    <script src="snake-form.js?v=34"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

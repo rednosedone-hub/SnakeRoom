@@ -190,6 +190,154 @@ function renderHealthWatch(snakes) {
     }).join("");
 }
 
+// ---- Holds due -------------------------------------------------------------
+//
+// Holds are promises with dates. This watchlist puts late, expired and
+// due-soon pickups on the home screen before they turn into a problem.
+
+function formatHoldDate(value) {
+    const date = window.SaleHolds && window.SaleHolds.parseDate
+        ? window.SaleHolds.parseDate(value)
+        : null;
+
+    return date
+        ? date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+        : String(value || "");
+}
+
+function formatHoldMoney(value) {
+    return window.SnakeFinance && window.SnakeFinance.formatMoney
+        ? window.SnakeFinance.formatMoney(value)
+        : `$${(Number(value) || 0).toFixed(2)}`;
+}
+
+function describeHoldDue(hold) {
+    const days = hold.daysPastDue;
+    const dayLabel = count => `${count} day${count === 1 ? "" : "s"}`;
+
+    if (hold.expired) {
+        return {
+            label: "Hold expired",
+            className: "sale-badge-expired",
+            detail: `${dayLabel(days)} past pickup · ${formatHoldDate(hold.dueDate)}`
+        };
+    }
+
+    if (hold.overdue) {
+        return {
+            label: `${dayLabel(days)} late`,
+            className: "sale-badge-overdue",
+            detail: `Pickup was ${formatHoldDate(hold.dueDate)}`
+        };
+    }
+
+    if (hold.daysLeft === 0) {
+        return {
+            label: "Due today",
+            className: "sale-badge-hold",
+            detail: `Pickup ${formatHoldDate(hold.dueDate)}`
+        };
+    }
+
+    return {
+        label: `Due in ${dayLabel(hold.daysLeft)}`,
+        className: "sale-badge-hold",
+        detail: `Pickup ${formatHoldDate(hold.dueDate)}`
+    };
+}
+
+function describeHoldMoney(hold) {
+    if (hold.hasPrice) {
+        return `${formatHoldMoney(hold.deposit)} of ${formatHoldMoney(hold.agreedPrice)} paid · ${formatHoldMoney(hold.balance)} balance`;
+    }
+
+    if (hold.hasDeposit) {
+        return `${formatHoldMoney(hold.deposit)} deposit · no agreed price`;
+    }
+
+    return "No deposit recorded";
+}
+
+function renderHoldDue(activeSnakes) {
+    const list = document.getElementById("holdDueList");
+    const lead = document.getElementById("holdDueLead");
+    const countBadge = document.getElementById("holdDueCount");
+
+    if (!list || !lead || !countBadge || !window.SaleHolds) {
+        return;
+    }
+
+    const financeSettings = window.SnakeFinance && window.SnakeFinance.getSettings
+        ? window.SnakeFinance.getSettings()
+        : {};
+    const reminders = window.SaleHolds.listHoldReminders(activeSnakes, {
+        graceDays: financeSettings.holdGraceDays
+    });
+    const horizon = window.SaleHolds.DUE_SOON_DAYS;
+    const lateCount = Math.max(0, reminders.overdueCount - reminders.expiredCount);
+
+    countBadge.textContent = String(reminders.holds.length);
+    countBadge.classList.toggle("visible", reminders.holds.length > 0);
+    countBadge.title = reminders.holds.length === 1
+        ? "1 hold needs attention"
+        : `${reminders.holds.length} holds need attention`;
+
+    if (reminders.holds.length === 0) {
+        if (reminders.activeCount === 0) {
+            lead.textContent = "No active holds.";
+        } else if (reminders.nextDue) {
+            const next = reminders.nextDue;
+            lead.textContent = `No pickups in the next ${horizon} days. Next is ${next.snake.name || "a hold"} on ${formatHoldDate(next.hold.dueDate)} (in ${next.hold.daysLeft} day${next.hold.daysLeft === 1 ? "" : "s"}).`;
+        } else if (reminders.undatedCount > 0) {
+            lead.textContent = `No pickups in the next ${horizon} days. ${reminders.undatedCount} hold${reminders.undatedCount === 1 ? " has" : "s have"} no pickup date.`;
+        } else {
+            lead.textContent = `No pickups in the next ${horizon} days.`;
+        }
+
+        list.innerHTML = `<p class="empty-message">Nothing needs attention right now.</p>`;
+        return;
+    }
+
+    const parts = [];
+
+    if (reminders.expiredCount > 0) {
+        parts.push(`${reminders.expiredCount} expired`);
+    }
+
+    if (lateCount > 0) {
+        parts.push(`${lateCount} late`);
+    }
+
+    if (reminders.dueSoonCount > 0) {
+        parts.push(`${reminders.dueSoonCount} due in the next ${horizon} days`);
+    }
+
+    if (reminders.undatedCount > 0) {
+        parts.push(`${reminders.undatedCount} with no pickup date`);
+    }
+
+    lead.textContent = `${parts.join(" · ")}. Open Finances → Holds to see the details.`;
+
+    list.innerHTML = reminders.holds.map(({ snake, hold }) => {
+        const due = describeHoldDue(hold);
+        const profileUrl = `snake-form.html?uid=${encodeURIComponent(snake.id || "")}`;
+        const buyerLine = hold.buyer ? `Held for ${hold.buyer}` : "Buyer not recorded";
+        const planLine = hold.paymentPlan ? " · payment plan" : "";
+
+        return `
+            <div class="dashboard-list-item hold-due-item${hold.expired ? " is-urgent" : ""}">
+                <strong><a href="${profileUrl}">${escapeHtml(snake.name || "Unnamed")}</a></strong>
+                <span>${escapeHtml(window.SnakeData.getSnakeIdentityText(snake))}</span>
+                <span>${escapeHtml(buyerLine)}</span>
+                <span>
+                    <span class="sale-badge ${due.className}">${escapeHtml(due.label)}</span>
+                    ${escapeHtml(due.detail)} · ${escapeHtml(describeHoldMoney(hold))}${planLine}
+                </span>
+            </div>
+        `;
+    }).join("");
+}
+
 // ---- Feeder watch ----------------------------------------------------------
 //
 // The feeding list says who eats next; this says whether there is food for it.
@@ -347,6 +495,7 @@ function renderDashboard() {
     const convertedClutches = clutches.length - activeClutches;
 
     renderFinanceSummary(snakes);
+    renderHoldDue(activeSnakes);
     renderFeederWatch(activeSnakes);
     renderHealthWatch(activeSnakes);
 

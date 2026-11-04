@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Finances</title>
-    <link rel="stylesheet" href="style.css?v=45">
+    <link rel="stylesheet" href="style.css?v=72">
 </head>
 
 <body>
@@ -25,6 +25,8 @@
             <a href="index.html" class="main-button">Home</a>
             <a href="snakes.html" class="main-button">Collection</a>
             <a href="breeding.html" class="main-button">Breeding</a>
+            <a href="buyers.html" class="main-button">Buyers</a>
+            <a href="season-review.html" class="main-button">Season Review</a>
             <a href="account.html" class="main-button">Account</a>
         </div>
 
@@ -51,6 +53,8 @@
                     aria-selected="true">Overview</button>
                 <button type="button" class="fin-tab" data-fin-tab="snakes" role="tab"
                     aria-selected="false">Snakes</button>
+                <button type="button" class="fin-tab" data-fin-tab="holds" role="tab"
+                    aria-selected="false">Holds</button>
                 <button type="button" class="fin-tab" data-fin-tab="feeders" role="tab"
                     aria-selected="false">Feeders</button>
                 <button type="button" class="fin-tab" data-fin-tab="expos" role="tab"
@@ -185,6 +189,63 @@
                 </div>
 
                 <div class="fin-warning" id="finSalesWarnings" style="display: none;"></div>
+            </section>
+
+            <section class="fin-panel" data-fin-panel="holds" role="tabpanel">
+                <div class="fin-panel-head">
+                    <div>
+                        <h3>Holds &amp; deposits</h3>
+                        <p class="empty-message fin-panel-lead">
+                            Snakes promised to a buyer but not sold yet. A deposit is counted as
+                            money in while the snake is held; when it is marked Sold, the sale
+                            price takes over and the deposit is already part of it.
+                        </p>
+                    </div>
+
+                    <a class="small-link-button" href="snakes.html">Open Collection</a>
+                </div>
+
+                <div class="fin-kpi-grid" id="finHoldKpis"></div>
+
+                <form class="fin-hold-settings" id="holdGraceForm">
+                    <label class="form-field">
+                        <span>Flag a hold as expired after</span>
+                        <div class="fin-hold-grace-row">
+                            <input type="number" id="holdGraceDaysInput" min="1" max="365"
+                                step="1" inputmode="numeric" aria-label="Hold expiry grace period in days">
+                            <span>days past the pickup date</span>
+                            <button type="submit" class="gene-action-button">Save</button>
+                        </div>
+                    </label>
+
+                    <p class="empty-message fin-hold-settings-note">
+                        This only decides when the red expiry flag appears. A hold is never
+                        released automatically; you still choose what happens to the deposit.
+                    </p>
+
+                    <p class="fin-status" id="holdGraceStatus" role="status"></p>
+                </form>
+
+                <div class="fin-table-wrap">
+                    <table class="fin-table">
+                        <thead>
+                            <tr>
+                                <th>Snake</th>
+                                <th>Held for</th>
+                                <th class="fin-amount-cell">Agreed</th>
+                                <th class="fin-amount-cell">Deposit</th>
+                                <th class="fin-amount-cell">Balance</th>
+                                <th>Due</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="finHoldsBody"></tbody>
+                    </table>
+                </div>
+
+                <p class="empty-message" id="finHoldsEmpty">No snakes are on hold right now.</p>
+                <p class="fin-status" id="finHoldsStatus" role="status"></p>
             </section>
 
             <section class="fin-panel" data-fin-panel="feeders" role="tabpanel">
@@ -432,6 +493,63 @@
         </div>
     </div>
 
+    <div class="modal" id="releaseHoldModal" role="dialog" aria-modal="true"
+        aria-labelledby="releaseHoldTitle">
+        <div class="modal-content">
+            <button type="button" class="close-button" onclick="closeReleaseHoldModal()"
+                aria-label="Cancel">&#215;</button>
+
+            <h3 id="releaseHoldTitle">Release hold</h3>
+            <p class="empty-message" id="releaseHoldText"></p>
+
+            <fieldset class="release-options">
+                <legend>What happens to the deposit?</legend>
+
+                <label class="release-option">
+                    <input type="radio" name="releaseDisposition" value="forfeit" checked
+                        onchange="updateReleaseDispositionFields()">
+                    <span>Forfeited
+                        <small>The deposit stays as money received. Nothing is refunded.</small>
+                    </span>
+                </label>
+
+                <label class="release-option">
+                    <input type="radio" name="releaseDisposition" value="transfer"
+                        onchange="updateReleaseDispositionFields()">
+                    <span>Transferred
+                        <small>The credit moves to another animal or a future purchase. The cash stays on this ledger, so do not enter it again as a new deposit.</small>
+                    </span>
+                </label>
+
+                <label class="release-option">
+                    <input type="radio" name="releaseDisposition" value="return"
+                        onchange="updateReleaseDispositionFields()">
+                    <span>Returned
+                        <small>A deposit refund is added to the ledger, so the deposit and refund cancel out.</small>
+                    </span>
+                </label>
+            </fieldset>
+
+            <label class="form-field" id="releaseTransferField" hidden>
+                <span>Transferred to</span>
+                <input type="text" id="releaseTransferInput"
+                    placeholder="Another snake, or the buyer's credit">
+            </label>
+
+            <p class="empty-message" id="releaseRefundNote" hidden></p>
+
+            <div class="modal-actions">
+                <button type="button" class="main-button" onclick="confirmReleaseHold()">
+                    Release hold
+                </button>
+
+                <button type="button" class="secondary-button" onclick="closeReleaseHoldModal()">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="data-helpers.js"></script>
@@ -440,8 +558,9 @@
     <script src="auto-sync.js?v=8"></script>
     <script src="account-gate.js?v=1"></script>
     <script src="plans.js?v=2"></script>
-    <script src="finance-helpers.js?v=2"></script>
-    <script src="finance.js?v=1"></script>
+    <script src="finance-helpers.js?v=6"></script>
+    <script src="sales-helpers.js?v=5"></script>
+    <script src="finance.js?v=4"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

@@ -85,6 +85,10 @@ function getExpectedHatchDate(layDate) {
         return "";
     }
 
+    if (window.Incubation && window.Incubation.expectedHatchDate) {
+        return window.Incubation.expectedHatchDate({ laidDate: layDate });
+    }
+
     const date = new Date(layDate);
     date.setDate(date.getDate() + 55);
 
@@ -136,6 +140,199 @@ function getPairings(pair) {
     }
 
     return [];
+}
+
+// A pairing is either for sales or a step in a project toward a target morph.
+// The scorecard reads this field to decide whether a low sales figure is a
+// problem or simply the point.
+function getPairPurpose(pair) {
+    return String(pair && pair.purpose || "").toLowerCase() === "project" ? "project" : "sales";
+}
+
+function getPairPurposeLabel(pair) {
+    return getPairPurpose(pair) === "project" ? "Project pairing" : "Sales pairing";
+}
+
+// A project pairing is judged on the morph it produced, not on the eggs that
+// hatched: a healthy clutch can still miss the goal entirely, and the keeper
+// needs to record that so the next step can be planned.
+const PROJECT_OUTCOME_OPTIONS = [
+    { key: "pending", label: "Not judged yet" },
+    { key: "hit", label: "Goal hit" },
+    { key: "partial", label: "Partial - kept something useful" },
+    { key: "missed", label: "Missed - nothing to keep" }
+];
+
+const PROJECT_NEXT_OPTIONS = [
+    { key: "undecided", label: "Not decided" },
+    { key: "breed-back", label: "Keep and breed back" },
+    { key: "repeat", label: "Repeat this pairing" },
+    { key: "new-approach", label: "Try a different approach" },
+    { key: "done", label: "Project complete" }
+];
+
+function getPairHatchlings(pair) {
+    if (!pair) {
+        return [];
+    }
+
+    const clutch = clutches.find(item => item && String(item.id || "") === String(pair.clutchId || ""));
+    const token = clutch && clutch.clutchToken ? String(clutch.clutchToken) : "";
+    const clutchId = String((clutch && clutch.id) || pair.clutchId || "");
+
+    return snakes.filter(snake => {
+        if (!snake || !window.SnakeData.isActiveSnake(snake)) {
+            return false;
+        }
+
+        if (token && String(snake.clutchToken || "") === token) {
+            return true;
+        }
+
+        return Boolean(clutchId) && String(snake.clutchId || "") === clutchId;
+    });
+}
+
+function hatchlingOptionLabel(snake) {
+    const name = snake.name || "Unnamed";
+    const morph = snake.morph && snake.morph !== name ? ` - ${snake.morph}` : "";
+
+    return `${name}${morph}`;
+}
+
+// The plan for the next generation, recorded on the step that produced the
+// keeper: which animal to hold back, and which gene or animal still has to be
+// added before the next pairing can happen.
+function pairProjectFields(pair) {
+    const hatchlings = getPairHatchlings(pair);
+    const outcome = String(pair.projectOutcome || "pending");
+    const next = String(pair.projectNext || "undecided");
+    const options = (list, selected) => list
+        .map(option => `<option value="${option.key}" ${option.key === selected ? "selected" : ""}>${option.label}</option>`)
+        .join("");
+
+    return `
+        <div class="pair-project-fields">
+            <h5>Project Step</h5>
+            <p class="empty-message">
+                Judge this step on the morph it produced. The scorecard groups pairings by target
+                morph and lists their steps in order.
+            </p>
+
+            <div class="form-grid">
+                <label class="form-field">
+                    <span>Step</span>
+                    <input type="number" min="1" value="${Number(pair.projectStep) || ""}" placeholder="1"
+                        onchange="updatePairField('${pair.id}', 'projectStep', this.value)">
+                </label>
+
+                <label class="form-field">
+                    <span>Outcome</span>
+                    <select onchange="updatePairField('${pair.id}', 'projectOutcome', this.value)">
+                        ${options(PROJECT_OUTCOME_OPTIONS, outcome)}
+                    </select>
+                </label>
+
+                <label class="form-field">
+                    <span>What Hatched</span>
+                    <input type="text" value="${escapePairText(pair.projectResult || "")}"
+                        placeholder="e.g. Hurricane Clown, no Cypress or Pin"
+                        onchange="updatePairField('${pair.id}', 'projectResult', this.value)">
+                </label>
+
+                <label class="form-field">
+                    <span>What Was Missing</span>
+                    <input type="text" value="${escapePairText(pair.projectMissing || "")}"
+                        placeholder="e.g. Cypress, Pinstripe"
+                        onchange="updatePairField('${pair.id}', 'projectMissing', this.value)">
+                </label>
+
+                <label class="form-field">
+                    <span>Next Move</span>
+                    <select onchange="updatePairField('${pair.id}', 'projectNext', this.value)">
+                        ${options(PROJECT_NEXT_OPTIONS, next)}
+                    </select>
+                </label>
+
+                <label class="form-field">
+                    <span>Next-Step Note</span>
+                    <input type="text" value="${escapePairText(pair.projectNextNote || "")}"
+                        placeholder="e.g. Keep him and breed back to the mother when he is up to size"
+                        onchange="updatePairField('${pair.id}', 'projectNextNote', this.value)">
+                </label>
+
+                <label class="form-field">
+                    <span>Keeper Kept</span>
+                    <select onchange="updatePairField('${pair.id}', 'nextKeeperId', this.value)">
+                        <option value="">Not chosen yet</option>
+                        ${hatchlings.map(snake => `
+                            <option value="${snake.id}" ${String(pair.nextKeeperId || "") === String(snake.id) ? "selected" : ""}>
+                                ${escapePairText(hatchlingOptionLabel(snake))}
+                            </option>
+                        `).join("")}
+                    </select>
+                    <small class="empty-message">${hatchlings.length > 0
+                        ? "The animal from this clutch that carries the project on."
+                        : "No hatchlings from this clutch are on record yet."}</small>
+                </label>
+
+                <label class="form-field">
+                    <span>Next Step Needs</span>
+                    <input type="text" value="${escapePairText(pair.nextNeeds || "")}"
+                        placeholder="e.g. Yellow Belly or Banana Het Clown"
+                        onchange="updatePairField('${pair.id}', 'nextNeeds', this.value)">
+                </label>
+            </div>
+
+            <div class="card-buttons">
+                <button type="button" class="edit-button" onclick="startProjectNextStep('${pair.id}')">
+                    Start Next Step
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// Fill the new-pair form with the next step so it is a record, not a note: the
+// keeper becomes one parent, the target and step carry over, and the missing
+// partner is left for the keeper to choose (or to source later).
+function startProjectNextStep(pairId) {
+    const pair = breedingPairs.find(item => item.id === pairId);
+
+    if (!pair) {
+        return;
+    }
+
+    const keeper = pair.nextKeeperId
+        ? window.SnakeData.getSnakeByReference(snakes, pair.nextKeeperId)
+        : null;
+    const nextStep = (Number(pair.projectStep) || 1) + 1;
+    const hint = document.getElementById("projectNextHint");
+
+    document.getElementById("pairPurposeInput").value = "project";
+    document.getElementById("targetMorphInput").value = pair.targetMorph || "";
+    document.getElementById("projectStepInput").value = nextStep;
+    document.getElementById("femaleSelect").value = "";
+    document.getElementById("maleSelect").value = "";
+
+    if (keeper && keeper.sex === "Female") {
+        document.getElementById("femaleSelect").value = keeper.id;
+    } else if (keeper && keeper.sex === "Male") {
+        document.getElementById("maleSelect").value = keeper.id;
+    }
+
+    if (hint) {
+        hint.textContent = [
+            `Step ${nextStep} toward ${pair.targetMorph || "the goal"}`,
+            keeper ? `keeper ${keeper.name || "unnamed"} is set as a parent` : "",
+            pair.nextNeeds ? `the other parent still needs ${pair.nextNeeds}` : ""
+        ].filter(Boolean).join(" \u00b7 ")
+            + ". Choose the other parent, then Save Pair. Until that animal is on hand the need stays recorded on the step.";
+        hint.hidden = false;
+    }
+
+    renderPairCheck();
+    document.getElementById("femaleSelect").scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 function getPairStatus(pair) {
@@ -388,6 +585,179 @@ function getPairTimelineLine(pair) {
     return `<p class="pair-readiness-line">Timeline: ${escapePairText(ovulation)} \u00b7 eggs due est. ${escapePairText(estimate.layDate)} (${escapePairText(estimate.layFrom)} to ${escapePairText(estimate.layTo)}) \u00b7 ${escapePairText(climb)}</p>`;
 }
 
+function getTimelineCardFor(record) {
+    const timeline = window.BreedingTimeline;
+
+    if (!timeline || !timeline.card) {
+        return null;
+    }
+
+    const female = getPairParentSnake(record.femaleSnakeId, record.femaleIndex);
+    const incubationDays = window.Incubation && window.Incubation.incubationDays
+        ? window.Incubation.incubationDays(record)
+        : record.incubationDays;
+
+    return timeline.card(record, female, { incubationDays });
+}
+
+function formatCardDate(value) {
+    const date = window.BreedingTimeline && window.BreedingTimeline.parseDate(value);
+
+    if (!date) {
+        return "";
+    }
+
+    return date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+function getTimelineRailStop(stage) {
+    return `
+        <div class="clutch-rail-stop${stage.observed ? " is-observed" : ""}">
+            <span class="clutch-rail-label">${escapePairText(stage.label)}</span>
+            <strong class="clutch-rail-date">${escapePairText(formatCardDate(stage.date) || "To come")}</strong>
+        </div>
+    `;
+}
+
+function getTimelineStageRow(stage) {
+    const windowText = stage.from && stage.to
+        ? `${formatCardDate(stage.from)} &ndash; ${formatCardDate(stage.to)}`
+        : "&mdash;";
+
+    return `
+        <tr>
+            <td>
+                <strong>${escapePairText(stage.label)}</strong>
+                <span class="clutch-stage-note">${escapePairText(stage.note)}</span>
+            </td>
+            <td>${formatCardDate(stage.date) || "&mdash;"}</td>
+            <td>${windowText}</td>
+            <td class="clutch-tick-cell">${stage.observed ? "&#10003;" : `<span class="clutch-tick-box"></span>`}</td>
+        </tr>
+    `;
+}
+
+// The card is built into its own sheet rather than printed from the breeding
+// page itself: the print styles then hide the whole app and leave only paper.
+function getTimelineCardHtml(record, options = {}) {
+    const card = getTimelineCardFor(record);
+
+    if (!card) {
+        return "";
+    }
+
+    const timeline = window.BreedingTimeline;
+    const femaleLabel = getSnakeLabel(record.femaleSnakeId || record.femaleIndex);
+    const maleLabel = getSnakeLabel(record.maleSnakeId || record.maleIndex);
+    const title = `${femaleLabel} x ${maleLabel}`;
+    const pairings = Array.isArray(record.pairings) && record.pairings.length
+        ? record.pairings.map(pairing => pairing && pairing.date).filter(Boolean)
+        : (record.pairingDate ? [record.pairingDate] : []);
+    const pairingText = pairings.map(formatCardDate).filter(Boolean).join(" \u00b7 ");
+    const evidence = card.weightClimb
+        ? `Weight climbed ${timeline.describeClimb(card.weightClimb)} before the shed.`
+        : (card.shedDate
+            ? "No weight climb on record before the shed, so the dates rest on the shed alone."
+            : "");
+
+    return `
+        <article class="clutch-timeline-card">
+            <header class="clutch-timeline-head">
+                <div>
+                    <p class="clutch-timeline-kicker">The Snake Room</p>
+                    <h1>Clutch Timeline</h1>
+                    <p class="clutch-timeline-pair">${escapePairText(title)}</p>
+                    ${options.subtitle ? `<p class="clutch-timeline-subtitle">${escapePairText(options.subtitle)}</p>` : ""}
+                </div>
+
+                <div class="clutch-timeline-meta">
+                    <p>Printed ${escapePairText(formatCardDate(getTodayText()))}</p>
+                    ${card.eggCount ? `<p>${card.eggCount} egg${card.eggCount === 1 ? "" : "s"} on record</p>` : ""}
+                </div>
+            </header>
+
+            <div class="clutch-timeline-rail">
+                ${card.stages.map(getTimelineRailStop).join("")}
+            </div>
+
+            <table class="clutch-timeline-table">
+                <thead>
+                    <tr>
+                        <th>Stage</th>
+                        <th>Date</th>
+                        <th>Window</th>
+                        <th>Seen</th>
+                    </tr>
+                </thead>
+                <tbody>${card.stages.map(getTimelineStageRow).join("")}</tbody>
+            </table>
+
+            <div class="clutch-timeline-notes">
+                ${pairingText ? `<p><strong>Pairings:</strong> ${escapePairText(pairingText)}</p>` : ""}
+                ${evidence ? `<p><strong>Evidence:</strong> ${escapePairText(evidence)}</p>` : ""}
+                <p class="clutch-timeline-footnote">
+                    ${card.stages.every(stage => stage.observed)
+                        ? "Every date on this card is a recorded event."
+                        : "An estimated date is the middle of the usual window, not a promise. Write the real date in the Seen column when it happens."}
+                </p>
+            </div>
+        </article>
+    `;
+}
+
+function getTimelinePrintButton(record, kind) {
+    if (!getTimelineCardFor(record)) {
+        return "";
+    }
+
+    return `
+        <button type="button" class="gene-action-button" onclick="printClutchTimeline('${kind}', '${record.id}')">
+            Print Timeline
+        </button>
+    `;
+}
+
+function clearClutchTimelinePrint() {
+    document.body.classList.remove("printing-clutch-timeline");
+
+    const sheet = document.getElementById("clutchTimelinePrintSheet");
+
+    if (sheet) {
+        sheet.innerHTML = "";
+    }
+}
+
+function printClutchTimeline(kind, id) {
+    const record = kind === "clutch"
+        ? clutches.find(item => item.id === id)
+        : breedingPairs.find(item => item.id === id);
+
+    if (!record) {
+        return;
+    }
+
+    const html = getTimelineCardHtml(record, kind === "clutch"
+        ? { subtitle: `Clutch ${record.id}` }
+        : { subtitle: "Pair in progress" });
+
+    if (!html) {
+        return;
+    }
+
+    let sheet = document.getElementById("clutchTimelinePrintSheet");
+
+    if (!sheet) {
+        sheet = document.createElement("div");
+        sheet.id = "clutchTimelinePrintSheet";
+        sheet.className = "clutch-print-sheet";
+        document.body.appendChild(sheet);
+    }
+
+    sheet.innerHTML = html;
+    document.body.classList.add("printing-clutch-timeline");
+    window.print();
+}
+
 function renderPairCheck() {
     const container = document.getElementById("lineageWarning");
     const readinessContainer = document.getElementById("pairingReadiness");
@@ -453,6 +823,9 @@ function saveBreedingPair() {
         preLayShedDate: document.getElementById("preLayShedDateInput").value,
         eggsLaidDate: document.getElementById("eggsLaidDateInput").value,
         eggCount: Number(document.getElementById("eggCountInput").value) || 0,
+        purpose: getPairPurpose({ purpose: document.getElementById("pairPurposeInput").value }),
+        targetMorph: document.getElementById("targetMorphInput").value.trim(),
+        projectStep: Math.max(0, Math.round(Number(document.getElementById("projectStepInput").value))) || 0,
         clutchId: ""
     });
 
@@ -470,6 +843,16 @@ function clearPairForm() {
     document.getElementById("preLayShedDateInput").value = "";
     document.getElementById("eggsLaidDateInput").value = "";
     document.getElementById("eggCountInput").value = "";
+    document.getElementById("pairPurposeInput").value = "sales";
+    document.getElementById("targetMorphInput").value = "";
+    document.getElementById("projectStepInput").value = "";
+    const nextHint = document.getElementById("projectNextHint");
+
+    if (nextHint) {
+        nextHint.hidden = true;
+        nextHint.textContent = "";
+    }
+
     renderPairCheck();
 }
 
@@ -480,8 +863,8 @@ function updatePairField(pairId, fieldName, value) {
         return;
     }
 
-    if (fieldName === "eggCount") {
-        pair[fieldName] = Number(value) || 0;
+    if (fieldName === "eggCount" || fieldName === "projectStep") {
+        pair[fieldName] = Math.max(0, Math.round(Number(value))) || 0;
     } else if (fieldName === "ovulationObserved") {
         pair[fieldName] = Boolean(value);
     } else {
@@ -709,6 +1092,11 @@ function renderBreedingPairs() {
             <div>
                 <h4>${getSnakeLabel(pair.femaleSnakeId || pair.femaleIndex)} x ${getSnakeLabel(pair.maleSnakeId || pair.maleIndex)}</h4>
                 <p>Status: ${getPairStatus(pair)}</p>
+                <p>
+                    Purpose: ${getPairPurposeLabel(pair)}${pair.targetMorph
+                        ? ` &middot; toward ${escapePairText(pair.targetMorph)}`
+                        : ""}
+                </p>
                 <p>Pairings: ${getPairings(pair).length || "None recorded"}</p>
                 ${getPairReadinessLine(pair)}
                 ${getPairTimelineLine(pair)}
@@ -780,9 +1168,28 @@ function renderBreedingPairs() {
                     <input type="number" min="0" value="${pair.eggCount || ""}"
                         onchange="updatePairField('${pair.id}', 'eggCount', this.value)">
                 </label>
+
+                <label class="form-field">
+                    <span>Purpose</span>
+                    <select onchange="updatePairField('${pair.id}', 'purpose', this.value)">
+                        <option value="sales" ${getPairPurpose(pair) === "sales" ? "selected" : ""}>Sales pairing</option>
+                        <option value="project" ${getPairPurpose(pair) === "project" ? "selected" : ""}>Project pairing</option>
+                    </select>
+                </label>
+
+                <label class="form-field">
+                    <span>Target Morph</span>
+                    <input type="text" value="${escapePairText(pair.targetMorph || "")}"
+                        placeholder="e.g. Hurricane Cypress Pin Clown"
+                        onchange="updatePairField('${pair.id}', 'targetMorph', this.value)">
+                </label>
             </div>
 
+            ${getPairPurpose(pair) === "project" ? pairProjectFields(pair) : ""}
+
             <div class="card-buttons">
+                ${getTimelinePrintButton(pair, "pair")}
+
                 <button type="button" class="archive-button" onclick="openClosePairModal('${pair.id}')">
                     Close Pair
                 </button>
@@ -852,6 +1259,10 @@ function renderClutches() {
 
     list.innerHTML = clutches.map(clutch => {
         const isHatched = Boolean(clutch.convertedToSnakes || clutch.hatchedDate);
+        // A converted pair keeps its purpose and target on the pair record, so a
+        // project started from a pairing can still be relabelled after the egg
+        // date has passed.
+        const linkedPair = breedingPairs.find(item => item.clutchId === clutch.id) || null;
         // The number to expect before hatching, the number that actually came
         // out afterwards. Twins mean the second can be larger than the eggs.
         const expected = clutch.expectedHatchlings;
@@ -868,6 +1279,9 @@ function renderClutches() {
                 <p>Ovulation: ${clutch.ovulationObserved ? "Observed" : "Not marked"}${clutch.ovulationDate ? ` on ${clutch.ovulationDate}` : ""}</p>
                 <p>Pre-lay shed: ${clutch.preLayShedDate || "Not recorded"}</p>
                 <p>Laid: ${clutch.laidDate || "Not recorded"} / Eggs: ${clutch.eggCount || 0}</p>
+                ${linkedPair ? `<p>Purpose: ${getPairPurposeLabel(linkedPair)}${linkedPair.targetMorph
+                    ? ` &middot; toward ${escapePairText(linkedPair.targetMorph)}`
+                    : ""}</p>` : ""}
                 <p>${clutch.convertedToSnakes
                     ? `Hatched ${clutch.hatchlingCount || 0} hatchlings on ${clutch.hatchedDate || "not recorded"}. Record kept as history.`
                     : clutch.laidDate
@@ -890,9 +1304,30 @@ function renderClutches() {
                         onchange="updateClutchHatchlingCount('${clutch.id}', this.value)">
                     <small class="empty-message">${isHatched ? "More than the eggs means twins." : "Leave blank to use the egg count."}</small>
                 </label>
+
+                ${linkedPair ? `
+                <label class="form-field">
+                    <span>Purpose</span>
+                    <select onchange="updatePairField('${linkedPair.id}', 'purpose', this.value)">
+                        <option value="sales" ${getPairPurpose(linkedPair) === "sales" ? "selected" : ""}>Sales pairing</option>
+                        <option value="project" ${getPairPurpose(linkedPair) === "project" ? "selected" : ""}>Project pairing</option>
+                    </select>
+                </label>
+
+                <label class="form-field">
+                    <span>Target Morph</span>
+                    <input type="text" value="${escapePairText(linkedPair.targetMorph || "")}"
+                        placeholder="e.g. Hurricane Cypress Pin Clown"
+                        onchange="updatePairField('${linkedPair.id}', 'targetMorph', this.value)">
+                </label>
+                ` : ""}
             </div>
 
+            ${linkedPair && getPairPurpose(linkedPair) === "project" ? pairProjectFields(linkedPair) : ""}
+
             <div class="card-buttons">
+                ${getTimelinePrintButton(clutch, "clutch")}
+
                 <button type="button" class="edit-button" onclick="goToBreedingOutcomes('${clutch.id}')">
                     ${clutch.convertedToSnakes ? "View Outcomes" : "Record Hatch"}
                 </button>
@@ -1004,6 +1439,7 @@ window.reopenPair = reopenPair;
 window.goToBreedingOutcomes = goToBreedingOutcomes;
 window.updateClutchHatchlingCount = updateClutchHatchlingCount;
 window.deleteClutch = deleteClutch;
+window.printClutchTimeline = printClutchTimeline;
 
 const closePairModal = document.getElementById("closePairModal");
 
@@ -1020,6 +1456,8 @@ document.addEventListener("keydown", event => {
         closeClosePairModal();
     }
 });
+
+window.addEventListener("afterprint", clearClutchTimelinePrint);
 
 setupSnakeSelects();
 migrateBreedingReferences();

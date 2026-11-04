@@ -22,6 +22,11 @@
 
 /* Website Styles */
 
+/* The hidden attribute must beat component display rules such as flex. */
+[hidden] {
+    display: none !important;
+}
+
 :root {
     --gold-color: gold;
     --goldenrod-color: goldenrod;
@@ -3601,6 +3606,7 @@ body.has-sync-banner .page-container {
 
 .parentage-block,
 .sale-block,
+.hold-block,
 .retirement-block {
     margin-top: 22px;
     padding-top: 16px;
@@ -3609,10 +3615,12 @@ body.has-sync-banner .page-container {
 
 .parentage-block h4,
 .sale-block h4,
+.hold-block h4,
 .retirement-block h4 {
     margin-bottom: 8px;
 }
 
+.hold-block[hidden],
 .retirement-block[hidden] {
     display: none;
 }
@@ -3696,6 +3704,191 @@ body.has-sync-banner .page-container {
     }
 
     .expo-card-head h4 {
+        font-size: 20px;
+    }
+}
+
+/* Season review */
+
+.season-verdict {
+    margin-top: 20px;
+    padding: 18px 20px;
+    border: 1px solid var(--goldenrod-color);
+    border-left-width: 6px;
+    border-radius: 8px;
+    background-color: #14110a;
+}
+
+.season-verdict h4 {
+    margin: 0 0 6px;
+    color: var(--gold-color);
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 24px;
+    line-height: 1.25;
+}
+
+.season-verdict p {
+    max-width: 950px;
+    margin: 0;
+    color: var(--text-color);
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.season-verdict-investing {
+    border-left-color: #d9a94f;
+    background-color: rgba(217, 169, 79, 0.08);
+}
+
+.season-verdict-positive {
+    border-left-color: #6fbf73;
+}
+
+.season-verdict-down {
+    border-left-color: #d98a8a;
+}
+
+.season-verdict-empty {
+    border-left-color: #6b6250;
+}
+
+.season-disposition {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.season-disposition-item {
+    padding: 14px;
+    border: 1px solid #4a4128;
+    border-radius: 8px;
+    background-color: #0d0b07;
+}
+
+.season-disposition-item strong {
+    display: block;
+    color: var(--gold-color);
+    font-size: 30px;
+    line-height: 1;
+}
+
+.season-disposition-item span {
+    display: block;
+    margin-top: 4px;
+    color: var(--silver-color);
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.season-disposition-item p {
+    margin: 8px 0 0;
+    color: var(--text-color);
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.season-disposition-loss {
+    border-color: #6b3d3d;
+}
+
+.season-disposition-loss strong {
+    color: #ffb3b3;
+}
+
+.season-break-even {
+    margin: 0;
+    color: var(--text-color);
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+.season-inline {
+    color: var(--gold-color);
+}
+
+.season-table td {
+    vertical-align: top;
+}
+
+.season-table th:nth-child(1),
+.season-table td:nth-child(1),
+.season-table th:nth-child(3),
+.season-table td:nth-child(3),
+.season-table th:nth-child(4),
+.season-table td:nth-child(4) {
+    white-space: nowrap;
+}
+
+/* The nine-column clutch table does not belong on a phone; the same rows
+   render as cards instead. */
+.season-clutch-cards {
+    display: none;
+}
+
+.season-clutch-card {
+    padding: 12px 14px;
+    border: 1px solid #4a4128;
+    border-radius: 8px;
+    background-color: #0d0b07;
+}
+
+.season-clutch-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    align-items: baseline;
+}
+
+.season-clutch-card-head strong {
+    color: var(--gold-color);
+    font-size: 18px;
+}
+
+.season-clutch-card-head span {
+    color: var(--silver-color);
+    font-size: 13px;
+}
+
+.season-clutch-card p {
+    margin: 6px 0 0;
+    color: var(--text-color);
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.season-clutch-card .season-clutch-card-sales {
+    color: var(--gold-color);
+    font-weight: 600;
+}
+
+@media (max-width: 700px) {
+    .season-clutch-cards {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+    }
+
+    #seasonClutchTableWrap {
+        display: none;
+    }
+
+    /* Name, morph, hatched and status are the fields that matter here. */
+    .season-kept-table th:nth-child(3),
+    .season-kept-table td:nth-child(3),
+    .season-kept-table th:nth-child(6),
+    .season-kept-table td:nth-child(6) {
+        display: none;
+    }
+}
+
+@media (max-width: 600px) {
+    .season-verdict {
+        padding: 14px 16px;
+    }
+
+    .season-verdict h4 {
         font-size: 20px;
     }
 }
@@ -4229,6 +4422,163 @@ body.has-sync-banner .collection-notice {
     color: #f0d58a;
 }
 
+/* Sale, hold and deposit badges on collection cards and finance rows */
+
+.sale-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 3px 9px;
+    border: 1px solid var(--goldenrod-color);
+    border-radius: 999px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11px;
+    line-height: 1.25;
+    color: var(--text-color);
+    background-color: rgba(0, 0, 0, 0.28);
+    white-space: nowrap;
+}
+
+.sale-badge-available {
+    border-color: #6fbf73;
+    color: #b6e6b8;
+}
+
+.sale-badge-hold {
+    border-color: #c9a227;
+    color: #f0d58a;
+}
+
+.sale-badge-overdue {
+    border-color: #c0392b;
+    color: #ffb4a8;
+}
+
+.sale-badge-sold {
+    border-color: #6b6250;
+    color: #cfc7b4;
+}
+
+.sale-badge-expired {
+    border-color: #ff6b5e;
+    color: #ffd0c9;
+    background-color: rgba(192, 57, 43, 0.22);
+    font-weight: bold;
+}
+
+.fin-hold-actions {
+    white-space: nowrap;
+}
+
+.fin-hold-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0 0 22px;
+    padding: 16px;
+    border: 1px solid var(--goldenrod-color);
+    border-radius: 10px;
+    background-color: rgba(0, 0, 0, 0.18);
+}
+
+.fin-hold-grace-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.fin-hold-grace-row input {
+    width: 96px;
+}
+
+.fin-hold-grace-row span {
+    color: var(--silver-color);
+    font-size: 15px;
+}
+
+.fin-hold-settings-note {
+    margin: 0;
+    font-size: 14px;
+}
+
+.fin-hold-action {
+    margin: 2px 6px 2px 0;
+    padding: 4px 9px;
+    border: 1px solid var(--goldenrod-color);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-color);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.fin-hold-action:hover {
+    border-color: var(--gold-color);
+    color: var(--gold-color);
+}
+
+/* Released holds shown under the working hold fields on a snake record */
+.hold-history {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 10px 14px;
+    border: 1px dashed var(--goldenrod-color);
+    border-radius: 8px;
+    color: var(--silver-color);
+    font-size: 14px;
+}
+
+.hold-history strong {
+    color: var(--gold-color);
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.release-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--goldenrod-color);
+    border-radius: 8px;
+}
+
+.release-options legend {
+    padding: 0 6px;
+    color: var(--gold-color);
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 16px;
+}
+
+.release-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    color: var(--text-color);
+    font-size: 15px;
+    cursor: pointer;
+}
+
+.release-option input[type="radio"] {
+    width: 18px;
+    height: 18px;
+    margin-top: 3px;
+    accent-color: var(--gold-color);
+    box-shadow: none;
+}
+
+.release-option small {
+    display: block;
+    margin-top: 3px;
+    color: var(--silver-color);
+    font-size: 13px;
+    line-height: 1.35;
+}
+
 .health-watch-item.is-urgent {
     border-color: #c0392b;
 }
@@ -4530,6 +4880,212 @@ body.has-sync-banner .collection-notice {
 
 .pair-readiness-line .readiness-badge {
     margin-left: 4px;
+}
+
+/* Printable clutch timeline card */
+
+.clutch-print-sheet {
+    display: none;
+}
+
+.clutch-timeline-card {
+    box-sizing: border-box;
+    padding: 0.42in 0.45in 0.36in;
+    color: #111;
+    background: #fff;
+    border: 2px solid #111;
+    border-radius: 6px;
+    font-family: 'Times New Roman', Times, serif;
+}
+
+/* The app's gold headings and themed paragraphs must not leak onto paper. */
+.clutch-timeline-card,
+.clutch-timeline-card * {
+    color: #111;
+    font-family: 'Times New Roman', Times, serif;
+}
+
+.clutch-timeline-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16pt;
+    padding-bottom: 10pt;
+    border-bottom: 1px solid #111;
+}
+
+.clutch-timeline-kicker {
+    margin: 0 0 2pt;
+    font-size: 8.5pt;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+
+.clutch-timeline-card h1 {
+    margin: 0;
+    font-size: 24pt;
+    line-height: 1.05;
+}
+
+.clutch-timeline-pair {
+    margin: 4pt 0 0;
+    font-size: 14pt;
+    font-weight: 700;
+}
+
+.clutch-timeline-subtitle {
+    margin: 2pt 0 0;
+    color: #444;
+    font-size: 10pt;
+}
+
+.clutch-timeline-meta {
+    color: #333;
+    font-size: 9pt;
+    text-align: right;
+}
+
+.clutch-timeline-meta p {
+    margin: 0 0 3pt;
+}
+
+.clutch-timeline-rail {
+    display: flex;
+    margin: 20pt 0 16pt;
+    border-top: 2px solid #111;
+}
+
+.clutch-rail-stop {
+    position: relative;
+    flex: 1;
+    padding: 10pt 6pt 0;
+    text-align: center;
+}
+
+.clutch-rail-stop::before {
+    content: "";
+    position: absolute;
+    top: -5pt;
+    left: 50%;
+    width: 8pt;
+    height: 8pt;
+    margin-left: -4pt;
+    background: #fff;
+    border: 2px solid #111;
+    border-radius: 50%;
+}
+
+.clutch-rail-stop.is-observed::before {
+    background: #111;
+}
+
+.clutch-rail-label {
+    display: block;
+    color: #444;
+    font-size: 8.5pt;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.clutch-rail-date {
+    display: block;
+    margin-top: 2pt;
+    font-size: 12pt;
+}
+
+.clutch-timeline-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10pt;
+}
+
+.clutch-timeline-table th,
+.clutch-timeline-table td {
+    padding: 7pt 8pt;
+    border: 1px solid #111;
+    color: #111;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.clutch-timeline-table th {
+    background: #eee;
+    font-size: 8.5pt;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.clutch-timeline-table td:first-child {
+    width: 38%;
+}
+
+.clutch-stage-note {
+    display: block;
+    margin-top: 2pt;
+    color: #555;
+    font-size: 8.5pt;
+}
+
+.clutch-tick-cell {
+    width: 0.55in;
+    text-align: center;
+    font-size: 14pt;
+    font-weight: 700;
+}
+
+.clutch-tick-box {
+    display: inline-block;
+    width: 12pt;
+    height: 12pt;
+    border: 1.5px solid #111;
+    border-radius: 2px;
+}
+
+.clutch-timeline-notes {
+    margin-top: 14pt;
+    font-size: 9.5pt;
+    line-height: 1.45;
+}
+
+.clutch-timeline-notes p {
+    margin: 0 0 4pt;
+}
+
+.clutch-timeline-footnote {
+    margin-top: 8pt;
+    padding-top: 8pt;
+    border-top: 1px dashed #999;
+    color: #444;
+    font-size: 8.5pt;
+    font-style: italic;
+}
+
+@media print {
+    /* A named page so this card's margins cannot change how the bin cards,
+       weight sheet or feeder list print. */
+    @page clutch-timeline {
+        size: letter;
+        margin: 0.5in;
+    }
+
+    body.printing-clutch-timeline {
+        margin: 0;
+        background: #fff;
+    }
+
+    body.printing-clutch-timeline > *:not(#clutchTimelinePrintSheet) {
+        display: none !important;
+    }
+
+    body.printing-clutch-timeline #clutchTimelinePrintSheet {
+        display: block !important;
+    }
+
+    .clutch-timeline-card {
+        page: clutch-timeline;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
 }
 
 .readiness-record-panel {
@@ -4871,7 +5427,8 @@ body.has-sync-banner .collection-notice {
    Reuses the dashboard row grid: size, stock, action, then the timing line
    across the full row. Only the count badge and the urgent border are new. */
 
-.feeder-watch-count {
+.feeder-watch-count,
+.hold-due-count {
     display: none;
     margin-left: 8px;
     padding: 1px 9px;
@@ -4884,8 +5441,18 @@ body.has-sync-banner .collection-notice {
     vertical-align: middle;
 }
 
-.feeder-watch-count.visible {
+.feeder-watch-count.visible,
+.hold-due-count.visible {
     display: inline-block;
+}
+
+.hold-due-item.is-urgent {
+    border-color: #c0392b;
+}
+
+.hold-due-item .sale-badge {
+    margin-left: 0;
+    margin-right: 6px;
 }
 
 .feeder-watch-item {
@@ -5667,6 +6234,10 @@ body.has-sync-banner .collection-notice {
     border-left-color: var(--gold-color);
 }
 
+.calendar-chip.is-pickup {
+    border-left-color: #7fe0a8;
+}
+
 .calendar-more {
     font-size: 11px;
     color: #c9c2a6;
@@ -5708,6 +6279,10 @@ body.has-sync-banner .collection-notice {
     background: var(--gold-color);
 }
 
+.calendar-legend-item.is-pickup::before {
+    background: #7fe0a8;
+}
+
 .calendar-task-list {
     list-style: none;
     margin: 14px 0 0;
@@ -5742,6 +6317,10 @@ body.has-sync-banner .collection-notice {
 
 .calendar-task.is-order {
     border-left-color: var(--gold-color);
+}
+
+.calendar-task.is-pickup {
+    border-left-color: #7fe0a8;
 }
 
 .calendar-task.is-overdue {
@@ -5874,4 +6453,754 @@ body.has-sync-banner .collection-notice {
 /* `display: flex` above would otherwise override the hidden attribute. */
 .history-undo[hidden] {
     display: none;
+}
+
+
+/* ---- Buyers directory --------------------------------------------------- */
+
+.buyers-page .fin-inline-field input {
+    min-width: 190px;
+    padding: 8px 10px;
+    border: 2px solid var(--gold-color);
+    border-radius: 8px;
+    background-color: rgb(42, 42, 119);
+    color: var(--gold-color);
+    font-size: 14px;
+}
+
+.buyer-kpi-text {
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 24px;
+    line-height: 1.2;
+}
+
+.buyer-inline {
+    color: var(--text-color);
+}
+
+.buyer-form-help {
+    margin: 0;
+}
+
+.buyer-form-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.buyer-source-note {
+    margin-top: 10px;
+}
+
+.buyer-source-pill {
+    display: inline-block;
+    padding: 2px 9px;
+    border: 1px solid var(--goldenrod-color);
+    border-radius: 999px;
+    color: var(--text-color);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.buyer-source-expo {
+    border-color: #e0b34a;
+    color: #ffd979;
+}
+
+.buyer-source-morphmarket {
+    border-color: #7fb2e5;
+    color: #b9dcff;
+}
+
+.buyer-source-website {
+    border-color: #9fd39b;
+    color: #c8efc4;
+}
+
+.buyer-source-word-of-mouth {
+    border-color: #d6a6d6;
+    color: #efcdf0;
+}
+
+.buyer-source-unlinked,
+.buyer-source-unknown {
+    border-style: dashed;
+    color: var(--silver-color);
+}
+
+.buyer-share {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 118px;
+}
+
+.buyer-share-track {
+    width: 70px;
+    height: 6px;
+    overflow: hidden;
+    border-radius: 3px;
+    background: #241f12;
+}
+
+.buyer-share-fill {
+    display: block;
+    height: 100%;
+    background-color: var(--gold-color);
+}
+
+.buyer-share em {
+    min-width: 42px;
+    color: var(--silver-color);
+    font-size: 12px;
+    font-style: normal;
+    text-align: right;
+}
+
+.buyer-unlinked-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.buyer-unlinked-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    border: 1px dashed var(--goldenrod-color);
+    border-radius: 8px;
+    background-color: #14110a;
+}
+
+.buyer-unlinked-row strong {
+    color: var(--gold-color);
+}
+
+.buyer-unlinked-row span {
+    display: block;
+    color: var(--silver-color);
+    font-size: 13px;
+}
+
+.buyer-action-button {
+    padding: 6px 12px;
+    border: 1px solid var(--goldenrod-color);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--gold-color);
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.buyer-action-button:hover {
+    border-color: var(--gold-color);
+    color: #fff1b8;
+}
+
+.buyer-action-button:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.buyer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.buyer-card {
+    overflow: hidden;
+    border: 1px solid var(--goldenrod-color);
+    border-radius: 9px;
+    background-color: #14110a;
+}
+
+.buyer-card-toggle {
+    display: grid;
+    grid-template-columns: minmax(180px, 1.1fr) minmax(220px, 1.6fr) 24px;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 13px 15px;
+    border: 0;
+    background: transparent;
+    color: var(--text-color);
+    font-family: 'Times New Roman', Times, serif;
+    text-align: left;
+    cursor: pointer;
+}
+
+.buyer-card-toggle:hover {
+    background-color: rgba(255, 215, 0, 0.06);
+}
+
+.buyer-card-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.buyer-card-title strong {
+    color: var(--gold-color);
+    font-size: 18px;
+}
+
+.buyer-card-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    color: var(--silver-color);
+    font-size: 14px;
+}
+
+.buyer-card-chevron {
+    color: var(--goldenrod-color);
+    font-size: 11px;
+    text-align: right;
+}
+
+.buyer-card-body {
+    padding: 4px 15px 16px;
+    border-top: 1px solid rgba(255, 215, 0, 0.18);
+}
+
+.buyer-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 14px;
+    margin: 16px 0;
+}
+
+.buyer-detail-label {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--goldenrod-color);
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.buyer-contact a {
+    color: var(--text-color);
+}
+
+.buyer-contact a:hover {
+    color: var(--gold-color);
+}
+
+.buyer-contact-sep {
+    margin: 0 6px;
+    color: var(--goldenrod-color);
+}
+
+.buyer-contact-none {
+    color: var(--silver-color);
+    font-style: italic;
+}
+
+.buyer-source-detail {
+    display: block;
+    color: var(--silver-color);
+    font-size: 13px;
+}
+
+.buyer-history {
+    margin-top: 16px;
+}
+
+.buyer-history h4 {
+    margin: 0 0 6px;
+    color: var(--gold-color);
+    font-size: 15px;
+    letter-spacing: 0.03em;
+}
+
+.buyer-mini-table {
+    margin-top: 0;
+}
+
+.buyer-mini-table th,
+.buyer-mini-table td {
+    font-size: 13px;
+}
+
+.buyer-empty-cell {
+    color: var(--silver-color);
+    font-style: italic;
+}
+
+.buyer-none {
+    margin: 0;
+}
+
+.buyer-note {
+    margin: 16px 0 0;
+    padding: 10px 12px;
+    border-left: 3px solid var(--goldenrod-color);
+    background-color: rgba(255, 215, 0, 0.05);
+    color: #ded6b4;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.buyer-card-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+}
+
+@media (max-width: 700px) {
+    .buyer-card-toggle {
+        grid-template-columns: 1fr auto;
+    }
+
+    .buyer-card-stats {
+        grid-column: 1 / -1;
+        order: 3;
+    }
+
+    .buyer-share-track {
+        width: 42px;
+    }
+
+    .buyer-share {
+        min-width: 92px;
+    }
+}
+
+.buyer-statement-modal .modal-content {
+    width: min(860px, calc(100% - 30px));
+}
+
+.buyer-statement-content {
+    gap: 10px;
+}
+
+.buyer-statement-content h3 {
+    margin: 0;
+    color: var(--gold-color);
+}
+
+.buyer-statement-frame {
+    width: 100%;
+    height: min(68vh, 760px);
+    min-height: 420px;
+    border: 0;
+    border-radius: 6px;
+    background-color: white;
+}
+
+@media (max-width: 700px) {
+    .buyer-statement-frame {
+        height: 58vh;
+        min-height: 340px;
+    }
+}
+/* Pair & clutch scorecard
+   -------------------------------------------------------------------------
+   A grade is a hatch rate, so the badge, the meter and the numbers all agree.
+   Cards rather than a table: five numbers per pairing wrap badly on a phone. */
+
+.scorecard-pair-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 14px;
+    margin-top: 16px;
+}
+
+.scorecard-pair {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid #4a4128;
+    border-radius: 10px;
+    background-color: #0d0b07;
+}
+
+.scorecard-pair.is-attention {
+    border-color: #6b3d3d;
+}
+
+.scorecard-pair-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.scorecard-pair-head h4 {
+    margin: 0;
+    color: var(--gold-color);
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 21px;
+    line-height: 1.3;
+}
+
+.scorecard-pair-head h4 a {
+    color: var(--gold-color);
+}
+
+.scorecard-cross {
+    color: var(--silver-color);
+    font-size: 16px;
+    padding: 0 2px;
+}
+
+.scorecard-pair-status {
+    margin: 4px 0 0;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--silver-color);
+}
+
+.scorecard-pair-status.is-working {
+    color: #8fce8f;
+}
+
+.scorecard-pair-status.is-patchy {
+    color: #d9a94f;
+}
+
+.scorecard-pair-status.is-weak {
+    color: #ff9a9a;
+}
+
+.scorecard-purpose {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 7px;
+    border: 1px solid #4a4128;
+    border-radius: 999px;
+    color: var(--silver-color);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+}
+
+.scorecard-purpose.is-project {
+    border-color: #7fe0a8;
+    color: #a8e0c2;
+}
+
+.scorecard-target {
+    margin: 4px 0 0;
+    color: #b9b096;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.scorecard-target a {
+    color: var(--gold-color);
+}
+
+.scorecard-grade {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    min-width: 42px;
+    height: 42px;
+    padding: 0 8px;
+    border: 2px solid #6b6250;
+    border-radius: 10px;
+    color: var(--text-color);
+    background-color: #14110a;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 22px;
+    line-height: 1;
+}
+
+.scorecard-grade.is-a {
+    border-color: #6fbf73;
+    color: #a8e0a8;
+}
+
+.scorecard-grade.is-b {
+    border-color: #9ec96f;
+    color: #d3e9a8;
+}
+
+.scorecard-grade.is-c {
+    border-color: #d9a94f;
+    color: #f0cf8e;
+}
+
+.scorecard-grade.is-d {
+    border-color: #b85c5c;
+    color: #ffb3b3;
+}
+
+.scorecard-grade.is-none {
+    border-color: #4a4128;
+    color: var(--silver-color);
+}
+
+.scorecard-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+    gap: 10px;
+}
+
+.scorecard-stat span {
+    display: block;
+    color: var(--silver-color);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.scorecard-stat strong {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-color);
+    font-size: 20px;
+    font-weight: normal;
+    line-height: 1.1;
+}
+
+.scorecard-stat em {
+    display: block;
+    margin-top: 2px;
+    color: #b9b096;
+    font-size: 11px;
+    font-style: normal;
+    line-height: 1.35;
+}
+
+.scorecard-meter {
+    height: 6px;
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+.scorecard-meter-fill {
+    display: block;
+    height: 100%;
+    background-color: #6b6250;
+}
+
+.scorecard-meter-fill.is-a {
+    background-color: #6fbf73;
+}
+
+.scorecard-meter-fill.is-b {
+    background-color: #9ec96f;
+}
+
+.scorecard-meter-fill.is-c {
+    background-color: #d9a94f;
+}
+
+.scorecard-meter-fill.is-d {
+    background-color: #b85c5c;
+}
+
+.scorecard-note {
+    margin: 0;
+    color: var(--text-color);
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+.scorecard-meta {
+    margin: 0;
+    color: #9c947c;
+    font-size: 12px;
+}
+
+/* Project step fields on a breeding pair card. */
+.pair-project-fields {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid #4a4128;
+}
+
+.pair-project-fields h5 {
+    margin: 0 0 4px;
+    color: var(--gold-color);
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 19px;
+    font-weight: normal;
+}
+
+.pair-project-fields .empty-message {
+    margin-bottom: 10px;
+}
+
+/* Project steps: one card per target morph, steps listed in order. */
+
+.scorecard-projects {
+    display: grid;
+    gap: 14px;
+    margin-top: 16px;
+}
+
+.scorecard-project {
+    padding: 16px;
+    border: 1px solid #4a4128;
+    border-radius: 10px;
+    background-color: #0d0b07;
+}
+
+.scorecard-project-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.scorecard-project-head h4 {
+    margin: 0;
+    color: var(--gold-color);
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 21px;
+    line-height: 1.3;
+}
+
+.scorecard-project-meta {
+    margin: 4px 0 0;
+    color: #b9b096;
+    font-size: 13px;
+}
+
+.scorecard-project-steps {
+    list-style: none;
+    margin: 14px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.scorecard-project-steps li {
+    padding-top: 12px;
+    border-top: 1px solid #2a2519;
+}
+
+.scorecard-project-steps li:first-child {
+    padding-top: 0;
+    border-top: 0;
+}
+
+.scorecard-step-no {
+    margin-right: 8px;
+    color: var(--silver-color);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.scorecard-outcome {
+    display: inline-block;
+    padding: 1px 8px;
+    border: 1px solid #6b6250;
+    border-radius: 999px;
+    color: var(--text-color);
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+.scorecard-outcome.is-hit {
+    border-color: #6fbf73;
+    color: #a8e0a8;
+}
+
+.scorecard-outcome.is-partial {
+    border-color: #d9a94f;
+    color: #f0cf8e;
+}
+
+.scorecard-outcome.is-missed {
+    border-color: #b85c5c;
+    color: #ffb3b3;
+}
+
+.scorecard-outcome.is-pending {
+    border-color: #4a4128;
+    color: var(--silver-color);
+}
+
+.scorecard-project-steps strong {
+    color: var(--text-color);
+    font-size: 15px;
+    font-weight: normal;
+}
+
+.scorecard-project-steps p {
+    margin: 6px 0 0;
+    color: #c9c2a6;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.scorecard-project-step {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    margin: 10px 0 0;
+}
+
+.scorecard-next {
+    color: #9c947c;
+    font-size: 12px;
+}
+
+.scorecard-pair-status.is-project-hit {
+    color: #8fce8f;
+}
+
+.scorecard-pair-status.is-project-partial {
+    color: #d9a94f;
+}
+
+.scorecard-pair-status.is-project-missed {
+    color: #ff9a9a;
+}
+
+.scorecard-table td {
+    vertical-align: top;
+}
+
+.scorecard-table th:nth-child(1),
+.scorecard-table td:nth-child(1) {
+    white-space: nowrap;
+}
+
+.scorecard-table td .scorecard-grade {
+    min-width: 30px;
+    height: 30px;
+    font-size: 16px;
+    border-width: 1px;
+    border-radius: 7px;
+}
+
+@media (max-width: 700px) {
+    .scorecard-pair-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .scorecard-stats {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    /* The nine-column clutch table is for a desk; phones get the cards above. */
+    #scorecardClutchTableWrap {
+        display: none;
+    }
 }

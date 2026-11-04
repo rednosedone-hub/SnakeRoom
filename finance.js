@@ -17,7 +17,8 @@
     const state = {
         tab: "overview",
         year: "",
-        editingExpoId: ""
+        editingExpoId: "",
+        releaseSnakeId: ""
     };
 
     let snakes = [];
@@ -26,7 +27,7 @@
     let events = [];
     let settings = F.getSettings();
 
-    const PANEL_NAMES = ["overview", "snakes", "feeders", "expos", "costs"];
+    const PANEL_NAMES = ["overview", "snakes", "holds", "feeders", "expos", "costs"];
 
     function $(id) {
         return document.getElementById(id);
@@ -162,12 +163,12 @@
         net.classList.toggle("fin-negative", totals.net < 0);
 
         $("finRevenueNote").textContent = revenueCount === 0
-            ? "No sales recorded yet."
-            : `${revenueCount} sale${revenueCount === 1 ? "" : "s"} recorded.`;
+            ? "No money in recorded yet."
+            : `${revenueCount} money-in entr${revenueCount === 1 ? "y" : "ies"} recorded.`;
 
         $("finSpendNote").textContent = spendCount === 0
-            ? "No costs recorded yet."
-            : `${spendCount} cost${spendCount === 1 ? "" : "s"} recorded.`;
+            ? "No money out recorded yet."
+            : `${spendCount} money-out entr${spendCount === 1 ? "y" : "ies"} recorded.`;
 
         $("finNetNote").textContent = state.year
             ? `Money in minus money out in ${state.year}.`
@@ -206,8 +207,8 @@
             totals[event.category][event.direction] += event.amount;
         });
 
-        const inOrder = ["snake-sale", "show-revenue"];
-        const outOrder = ["snake-purchase", "feeders", "show-cost", "supplies", "vet", "shipping", "other"];
+        const inOrder = ["snake-sale", "hold-deposit", "show-revenue"];
+        const outOrder = ["snake-purchase", "hold-refund", "feeders", "show-cost", "supplies", "vet", "shipping", "other"];
         const rows = [];
 
         inOrder.forEach(category => {
@@ -289,7 +290,7 @@
     function getSales() {
         return snakes
             .map(snake => ({ snake, sale: F.getSnakeSale(snake) }))
-            .filter(item => item.sale.recorded)
+            .filter(item => F.isRealizedSale(item.snake))
             .sort((a, b) => String(b.sale.date || "").localeCompare(String(a.sale.date || "")));
     }
 
@@ -346,7 +347,7 @@
             F.isMarkedSold(snake) && !F.getSnakeSale(snake).recorded
         );
         const saleWithoutSoldStatus = snakes.filter(snake =>
-            F.getSnakeSale(snake).recorded && !F.isMarkedSold(snake)
+            F.getSnakeSale(snake).date && !F.isMarkedSold(snake)
         );
         const warningLines = [];
 
@@ -360,7 +361,7 @@
 
         if (saleWithoutSoldStatus.length > 0) {
             warningLines.push(`
-                <p><strong>${saleWithoutSoldStatus.length} sale${saleWithoutSoldStatus.length === 1 ? " is" : "s are"} recorded but the snake is not marked Sold:</strong>
+                <p><strong>${saleWithoutSoldStatus.length} sale${saleWithoutSoldStatus.length === 1 ? " is" : "s are"} dated but the snake is not marked Sold:</strong>
                 ${saleWithoutSoldStatus.map(snakeLink).join(", ")}.
                 The money is counted; set Status to Sold to match the collection.</p>
             `);
@@ -809,10 +810,289 @@
 
     // ---- Render all --------------------------------------------------------
 
+    // ---- Holds -------------------------------------------------------------
+
+    function renderHolds() {
+        const body = $("finHoldsBody");
+        const empty = $("finHoldsEmpty");
+        const kpis = $("finHoldKpis");
+        const helper = window.SaleHolds;
+
+        if (!body || !helper) {
+            return;
+        }
+
+        const summary = helper.listHolds(snakes, { graceDays: settings.holdGraceDays });
+
+        body.innerHTML = summary.holds.map(({ snake, hold }) => {
+            const dueText = hold.dueDate
+                ? `${formatDate(hold.dueDate)}${helper.describeDays(hold.daysLeft) ? ` · ${helper.describeDays(hold.daysLeft)}` : ""}`
+                : "—";
+            const statusText = hold.expired
+                ? '<span class="sale-badge sale-badge-expired">Hold expired</span>'
+                : hold.overdue
+                    ? '<span class="sale-badge sale-badge-overdue">Hold overdue</span>'
+                    : hold.paymentPlan
+                        ? '<span class="sale-badge sale-badge-hold">Payment plan</span>'
+                        : '<span class="sale-badge sale-badge-hold">On hold</span>';
+            const snakeId = escapeHtml(snake.id || "");
+
+            return `
+                <tr>
+                    <td>${snakeLink(snake)}</td>
+                    <td>${escapeHtml(hold.buyer || "Not recorded")}</td>
+                    <td class="fin-amount-cell">${hold.hasPrice ? formatMoney(hold.agreedPrice) : "—"}</td>
+                    <td class="fin-amount-cell">${hold.hasDeposit ? formatMoney(hold.deposit) : "—"}</td>
+                    <td class="fin-amount-cell">${hold.hasPrice ? formatMoney(hold.balance) : "—"}</td>
+                    <td>${dueText}</td>
+                    <td>${statusText}</td>
+                    <td class="fin-hold-actions">
+                        <button type="button" class="fin-hold-action" data-extend-hold="${snakeId}">+${settings.holdGraceDays} days</button>
+                        <button type="button" class="fin-hold-action" data-release-hold="${snakeId}">Release</button>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+
+        body.querySelectorAll("[data-extend-hold]").forEach(button => {
+            button.addEventListener("click", () => extendSnakeHold(button.getAttribute("data-extend-hold")));
+        });
+
+        body.querySelectorAll("[data-release-hold]").forEach(button => {
+            button.addEventListener("click", () => openReleaseHoldModal(button.getAttribute("data-release-hold")));
+        });
+
+        if (empty) {
+            empty.style.display = summary.holds.length > 0 ? "none" : "";
+        }
+
+        if (kpis) {
+            kpis.innerHTML = [
+                {
+                    label: "On hold",
+                    value: String(summary.holds.length),
+                    note: summary.expiredCount > 0
+                        ? `${summary.expiredCount} expired · ${summary.overdueCount} past pickup`
+                        : summary.overdueCount > 0
+                            ? `${summary.overdueCount} past pickup`
+                            : "No overdue pickups"
+                },
+                {
+                    label: "Deposits received",
+                    value: formatMoney(summary.depositTotal),
+                    note: "Counted as money in until the snake sells"
+                },
+                {
+                    label: "Balance due",
+                    value: formatMoney(summary.balanceTotal),
+                    note: "Across every active hold"
+                }
+            ].map(kpi => `
+                <div class="fin-kpi">
+                    <span class="fin-kpi-label">${escapeHtml(kpi.label)}</span>
+                    <strong class="fin-kpi-value">${escapeHtml(kpi.value)}</strong>
+                    <span class="fin-kpi-note">${escapeHtml(kpi.note)}</span>
+                </div>
+            `).join("");
+        }
+    }
+
+    function findSnakeById(snakeId) {
+        return snakes.find(snake => snake.id === snakeId) || null;
+    }
+
+    function updateReleaseDispositionFields() {
+        const field = $("releaseTransferField");
+        const note = $("releaseRefundNote");
+        const selected = document.querySelector('input[name="releaseDisposition"]:checked');
+        const disposition = selected ? selected.value : "forfeit";
+
+        if (field) {
+            field.hidden = disposition !== "transfer";
+        }
+
+        if (note) {
+            note.hidden = disposition !== "return";
+            note.textContent = "The deposit stays in the ledger as received, and a matching deposit refund is added as money out, so the pair nets to zero.";
+        }
+    }
+
+    function openReleaseHoldModal(snakeId) {
+        const snake = findSnakeById(snakeId);
+        const helper = window.SaleHolds;
+        const modal = $("releaseHoldModal");
+
+        if (!snake || !helper || !modal) {
+            return;
+        }
+
+        const hold = helper.getHold(snake, undefined, settings.holdGraceDays);
+
+        if (!hold.active) {
+            setStatus("finHoldsStatus", "That hold has already ended.", true);
+            return;
+        }
+
+        state.releaseSnakeId = snake.id;
+
+        const depositText = hold.hasDeposit
+            ? `${formatMoney(hold.deposit)} deposit is on the ledger.`
+            : "No deposit was recorded.";
+
+        $("releaseHoldTitle").textContent = `Release hold \u2014 ${snake.name || "Unnamed snake"}`;
+        $("releaseHoldText").textContent = `Held for ${hold.buyer || "no recorded buyer"}. ${depositText} Releasing sets the snake back to Available and keeps this hold in its history.`;
+        $("releaseTransferInput").value = "";
+
+        document.querySelectorAll('input[name="releaseDisposition"]').forEach(input => {
+            input.checked = input.value === "forfeit";
+        });
+
+        updateReleaseDispositionFields();
+        modal.style.display = "block";
+    }
+
+    function closeReleaseHoldModal() {
+        const modal = $("releaseHoldModal");
+
+        if (modal) {
+            modal.style.display = "none";
+        }
+
+        state.releaseSnakeId = "";
+    }
+
+    function confirmReleaseHold() {
+        const snake = findSnakeById(state.releaseSnakeId);
+        const helper = window.SaleHolds;
+
+        if (!snake || !helper) {
+            closeReleaseHoldModal();
+            return;
+        }
+
+        const selected = document.querySelector('input[name="releaseDisposition"]:checked');
+        const disposition = selected ? selected.value : "forfeit";
+        const transferTo = $("releaseTransferInput").value.trim();
+
+        if (disposition === "transfer" && !transferTo) {
+            alert("Say what the credit was transferred to, or choose another option.");
+            $("releaseTransferInput").focus();
+            return;
+        }
+
+        const hold = helper.getHold(snake, undefined, settings.holdGraceDays);
+        const updated = helper.releaseHold(snake, {
+            disposition,
+            transferTo,
+            today: F.getTodayText()
+        });
+
+        if (!updated) {
+            closeReleaseHoldModal();
+            setStatus("finHoldsStatus", "That hold has already ended.", true);
+            return;
+        }
+
+        const index = snakes.findIndex(candidate => candidate.id === snake.id);
+
+        if (index >= 0) {
+            snakes[index] = updated;
+        }
+
+        window.SnakeData.saveStorageArray("snakes", snakes);
+        closeReleaseHoldModal();
+        loadAll();
+        renderAll();
+
+        const outcome = !hold.hasDeposit
+            ? "No deposit was recorded."
+            : disposition === "return"
+                ? `The ${formatMoney(hold.deposit)} deposit was refunded in the ledger.`
+                : disposition === "transfer"
+                    ? `The ${formatMoney(hold.deposit)} deposit was marked transferred to ${transferTo}.`
+                    : `The ${formatMoney(hold.deposit)} deposit was marked forfeited and stays counted as received.`;
+
+        setStatus("finHoldsStatus", `${snake.name || "Snake"} is Available again. ${outcome}`);
+    }
+
+    function extendSnakeHold(snakeId) {
+        const snake = findSnakeById(snakeId);
+        const helper = window.SaleHolds;
+
+        if (!snake || !helper) {
+            return;
+        }
+
+        const updated = helper.extendHold(snake, {
+            today: F.getTodayText(),
+            days: settings.holdGraceDays
+        });
+
+        if (!updated) {
+            setStatus("finHoldsStatus", "That hold has already ended.", true);
+            return;
+        }
+
+        const index = snakes.findIndex(candidate => candidate.id === snake.id);
+
+        if (index >= 0) {
+            snakes[index] = updated;
+        }
+
+        window.SnakeData.saveStorageArray("snakes", snakes);
+        loadAll();
+        renderAll();
+        setStatus("finHoldsStatus", `Hold for ${snake.name || "this snake"} extended to ${formatDate(updated.holdDueDate)}.`);
+    }
+
+    function renderHoldGraceSetting() {
+        const input = $("holdGraceDaysInput");
+
+        if (!input) {
+            return;
+        }
+
+        input.value = String(settings.holdGraceDays);
+    }
+
+    function saveHoldGraceSetting(event) {
+        if (event) {
+            event.preventDefault();
+        }
+
+        const input = $("holdGraceDaysInput");
+        const days = Number(input.value);
+
+        if (!Number.isFinite(days)
+            || Math.round(days) !== days
+            || days < F.MIN_HOLD_GRACE_DAYS
+            || days > F.MAX_HOLD_GRACE_DAYS) {
+            setStatus(
+                "holdGraceStatus",
+                `Use a whole number from ${F.MIN_HOLD_GRACE_DAYS} to ${F.MAX_HOLD_GRACE_DAYS} days.`,
+                true
+            );
+            input.focus();
+            return;
+        }
+
+        F.saveSettings({ holdGraceDays: days });
+        loadAll();
+        renderAll();
+        setStatus("holdGraceStatus", `Holds are flagged expired ${settings.holdGraceDays} days past pickup.`);
+    }
+
+    window.openReleaseHoldModal = openReleaseHoldModal;
+    window.closeReleaseHoldModal = closeReleaseHoldModal;
+    window.updateReleaseDispositionFields = updateReleaseDispositionFields;
+    window.confirmReleaseHold = confirmReleaseHold;
+
     function renderAll() {
         renderYearOptions();
         renderOverview();
         renderSnakeLedger();
+        renderHoldGraceSetting();
+        renderHolds();
         renderFeederUsage();
         renderFeederOrders();
         renderExpoList();
@@ -872,6 +1152,7 @@
         });
 
         $("saveFeederPricesButton").addEventListener("click", saveFeederPrices);
+        $("holdGraceForm").addEventListener("submit", saveHoldGraceSetting);
         $("feederOrderForm").addEventListener("submit", saveFeederOrder);
         $("expenseForm").addEventListener("submit", saveExpense);
         $("expoForm").addEventListener("submit", saveExpoFromForm);

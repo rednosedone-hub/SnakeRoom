@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Snake Room - Season Review</title>
+    <link rel="stylesheet" href="style.css?v=67">
+</head>
+
+<body>
+    <div class="page-container">
+        <div class="hero-section">
+            <img src="Images/TheSnakeRoom.jpg" class="hero-image" alt="The Snake Room logo">
+
+            <div class="container">
+                <h1>The Snake Room</h1>
+                <h2>Season Review</h2>
+            </div>
+        </div>
+
+        <div class="button-row">
+            <a href="index.html" class="main-button">Home</a>
+            <a href="breeding.html" class="main-button">Breeding</a>
+            <a href="breedingOutcomes.html" class="main-button">Outcomes</a>
+            <a href="scorecard.html" class="main-button">Scorecard</a>
+            <a href="finance.html" class="main-button">Finances</a>
+            <a href="snakes.html" class="main-button">Collection</a>
+            <a href="calendar.html" class="main-button">Calendar</a>
+        </div>
+
+        <div class="divider"></div>
+
+        <main class="snake-form-page">
+            <section class="form-section">
+                <div class="fin-panel-head">
+                    <div>
+                        <h3 id="seasonTitle">Season Review</h3>
+                        <p class="empty-message fin-panel-lead">
+                            A season as it actually went: the eggs, the hatchlings, what stayed in the
+                            room and what the money did. Animals you keep back are counted as animals,
+                            never as sales &mdash; that is the point of this page.
+                        </p>
+                    </div>
+
+                    <div class="fin-toolbar">
+                        <label class="fin-inline-field">
+                            <span>Season</span>
+                            <select id="seasonYearSelect"></select>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="season-verdict" id="seasonVerdict"></div>
+
+                <div class="fin-kpi-grid" id="seasonKpis"></div>
+            </section>
+
+            <section class="form-section">
+                <h3>Clutches</h3>
+
+                <p class="empty-message">
+                    Eggs, hatchlings and sales for clutches laid or hatched in this season. A clutch
+                    still incubating counts its eggs but no hatchlings yet.
+                </p>
+
+                <div class="fin-table-wrap" id="seasonClutchTableWrap">
+                    <table class="fin-table season-table">
+                        <thead>
+                            <tr>
+                                <th>Clutch</th>
+                                <th>Pair</th>
+                                <th>Laid</th>
+                                <th>Hatched</th>
+                                <th class="fin-amount-cell">Eggs</th>
+                                <th class="fin-amount-cell">Hatchlings</th>
+                                <th class="fin-amount-cell">Kept</th>
+                                <th class="fin-amount-cell">Sold</th>
+                                <th class="fin-amount-cell">Sales</th>
+                            </tr>
+                        </thead>
+                        <tbody id="seasonClutchBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="season-clutch-cards" id="seasonClutchCards"></div>
+
+                <p class="empty-message" id="seasonClutchEmpty" hidden>
+                    No clutches on record for this season yet.
+                </p>
+            </section>
+
+            <section class="form-section">
+                <h3>Where the hatchlings went</h3>
+
+                <div class="season-disposition" id="seasonDisposition"></div>
+
+                <p class="empty-message" id="seasonDispositionEmpty" hidden>
+                    Nothing hatched this season yet, so there is nowhere for hatchlings to go.
+                </p>
+            </section>
+
+            <section class="form-section">
+                <h3>Kept back</h3>
+
+                <p class="empty-message">
+                    The animals from this season marked Holdback or Breeder. These are the ones
+                    carrying next season's plans, so they are listed by name rather than counted as
+                    unsold stock.
+                </p>
+
+                <div class="fin-table-wrap">
+                    <table class="fin-table season-kept-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Morph</th>
+                                <th>Sex</th>
+                                <th>Hatched</th>
+                                <th>Status</th>
+                                <th>Bin</th>
+                            </tr>
+                        </thead>
+                        <tbody id="seasonKeptBody"></tbody>
+                    </table>
+                </div>
+
+                <p class="empty-message" id="seasonKeptEmpty" hidden>
+                    No animal from this season is marked Holdback or Breeder yet. Growing-out
+                    hatchlings still count under <span class="season-inline">Where the hatchlings went</span>.
+                </p>
+            </section>
+
+            <section class="form-section" id="seasonMoneySection">
+                <h3>Money this season</h3>
+
+                <div class="form-section finance-locked" id="seasonMoneyLocked" hidden>
+                    <h3>Money is a Pro feature</h3>
+                    <p>
+                        The breeding half of this review works without it. Pro adds purchases,
+                        sales, feeder orders, show costs and this cash breakdown.
+                    </p>
+                    <a class="main-button" href="account.html">See Plans</a>
+                </div>
+
+                <div id="seasonMoneyBody">
+                    <p class="empty-message">
+                        Cash for the calendar year, built from the same records as the Finances page.
+                        It covers the whole collection, not only this season's clutches.
+                    </p>
+
+                    <div class="fin-kpi-grid" id="seasonMoneyKpis"></div>
+
+                    <div class="fin-two-column">
+                        <div class="fin-block">
+                            <h4>Money by type</h4>
+
+                            <div class="fin-table-wrap">
+                                <table class="fin-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th class="fin-amount-cell">In</th>
+                                            <th class="fin-amount-cell">Out</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="seasonMoneyBreakdown"></tbody>
+                                </table>
+                            </div>
+
+                            <p class="empty-message" id="seasonMoneyEmpty" hidden>
+                                No money recorded for this season yet.
+                            </p>
+                        </div>
+
+                        <div class="fin-block">
+                            <h4>Break-even on the animals you kept</h4>
+
+                            <p class="season-break-even" id="seasonBreakEven"></p>
+                            <p class="empty-message" id="seasonBreakEvenNote"></p>
+
+                            <div class="fin-actions">
+                                <a class="small-link-button" href="finance.html">Open Finances</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script src="data-helpers.js"></script>
+    <script src="backup-helpers.js?v=1"></script>
+    <script src="cloud-sync.js?v=18"></script>
+    <script src="auto-sync.js?v=8"></script>
+    <script src="account-gate.js?v=1"></script>
+    <script src="plans.js?v=2"></script>
+    <script src="finance-helpers.js?v=6"></script>
+    <script src="season-review-helpers.js?v=4"></script>
+    <script src="season-review.js?v=6"></script>
+    <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
+    <script src="nav-scroll.js?v=1"></script>
+</body>
+
+</html>

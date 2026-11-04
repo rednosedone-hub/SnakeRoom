@@ -13,7 +13,7 @@
 // Storage keys that make up a snapshot:
 //   snakes, breedingPairs, clutches, breedingGoals, customGeneCatalog,
 //   financeSettings, financeExpenses, financeExpos, feederSettings,
-//   feederInventory
+//   feederInventory, buyers
 // (Gene catalog is starter + custom; only custom genes need backup.)
 
 (function () {
@@ -27,7 +27,8 @@
         "financeExpenses",
         "financeExpos",
         "feederSettings",
-        "feederInventory"
+        "feederInventory",
+        "buyers"
     ];
 
     const SETTINGS_KEY = "cloudSyncSettings";

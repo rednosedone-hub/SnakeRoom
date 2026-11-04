@@ -600,7 +600,7 @@ function renderSnakes() {
                 <div class="snake-details">
                     <span>${feedingText}</span>
                     <span>${feederText}</span>
-                    <span>${snake.status || "No status"}</span>
+                    <span>${snake.status || "No status"}${getSaleBadgeHtml(snake)}</span>
                     ${getReadinessBadgeHtml(snake)}
                     ${healthBadge ? `<span class="health-badge ${healthBadge.className}" title="${escapeHealthText(healthBadge.title)}">${escapeHealthText(healthBadge.label)}</span>` : ""}
                     ${retirementDetail ? `<span>${retirementDetail}</span>` : ""}
@@ -685,7 +685,7 @@ function renderSnakeTable(snakeList) {
                 <td>${snake.lastFed || ""}</td>
                 <td>${feedingInterval}</td>
                 <td>${snake.feederSize || ""}</td>
-                <td>${snake.status || ""}${healthBadgeHtml}</td>
+                <td>${snake.status || ""}${getSaleBadgeHtml(snake)}${healthBadgeHtml}</td>
                 <td>${getReadinessBadgeHtml(snake, true)}</td>
                 <td>
                     <a href="${window.SnakeData.getSnakeQrImageUrl(snake, 220)}" target="_blank" rel="noopener">
@@ -1217,6 +1217,31 @@ function getReadinessBadgeHtml(snake, showNotReady = false) {
     }
 
     return `<span class="readiness-badge ${badge.className}" title="${escapeHealthText(badge.title)}">${escapeHealthText(badge.label)}</span>`;
+}
+
+// A for-sale or hold badge on the card, separate from readiness and health.
+function getSaleBadgeHtml(snake) {
+    const helper = window.SaleHolds;
+
+    if (!helper || typeof helper.getSaleBadge !== "function") {
+        return "";
+    }
+
+    const finance = window.SnakeFinance;
+    const settings = finance && finance.getSettings ? finance.getSettings() : {};
+    const formatter = finance && finance.formatMoney
+        ? value => finance.formatMoney(value)
+        : undefined;
+    const badge = helper.getSaleBadge(snake, {
+        formatMoney: formatter,
+        graceDays: settings.holdGraceDays
+    });
+
+    if (!badge) {
+        return "";
+    }
+
+    return ` <span class="sale-badge ${badge.className}" title="${escapeHealthText(badge.title)}">${escapeHealthText(badge.label)}</span>`;
 }
 
 function renderReadinessSegmented() {

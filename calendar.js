@@ -76,6 +76,9 @@
         const clutches = window.SnakeData.readStorageArray("clutches", []);
         // Pairs carry the pre-lay shed that the ovulation and egg estimates need.
         const pairs = window.SnakeData.readStorageArray("breedingPairs", []);
+        // The buyer directory supplies the phone or e-mail the pickup reminder
+        // should quote, so a reminder is a call to make, not just a date.
+        const buyers = window.SnakeBuyers ? window.SnakeBuyers.getBuyers() : [];
         const forecast = window.SnakeFeeders
             ? window.SnakeFeeders.buildForecast({
                 snakes,
@@ -84,7 +87,7 @@
             })
             : null;
 
-        return { snakes, clutches, pairs, forecast };
+        return { snakes, clutches, pairs, forecast, buyers };
     }
 
     function refreshTasks() {
@@ -98,6 +101,7 @@
             clutches: data.clutches,
             pairs: data.pairs,
             forecast: data.forecast,
+            buyers: data.buyers,
             health: window.SnakeHealth,
             today
         };

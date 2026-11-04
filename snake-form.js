@@ -2994,6 +2994,15 @@ function fillSaleExpoSelect(selectedId) {
 function fillMoneyDatalists() {
     const sellers = new Set();
     const buyers = new Set();
+    const directory = window.SnakeBuyers && window.SnakeBuyers.getBuyers
+        ? window.SnakeBuyers.getBuyers()
+        : [];
+
+    directory.forEach(buyer => {
+        if (buyer && buyer.name) {
+            buyers.add(buyer.name);
+        }
+    });
 
     snakes.forEach(snake => {
         if (snake && snake.purchasedFrom) {
@@ -3002,6 +3011,10 @@ function fillMoneyDatalists() {
 
         if (snake && snake.soldTo) {
             buyers.add(snake.soldTo);
+        }
+
+        if (snake && snake.holdBuyer) {
+            buyers.add(snake.holdBuyer);
         }
     });
 
@@ -3082,6 +3095,96 @@ function updateMoneySummary() {
         : '<span class="money-summary-item">No money recorded for this snake yet.</span>';
 }
 
+// ---- Hold and deposit -----------------------------------------------------
+
+function getHoldDraft() {
+    return {
+        status: document.getElementById("statusInput").value,
+        holdBuyer: document.getElementById("holdBuyerInput").value,
+        holdPrice: document.getElementById("holdPriceInput").value,
+        holdDeposit: document.getElementById("holdDepositInput").value,
+        holdDepositDate: document.getElementById("holdDepositDateInput").value,
+        holdDueDate: document.getElementById("holdDueDateInput").value,
+        holdNote: document.getElementById("holdNoteInput").value,
+        holdPaymentPlan: document.getElementById("holdPaymentPlanInput").checked,
+        salePrice: document.getElementById("salePriceInput").value
+    };
+}
+
+function updateHoldVisibility() {
+    const block = document.getElementById("holdFields");
+
+    if (!block) {
+        return;
+    }
+
+    const draft = getHoldDraft();
+    const hasDetails = Boolean(
+        draft.holdBuyer.trim()
+        || draft.holdPrice
+        || draft.holdDeposit
+        || draft.holdDepositDate
+        ||        draft.holdDueDate
+        || draft.holdNote.trim()
+        || draft.holdPaymentPlan
+    );
+
+    block.hidden = !["Available", "On Hold", "Sold"].includes(draft.status) && !hasDetails;
+}
+
+function updateHoldSummary() {
+    const summary = document.getElementById("holdSummary");
+
+    if (!summary) {
+        return;
+    }
+
+    updateHoldVisibility();
+
+    const helper = window.SaleHolds;
+    const financeSettings = window.SnakeFinance && window.SnakeFinance.getSettings
+        ? window.SnakeFinance.getSettings()
+        : {};
+    const text = helper
+        ? helper.getSaleSummary(getHoldDraft(), {
+            formatMoney: formatSnakeMoney,
+            graceDays: financeSettings.holdGraceDays
+        })
+        : "";
+
+    summary.innerHTML = text
+        ? `<span class="money-summary-item">${escapeMoneyText(text)}</span>`
+        : '<span class="money-summary-item">No hold or deposit recorded.</span>';
+
+    updateHoldHistorySummary();
+}
+
+// Released holds stay on the record after their working fields are cleared.
+function updateHoldHistorySummary() {
+    const box = document.getElementById("holdHistorySummary");
+
+    if (!box) {
+        return;
+    }
+
+    const snake = editingIndex !== null && snakes[editingIndex] ? snakes[editingIndex] : null;
+    const helper = window.SaleHolds;
+    const lines = snake && helper
+        ? helper.getReleasedHoldLines(snake, { formatMoney: formatSnakeMoney })
+        : [];
+
+    if (lines.length === 0) {
+        box.hidden = true;
+        box.innerHTML = "";
+        return;
+    }
+
+    box.hidden = false;
+    box.innerHTML = `<strong>Previous holds</strong>${lines
+        .map(line => `<span class="money-summary-item">${escapeMoneyText(line)}</span>`)
+        .join("")}`;
+}
+
 function initMoneySection() {
     const sourceInput = document.getElementById("acquisitionSourceInput");
 
@@ -3101,6 +3204,13 @@ function initMoneySection() {
     document.getElementById("soldToInput").value = snake ? snake.soldTo || "" : "";
     document.getElementById("salePriceInput").value = snake && snake.salePrice ? snake.salePrice : "";
     document.getElementById("saleDateInput").value = snake ? snake.saleDate || "" : "";
+    document.getElementById("holdBuyerInput").value = snake ? snake.holdBuyer || "" : "";
+    document.getElementById("holdPriceInput").value = snake && snake.holdPrice ? snake.holdPrice : "";
+    document.getElementById("holdDepositInput").value = snake && snake.holdDeposit ? snake.holdDeposit : "";
+    document.getElementById("holdDepositDateInput").value = snake ? snake.holdDepositDate || "" : "";
+    document.getElementById("holdDueDateInput").value = snake ? snake.holdDueDate || "" : "";
+    document.getElementById("holdNoteInput").value = snake ? snake.holdNote || "" : "";
+    document.getElementById("holdPaymentPlanInput").checked = Boolean(snake && snake.holdPaymentPlan);
 
     fillParentSelect("sireInput", snake ? snake.sireId || "" : "", snake ? snake.sire || "" : "", "Not recorded");
     fillParentSelect("damInput", snake ? snake.damId || "" : "", snake ? snake.dam || "" : "", "Not recorded");
@@ -3108,12 +3218,16 @@ function initMoneySection() {
     fillSaleExpoSelect(snake ? snake.saleExpoId || "" : "");
     fillMoneyDatalists();
     updateAcquisitionFields();
+    updateHoldVisibility();
+    updateHoldSummary();
 
     const statusInput = document.getElementById("statusInput");
 
     if (statusInput) {
         statusInput.addEventListener("change", () => {
             const saleDate = document.getElementById("saleDateInput");
+            const salePrice = document.getElementById("salePriceInput");
+            const holdPrice = Number(document.getElementById("holdPriceInput").value) || 0;
 
             if (statusInput.value === "Sold" && saleDate && !saleDate.value) {
                 const today = new Date();
@@ -3123,8 +3237,15 @@ function initMoneySection() {
                 saleDate.value = `${today.getFullYear()}-${month}-${day}`;
             }
 
+            // A hold already knows the agreed price, so a sale starts from it.
+            if (statusInput.value === "Sold" && salePrice && !salePrice.value && holdPrice > 0) {
+                salePrice.value = String(holdPrice);
+            }
+
             updateRetirementFields(true);
             updateMoneySummary();
+            updateHoldVisibility();
+            updateHoldSummary();
         });
     }
 
@@ -3162,6 +3283,9 @@ async function saveSnakeFromPage() {
     const isRetired = window.SnakeData.isRetiredStatus(status);
 
     const source = document.getElementById("acquisitionSourceInput").value;
+    const holdDeposit = moneyOrBlank(document.getElementById("holdDepositInput").value);
+    const holdDepositDate = document.getElementById("holdDepositDateInput").value
+        || (holdDeposit === "" ? "" : window.getTodayText());
     const sireId = document.getElementById("sireInput").value;
     const damId = document.getElementById("damInput").value;
     const sireSnake = snakes.find(candidate => candidate.id === sireId) || null;
@@ -3218,7 +3342,14 @@ async function saveSnakeFromPage() {
         soldTo: document.getElementById("soldToInput").value.trim(),
         salePrice: moneyOrBlank(document.getElementById("salePriceInput").value),
         saleDate: document.getElementById("saleDateInput").value,
-        saleExpoId: document.getElementById("saleExpoInput").value
+        saleExpoId: document.getElementById("saleExpoInput").value,
+        holdBuyer: document.getElementById("holdBuyerInput").value.trim(),
+        holdPrice: moneyOrBlank(document.getElementById("holdPriceInput").value),
+        holdDeposit,
+        holdDepositDate,
+        holdDueDate: document.getElementById("holdDueDateInput").value,
+        holdNote: document.getElementById("holdNoteInput").value.trim(),
+        holdPaymentPlan: document.getElementById("holdPaymentPlanInput").checked
     };
 
     // The Main Photo URL field is authoritative for the main photo; the
@@ -3256,6 +3387,7 @@ window.addCustomGene = addCustomGene;
 window.removeGene = removeGene;
 window.updateImagePreview = updateImagePreview;
 window.updateAcquisitionFields = updateAcquisitionFields;
+window.updateHoldSummary = updateHoldSummary;
 window.updateMoneySummary = updateMoneySummary;
 window.updateRetirementFields = updateRetirementFields;
 window.addWeightHistoryEntry = addWeightHistoryEntry;

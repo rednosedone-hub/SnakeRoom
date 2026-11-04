@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room</title>
-    <link rel="stylesheet" href="style.css?v=45">
+    <link rel="stylesheet" href="style.css?v=72">
 </head>
 
 <body>
@@ -32,9 +32,11 @@
         <div class="button-row">
             <a href="snakes.html" class="main-button">Collection</a>
             <a href="breeding.html" class="main-button">Breeding</a>
+            <a href="scorecard.html" class="main-button">Scorecard</a>
             <a href="feeders.html" class="main-button">Feeders</a>
             <a href="calendar.html" class="main-button">Calendar</a>
             <a href="finance.html" class="main-button">Finances</a>
+            <a href="buyers.html" class="main-button">Buyers</a>
             <a href="available.html" class="main-button">Available</a>
             <a href="morphCalculator.html" class="main-button">Morph Calculator</a>
             <a href="morphGallery.html" class="main-button">Morph Gallery</a>
@@ -103,6 +105,17 @@
                 <div class="dashboard-list" id="feedingDueList"></div>
             </section>
 
+            <section class="dashboard-section" id="holdDueSection">
+                <div class="section-heading-row">
+                    <h3>Holds Due <span class="hold-due-count" id="holdDueCount"></span></h3>
+                    <a href="finance.html#holds" class="small-link-button">Holds</a>
+                </div>
+
+                <p class="empty-message feeding-lead-note" id="holdDueLead"></p>
+
+                <div class="dashboard-list" id="holdDueList"></div>
+            </section>
+
             <section class="dashboard-section" id="feederWatchSection">
                 <div class="section-heading-row">
                     <h3>Feeder Watch <span class="feeder-watch-count" id="feederWatchCount"></span></h3>
@@ -138,10 +151,11 @@
     <script src="auto-sync.js?v=8"></script>
     <script src="account-gate.js?v=1"></script>
     <script src="feed-helpers.js?v=4"></script>
-    <script src="finance-helpers.js?v=2"></script>
+    <script src="finance-helpers.js?v=6"></script>
     <script src="feeder-inventory.js?v=8"></script>
     <script src="health-helpers.js?v=1"></script>
-    <script src="dashboard.js?v=8"></script>
+    <script src="sales-helpers.js?v=5"></script>
+    <script src="dashboard.js?v=10"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

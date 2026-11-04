@@ -19,6 +19,11 @@
     const MIN_CLIMB_SPAN_DAYS = 14;
     const MIN_CLIMB_GRAMS = 25;
     const MIN_CLIMB_PERCENT = 1.5;
+    // Matches Incubation.DEFAULT_DAYS (and its accepted range) so a printed
+    // hatch date cannot drift from the one the outcomes page shows.
+    const DEFAULT_INCUBATION_DAYS = 55;
+    const MIN_INCUBATION_DAYS = 40;
+    const MAX_INCUBATION_DAYS = 100;
 
     function text(value) {
         return String(value === undefined || value === null ? "" : value).trim();
@@ -123,6 +128,20 @@
         return `+${climb.gain}g in ${climb.days} days (+${climb.gramsPerWeek}g/week)`;
     }
 
+    function incubationDays(value) {
+        const days = Math.round(Number(value));
+
+        return Number.isFinite(days) && days >= MIN_INCUBATION_DAYS && days <= MAX_INCUBATION_DAYS
+            ? days
+            : DEFAULT_INCUBATION_DAYS;
+    }
+
+    function validDate(value) {
+        const clean = text(value).slice(0, 10);
+
+        return parseDate(clean) ? clean : "";
+    }
+
     // A recorded ovulation is a fact, so it replaces the estimate. Everything
     // else still comes from the shed, with the climb deciding how much the
     // record supports the estimate.
@@ -151,6 +170,94 @@
         };
     }
 
+    // Everything a printed card needs, for a pair that is still waiting or a
+    // clutch that already has eggs on record. The stages are kept generic so
+    // the card renders a shed-to-hatch rail whether the middle dates are
+    // estimates or facts.
+    function card(record, female, options = {}) {
+        const result = estimate(record, female);
+        const laidDate = validDate(record && (record.laidDate || record.eggsLaidDate));
+        const hatchedDate = validDate(record && record.hatchedDate);
+        const days = incubationDays(
+            options.incubationDays !== undefined
+                ? options.incubationDays
+                : record && record.incubationDays
+        );
+        const layDate = laidDate || (result ? result.layDate : "");
+        const hatchDate = hatchedDate || (layDate ? addDays(layDate, days) : "");
+
+        if (!result && !laidDate && !hatchDate) {
+            return null;
+        }
+
+        const eggCount = Math.max(0, Math.round(Number(record && record.eggCount) || 0));
+        const stages = [];
+
+        if (result) {
+            stages.push({
+                key: "shed",
+                label: "Pre-lay shed",
+                date: result.shedDate,
+                from: "",
+                to: "",
+                observed: true,
+                note: "The anchor for the dates below"
+            });
+            stages.push({
+                key: "ovulation",
+                label: result.ovulationObserved ? "Ovulation" : "Ovulation (est.)",
+                date: result.ovulationDate,
+                from: result.ovulationObserved ? "" : result.ovulationFrom,
+                to: result.ovulationObserved ? "" : result.ovulationTo,
+                observed: result.ovulationObserved,
+                note: result.ovulationObserved
+                    ? "Recorded on the pairing"
+                    : `${OVULATION_WINDOW[0]}\u2013${OVULATION_WINDOW[1]} days before the shed`
+            });
+        }
+
+        stages.push({
+            key: "eggs",
+            label: laidDate ? "Eggs laid" : "Eggs due (est.)",
+            date: layDate,
+            from: laidDate || !result ? "" : result.layFrom,
+            to: laidDate || !result ? "" : result.layTo,
+            observed: Boolean(laidDate),
+            note: laidDate
+                ? "On record"
+                : `${LAY_WINDOW[0]}\u2013${LAY_WINDOW[1]} days after the shed`
+        });
+
+        stages.push({
+            key: "hatch",
+            label: hatchedDate ? "Hatched" : "Hatch due",
+            date: hatchDate,
+            from: "",
+            to: "",
+            observed: Boolean(hatchedDate),
+            note: `${days} days in the incubator`
+        });
+
+        return {
+            shedDate: result ? result.shedDate : "",
+            ovulationDate: result ? result.ovulationDate : "",
+            ovulationFrom: result ? result.ovulationFrom : "",
+            ovulationTo: result ? result.ovulationTo : "",
+            ovulationObserved: result ? result.ovulationObserved : false,
+            laidDate,
+            layDate,
+            layFrom: laidDate || !result ? "" : result.layFrom,
+            layTo: laidDate || !result ? "" : result.layTo,
+            hatchDate,
+            hatchedDate,
+            incubationDays: days,
+            weightClimb: result ? result.weightClimb : null,
+            confidence: result ? result.confidence : "",
+            eggCount,
+            stages
+        };
+    }
+
     window.BreedingTimeline = {
         OVULATION_DAYS_BEFORE_SHED,
         OVULATION_WINDOW,
@@ -160,12 +267,15 @@
         MIN_CLIMB_SPAN_DAYS,
         MIN_CLIMB_GRAMS,
         MIN_CLIMB_PERCENT,
+        DEFAULT_INCUBATION_DAYS,
         parseDate,
         dateText,
         addDays,
         daysBetween,
         weightClimb,
         describeClimb,
-        estimate
+        incubationDays,
+        estimate,
+        card
     };
 })();

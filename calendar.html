@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Calendar</title>
-    <link rel="stylesheet" href="style.css?v=50">
+    <link rel="stylesheet" href="style.css?v=51">
 </head>
 
 <body>
@@ -23,7 +23,8 @@
 
         <div class="paragraph-container">
             <p>
-                Every job the app already knows about, on one calendar: meals coming due, health
+                Every job the app already knows about, on one calendar: pickups with a three-day
+                reminder to reach out and make the final arrangements, meals coming due, health
                 follow-ups and quarantine releases, clutch hatch windows and feeder orders. Overdue
                 work is pinned to today so it cannot hide in the past.
             </p>
@@ -89,6 +90,7 @@
                 <div class="calendar-grid" id="calendarGrid" role="grid" aria-label="Task calendar"></div>
 
                 <div class="calendar-legend">
+                    <span class="calendar-legend-item is-pickup">Pickup</span>
                     <span class="calendar-legend-item is-feeding">Feeding</span>
                     <span class="calendar-legend-item is-health">Health</span>
                     <span class="calendar-legend-item is-breeding">Breeding</span>
@@ -122,10 +124,12 @@
     <script src="feed-helpers.js?v=4"></script>
     <script src="feeder-inventory.js?v=8"></script>
     <script src="health-helpers.js?v=1"></script>
+    <script src="sales-helpers.js?v=1"></script>
+    <script src="buyer-helpers.js?v=3"></script>
     <script src="incubation-helpers.js?v=2"></script>
     <script src="breeding-timeline.js?v=1"></script>
-    <script src="calendar-helpers.js?v=3"></script>
-    <script src="calendar.js?v=3"></script>
+    <script src="calendar-helpers.js?v=4"></script>
+    <script src="calendar.js?v=4"></script>
 
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>

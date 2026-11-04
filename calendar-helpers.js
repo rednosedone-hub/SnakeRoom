@@ -6,6 +6,7 @@
 // Every task is something the keeper can act on that day:
 //   feeding  - a snake's next meal (and the meals after it, inside the window)
 //   health   - quarantine release, or a follow-up on a health event
+//   pickup   - a hold's pickup date, plus a reminder a few days before it
 //   breeding - a clutch's hatch window and first candling, plus a pair's
 //              estimated ovulation and egg date after a pre-lay shed
 //   order    - a feeder size that has reached its re-order date
@@ -15,13 +16,18 @@
 
 (function () {
     const TASK_TYPES = {
-        feeding: { label: "Feeding", rank: 1 },
-        health: { label: "Health", rank: 2 },
-        breeding: { label: "Breeding", rank: 3 },
-        order: { label: "Order", rank: 4 }
+        pickup: { label: "Pickup", rank: 1 },
+        feeding: { label: "Feeding", rank: 2 },
+        health: { label: "Health", rank: 3 },
+        breeding: { label: "Breeding", rank: 4 },
+        order: { label: "Order", rank: 5 }
     };
 
     const HATCH_DAYS = 55;
+    // A hold's pickup date is only useful if the keeper reaches out first. Three
+    // days is enough time to agree a time, settle the balance and sort out a
+    // shipping box or a meeting place without the buyer feeling chased.
+    const PICKUP_REMINDER_DAYS = 3;
 
     function text(value) {
         return String(value === undefined || value === null ? "" : value).trim();
@@ -389,6 +395,123 @@
         });
     }
 
+    function normalizeName(value) {
+        return text(value).replace(/\s+/g, " ").toLowerCase();
+    }
+
+    // The buyer directory is where the phone number and e-mail live, so the
+    // reminder can be acted on from the calendar without opening another page.
+    function findBuyerRecord(buyers, name) {
+        const wanted = normalizeName(name);
+
+        if (!wanted) {
+            return null;
+        }
+
+        if (window.SnakeBuyers && typeof window.SnakeBuyers.findBuyerByName === "function") {
+            const found = window.SnakeBuyers.findBuyerByName(buyers, name);
+
+            if (found) {
+                return found;
+            }
+        }
+
+        return (Array.isArray(buyers) ? buyers : [])
+            .find(buyer => normalizeName(buyer && buyer.name) === wanted) || null;
+    }
+
+    function buyerContact(buyers, name) {
+        const buyer = findBuyerRecord(buyers, name);
+
+        if (!buyer) {
+            return "";
+        }
+
+        // Ringing is how a pickup gets agreed, so the phone wins when both are
+        // on file; the e-mail is the fallback for a quiet follow-up.
+        return text(buyer.phone) || text(buyer.email);
+    }
+
+    function formatBalance(value) {
+        return `$${(Math.round((Number(value) || 0) * 100) / 100).toFixed(2).replace(/\.00$/, "")}`;
+    }
+
+    function describeDays(days) {
+        return days === 1 ? "1 day" : `${days} days`;
+    }
+
+    // A dated hold produces two calendar entries: a reminder three days before
+    // the pickup, when the keeper should reach out and make the final
+    // arrangements, and the pickup itself. A hold already past its date folds
+    // into one late pickup pinned to today, the way every other overdue job is.
+    function collectPickupTasks(snakes, options, push) {
+        const holds = window.SaleHolds;
+
+        if (!holds || typeof holds.getHold !== "function") {
+            return;
+        }
+
+        (Array.isArray(snakes) ? snakes : []).forEach(snake => {
+            if (!snake) {
+                return;
+            }
+
+            const hold = holds.getHold(snake, options.today);
+
+            if (!hold || !hold.active || !parseDate(hold.dueDate)) {
+                return;
+            }
+
+            const label = snakeLabel(snake);
+            const buyer = hold.buyer;
+            const contact = buyerContact(options.buyers, buyer);
+            const who = buyer ? `for ${buyer}` : "No buyer named";
+            const balance = hold.balance > 0 ? `${formatBalance(hold.balance)} balance due` : "";
+            const daysLeft = hold.daysLeft === null
+                ? daysBetween(options.today, hold.dueDate)
+                : hold.daysLeft;
+
+            if (daysLeft === null) {
+                return;
+            }
+
+            if (daysLeft > 0) {
+                const reminderDate = addDays(hold.dueDate, -PICKUP_REMINDER_DAYS);
+
+                if (reminderDate) {
+                    push({
+                        date: reminderDate < options.today ? options.today : reminderDate,
+                        type: "pickup",
+                        title: `Confirm pickup: ${label}`,
+                        detail: [
+                            `Pickup in ${describeDays(daysLeft)} (${hold.dueDate})`,
+                            who,
+                            contact,
+                            balance
+                        ].filter(Boolean).join(" \u00b7 "),
+                        href: snakeHref(snake)
+                    });
+                }
+            }
+
+            const overdue = daysLeft < 0;
+
+            push({
+                date: overdue ? options.today : hold.dueDate,
+                type: "pickup",
+                title: overdue ? `Pickup was due: ${label}` : `Pickup: ${label}`,
+                detail: [
+                    overdue ? `${describeDays(Math.abs(daysLeft))} late` : "",
+                    who,
+                    contact,
+                    balance
+                ].filter(Boolean).join(" \u00b7 "),
+                href: snakeHref(snake),
+                overdue
+            });
+        });
+    }
+
     function collectOrderTasks(forecast, options, push) {
         if (!forecast || !Array.isArray(forecast.sizes)) {
             return;
@@ -453,10 +576,17 @@
 
             tasks.push(task);
         };
-        const context = { today, startDate, endDate, health: opts.health };
+        const context = {
+            today,
+            startDate,
+            endDate,
+            health: opts.health,
+            buyers: opts.buyers
+        };
 
         collectFeedingTasks(opts.snakes, context, push);
         collectHealthTasks(opts.snakes, context, push);
+        collectPickupTasks(opts.snakes, context, push);
         collectBreedingTasks(opts.clutches, context, push);
         collectPairTasks(opts.pairs, opts.snakes, context, push);
         collectOrderTasks(opts.forecast, context, push);
@@ -497,6 +627,7 @@
     window.CalendarTools = {
         TASK_TYPES,
         HATCH_DAYS,
+        PICKUP_REMINDER_DAYS,
         parseDate,
         dateText,
         todayText,

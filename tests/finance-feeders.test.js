@@ -72,6 +72,190 @@ test("an older expense without feeder details still loads cleanly", () => {
     assert.equal(order.amount, 20);
 });
 
+test("a hold deposit is money in until the snake sells", () => {
+    const events = finance.getEvents([
+        {
+            id: "held-1",
+            name: "Luna",
+            status: "On Hold",
+            holdBuyer: "Sam",
+            holdDeposit: "150",
+            holdDepositDate: "2026-10-20"
+        }
+    ], [], []);
+
+    assert.equal(events.length, 1);
+    assert.equal(events[0].category, "hold-deposit");
+    assert.equal(events[0].direction, "in");
+    assert.equal(events[0].amount, 150);
+    assert.match(events[0].detail, /Sam/);
+});
+
+test("selling replaces the deposit with the full sale price", () => {
+    const events = finance.getEvents([
+        {
+            id: "sold-1",
+            name: "Luna",
+            status: "Sold",
+            salePrice: "400",
+            saleDate: "2026-11-01",
+            holdDeposit: "150",
+            holdDepositDate: "2026-10-20"
+        }
+    ], [], []);
+
+    assert.equal(events.length, 1);
+    assert.equal(events[0].category, "snake-sale");
+    assert.equal(events[0].amount, 400);
+});
+
+test("a sale marked without a price keeps its deposit on the ledger", () => {
+    const events = finance.getEvents([
+        {
+            id: "sold-noprice",
+            name: "Luna",
+            status: "Sold",
+            saleDate: "2026-11-01",
+            holdDeposit: "150",
+            holdDepositDate: "2026-10-20"
+        }
+    ], [], []);
+
+    assert.equal(events.length, 1);
+    assert.equal(events[0].category, "snake-sale");
+    assert.equal(events[0].amount, 150);
+});
+
+test("a released forfeited hold keeps its deposit on the ledger", () => {
+    const events = finance.getEvents([
+        {
+            id: "released-forfeit",
+            name: "Luna",
+            status: "Available",
+            holdHistory: [
+                {
+                    buyer: "Sam",
+                    deposit: 150,
+                    depositDate: "2026-10-20",
+                    releasedDate: "2026-11-01",
+                    disposition: "forfeit"
+                }
+            ]
+        }
+    ], [], []);
+
+    assert.equal(events.length, 1);
+    assert.equal(events[0].category, "hold-deposit");
+    assert.equal(events[0].amount, 150);
+    assert.match(events[0].detail, /forfeited/);
+});
+
+test("a returned deposit adds a matching refund so the pair nets to zero", () => {
+    const events = finance.getEvents([
+        {
+            id: "released-return",
+            name: "Luna",
+            status: "Available",
+            holdHistory: [
+                {
+                    buyer: "Sam",
+                    deposit: 150,
+                    depositDate: "2026-10-20",
+                    releasedDate: "2026-11-01",
+                    disposition: "return"
+                }
+            ]
+        }
+    ], [], []);
+    const refund = events.find(event => event.category === "hold-refund");
+    const totals = finance.summarize(events);
+
+    assert.equal(events.length, 2);
+    assert.equal(refund.direction, "out");
+    assert.equal(refund.amount, 150);
+    assert.match(refund.detail, /Deposit refund/);
+    assert.equal(totals.revenue, 150);
+    assert.equal(totals.spend, 150);
+    assert.equal(totals.net, 0);
+});
+
+test("a transferred deposit stays money in without a refund", () => {
+    const events = finance.getEvents([
+        {
+            id: "released-transfer",
+            name: "Luna",
+            status: "Available",
+            holdHistory: [
+                {
+                    buyer: "Sam",
+                    deposit: 150,
+                    depositDate: "2026-10-20",
+                    releasedDate: "2026-11-01",
+                    disposition: "transfer",
+                    transferTo: "Kaa"
+                }
+            ]
+        }
+    ], [], []);
+
+    assert.equal(events.length, 1);
+    assert.equal(events[0].category, "hold-deposit");
+    assert.match(events[0].detail, /transferred/);
+});
+
+test("an agreed price on a held snake is not counted as a sale as well", () => {
+    const events = finance.getEvents([
+        {
+            id: "held-2",
+            name: "Luna",
+            status: "On Hold",
+            salePrice: "400",
+            holdDeposit: "150",
+            holdDepositDate: "2026-10-20"
+        }
+    ], [], []);
+
+    assert.equal(events.length, 1);
+    assert.equal(events[0].category, "hold-deposit");
+    assert.equal(events[0].amount, 150);
+});
+
+test("an asking price on an unsold snake is not money in", () => {
+    const events = finance.getEvents([
+        { id: "avail-1", name: "Nova", status: "Available", salePrice: "500" }
+    ], [], []);
+
+    assert.equal(events.length, 0);
+});
+
+test("a dated sale counts even before the status is changed to Sold", () => {
+    const events = finance.getEvents([
+        { id: "dated-1", name: "Nova", status: "Available", salePrice: "500", saleDate: "2026-10-01" }
+    ], [], []);
+
+    assert.equal(events.length, 1);
+    assert.equal(events[0].category, "snake-sale");
+    assert.equal(events[0].amount, 500);
+});
+
+test("hold grace days default to 30, persist, and reject impossible values", () => {
+    store.clear();
+
+    assert.equal(finance.getSettings().holdGraceDays, 30);
+
+    finance.saveSettings({ holdGraceDays: 45 });
+    assert.equal(finance.getSettings().holdGraceDays, 45);
+
+    finance.saveSettings({ feederPrices: { "Small Rat": 4 } });
+    assert.equal(finance.getSettings().holdGraceDays, 45);
+
+    finance.saveSettings({ holdGraceDays: 0 });
+    assert.equal(finance.getSettings().holdGraceDays, 30);
+
+    finance.saveSettings({ holdGraceDays: 500 });
+    assert.equal(finance.getSettings().holdGraceDays, 30);
+});
+
 test("invalid line quantities are dropped instead of saved", () => {
     store.clear();
 

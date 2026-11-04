@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Snake Room - Buyers</title>
+    <link rel="stylesheet" href="style.css?v=74">
+</head>
+
+<body>
+    <div class="page-container buyers-page">
+        <div class="hero-section">
+            <img src="Images/TheSnakeRoom.jpg" class="hero-image" alt="The Snake Room logo">
+
+            <div class="container">
+                <h1>The Snake Room</h1>
+                <h2>Buyers</h2>
+            </div>
+        </div>
+
+        <div class="button-row">
+            <a href="index.html" class="main-button">Home</a>
+            <a href="finance.html" class="main-button">Finances</a>
+            <a href="snakes.html" class="main-button">Collection</a>
+            <a href="season-review.html" class="main-button">Season Review</a>
+            <a href="account.html" class="main-button">Account</a>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="import-report" id="buyerReport" role="status" style="display: none;"></div>
+
+        <section class="form-section">
+            <div class="fin-panel-head">
+                <div>
+                    <h3>Buyers</h3>
+                    <p class="empty-message fin-panel-lead">
+                        Everyone who has bought or held an animal, where they found you, and what
+                        the relationship is worth. Sales and holds are matched by the buyer name
+                        already on each snake, so old records link as soon as the name is added.
+                    </p>
+                </div>
+
+                <div class="fin-toolbar">
+                    <button type="button" class="main-button" id="addBuyerButton">Add Buyer</button>
+                </div>
+            </div>
+
+            <div class="fin-kpi-grid" id="buyerKpis"></div>
+        </section>
+
+        <section class="form-section buyer-form-section" id="buyerFormSection" hidden>
+            <h3 id="buyerFormTitle">Add buyer</h3>
+
+            <form class="form-grid" id="buyerForm">
+                <label class="form-field">
+                    <span>Name</span>
+                    <input type="text" id="buyerNameInput" autocomplete="name" required
+                        placeholder="First and last name">
+                </label>
+
+                <label class="form-field">
+                    <span>Email</span>
+                    <input type="email" id="buyerEmailInput" autocomplete="email"
+                        placeholder="name@example.com">
+                </label>
+
+                <label class="form-field">
+                    <span>Phone</span>
+                    <input type="tel" id="buyerPhoneInput" autocomplete="tel"
+                        placeholder="555-555-5555">
+                </label>
+
+                <label class="form-field">
+                    <span>How they found you</span>
+                    <select id="buyerSourceInput"></select>
+                </label>
+
+                <label class="form-field fin-span-all" id="buyerSourceDetailField" hidden>
+                    <span>Source detail</span>
+                    <input type="text" id="buyerSourceDetailInput"
+                        placeholder="Which expo, group, listing or person">
+                </label>
+
+                <label class="form-field fin-span-all">
+                    <span>Private note</span>
+                    <textarea id="buyerNotesInput" rows="3"
+                        placeholder="Preferences, payment history, anything worth remembering"></textarea>
+                </label>
+
+                <p class="empty-message fin-span-all buyer-form-help">
+                    The note stays private. It is not printed on a buyer statement.
+                </p>
+
+                <div class="form-field fin-span-all buyer-form-actions">
+                    <button type="submit" class="main-button" id="buyerSaveButton">Add Buyer</button>
+                    <button type="button" class="secondary-button" id="buyerCancelButton">Cancel</button>
+                </div>
+            </form>
+
+            <p class="empty-message fin-error" id="buyerFormError" role="alert" hidden></p>
+        </section>
+
+        <section class="form-section">
+            <div class="fin-panel-head">
+                <div>
+                    <h3>Where buyers come from</h3>
+                    <p class="empty-message fin-panel-lead">
+                        A buyer stays attached to the channel that first found you, so repeat
+                        business counts for the source that earned it. Sales without a directory
+                        record are grouped as <span class="buyer-inline">Not in directory</span>
+                        until you add the name below.
+                    </p>
+                </div>
+
+                <div class="fin-toolbar">
+                    <label class="fin-inline-field">
+                        <span>Period</span>
+                        <select id="buyerYearSelect"></select>
+                    </label>
+                </div>
+            </div>
+
+            <div class="fin-table-wrap">
+                <table class="fin-table buyer-source-table">
+                    <thead>
+                        <tr>
+                            <th>Source</th>
+                            <th class="fin-amount-cell">Buyers added</th>
+                            <th class="fin-amount-cell">Sales</th>
+                            <th class="fin-amount-cell">Revenue</th>
+                            <th class="fin-amount-cell">Share</th>
+                        </tr>
+                    </thead>
+                    <tbody id="buyerSourceBody"></tbody>
+                </table>
+            </div>
+
+            <p class="empty-message" id="buyerSourceEmpty" hidden>
+                Nothing to compare yet. Add a buyer or record a sale and this table fills in.
+            </p>
+
+            <p class="empty-message buyer-source-note" id="buyerSourceNote" hidden></p>
+        </section>
+
+        <section class="form-section" id="buyerUnlinkedSection" hidden>
+            <div class="fin-panel-head">
+                <div>
+                    <h3>Not in the directory yet</h3>
+                    <p class="empty-message fin-panel-lead">
+                        These names already appear on a sale or hold. Add one to give it contact
+                        details and a source, and its history links automatically.
+                    </p>
+                </div>
+            </div>
+
+            <div class="buyer-unlinked-list" id="buyerUnlinkedList"></div>
+        </section>
+
+        <section class="form-section">
+            <div class="fin-panel-head">
+                <div>
+                    <h3>Directory</h3>
+                    <p class="empty-message" id="buyerDirectoryCount"></p>
+                </div>
+
+                <div class="fin-toolbar">
+                    <label class="fin-inline-field">
+                        <span>Search</span>
+                        <input type="search" id="buyerSearchInput" placeholder="Name, email or phone">
+                    </label>
+
+                    <label class="fin-inline-field">
+                        <span>Source</span>
+                        <select id="buyerSourceFilter"></select>
+                    </label>
+                </div>
+            </div>
+
+            <div class="buyer-list" id="buyerList"></div>
+
+            <p class="empty-message" id="buyerEmpty" hidden></p>
+        </section>
+    </div>
+
+    <div class="modal buyer-statement-modal" id="buyerStatementModal" role="dialog" aria-modal="true"
+        aria-label="Buyer statement">
+        <div class="modal-content buyer-statement-content">
+            <button type="button" class="close-button" id="buyerStatementClose" aria-label="Close statement">&#215;</button>
+
+            <iframe id="buyerStatementFrame" class="buyer-statement-frame" title="Buyer statement preview"></iframe>
+
+            <div class="modal-actions">
+                <button type="button" class="main-button" id="buyerStatementPrint">Print / Save as PDF</button>
+                <button type="button" class="secondary-button" id="buyerStatementDone">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script src="data-helpers.js"></script>
+    <script src="backup-helpers.js?v=1"></script>
+    <script src="cloud-sync.js?v=19"></script>
+    <script src="auto-sync.js?v=8"></script>
+    <script src="account-gate.js?v=1"></script>
+    <script src="plans.js?v=2"></script>
+    <script src="finance-helpers.js?v=6"></script>
+    <script src="sales-helpers.js?v=5"></script>
+    <script src="buyer-helpers.js?v=5"></script>
+    <script src="buyers.js?v=3"></script>
+    <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
+    <script src="nav-scroll.js?v=1"></script>
+</body>
+
+</html>

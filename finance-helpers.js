@@ -20,6 +20,11 @@
 
     const DEFAULT_CURRENCY = "CAD";
     const CURRENCIES = ["CAD", "USD", "GBP", "EUR", "AUD", "NZD"];
+    // How late a pickup can be before the hold is flagged expired. This is a
+    // policy setting, not a fact about the sale, so the keeper can change it.
+    const DEFAULT_HOLD_GRACE_DAYS = 30;
+    const MIN_HOLD_GRACE_DAYS = 1;
+    const MAX_HOLD_GRACE_DAYS = 365;
 
     const EXPENSE_CATEGORIES = [
         { id: "Feeders", label: "Feeders" },
@@ -46,6 +51,8 @@
     const EVENT_LABELS = {
         "snake-purchase": "Snake purchases",
         "snake-sale": "Snake sales",
+        "hold-deposit": "Hold deposits",
+        "hold-refund": "Deposit refunds",
         feeders: "Feeder orders",
         supplies: "Supplies",
         vet: "Vet",
@@ -121,9 +128,18 @@
 
     // ---- Settings ----------------------------------------------------------
 
+    function normalizeHoldGraceDays(value) {
+        const days = Math.round(toNumber(value));
+
+        return days >= MIN_HOLD_GRACE_DAYS && days <= MAX_HOLD_GRACE_DAYS
+            ? days
+            : DEFAULT_HOLD_GRACE_DAYS;
+    }
+
     function getSettings() {
         const stored = readObject(KEYS.settings);
         const currency = CURRENCIES.includes(stored.currency) ? stored.currency : DEFAULT_CURRENCY;
+        const holdGraceDays = normalizeHoldGraceDays(stored.holdGraceDays);
         const prices = {};
 
         if (stored.feederPrices && typeof stored.feederPrices === "object") {
@@ -136,7 +152,7 @@
             });
         }
 
-        return { currency, feederPrices: prices };
+        return { currency, feederPrices: prices, holdGraceDays };
     }
 
     function saveSettings(settings) {
@@ -152,7 +168,8 @@
 
         writeObject(KEYS.settings, {
             currency: next.currency,
-            feederPrices: next.feederPrices || {}
+            feederPrices: next.feederPrices || {},
+            holdGraceDays: normalizeHoldGraceDays(next.holdGraceDays)
         });
     }
 
@@ -325,6 +342,14 @@
         return Boolean(snake) && String(snake.status || "") === "Sold";
     }
 
+    // A price on a snake that is still Available is an asking price, not money.
+    // A sale is realized by the Sold status or by a sale date on the record.
+    function isRealizedSale(snake) {
+        const sale = getSnakeSale(snake);
+
+        return sale.recorded && (isMarkedSold(snake) || Boolean(sale.date));
+    }
+
     function getSnakeLabel(snake) {
         if (!snake) {
             return "Unknown snake";
@@ -418,7 +443,7 @@
         (snakes || []).forEach(snake => {
             const sale = getSnakeSale(snake);
 
-            if (sale.recorded && expo && sale.expoId === expo.id) {
+            if (isRealizedSale(snake) && expo && sale.expoId === expo.id) {
                 sales.push({ snake, sale });
             }
         });
@@ -461,9 +486,18 @@
             }
 
             const sale = getSnakeSale(snake);
+            const deposit = toMoney(snake.holdDeposit);
+            // A dated sale, or a snake marked Sold, is a completed sale and the
+            // deposit is already part of its price. Until then a deposit is cash
+            // received but not a sale, so it is counted on its own. An asking
+            // price on an unsold snake is not money at all.
+            const realizedSale = isRealizedSale(snake);
 
-            if (sale.recorded) {
+            if (realizedSale) {
                 const expo = findExpo(expos, sale.expoId);
+                // A sale marked without a price still has real cash in it if a
+                // deposit was taken. Never drop that money off the ledger.
+                const saleAmount = sale.amount > 0 ? sale.amount : deposit;
 
                 events.push({
                     date: sale.date,
@@ -471,11 +505,72 @@
                     category: "snake-sale",
                     label: snake.name || "Unnamed snake",
                     detail: expo ? `${expo.name}${sale.buyer ? ` — ${sale.buyer}` : ""}` : (sale.buyer || "Sale"),
-                    amount: sale.amount,
+                    amount: saleAmount,
                     snakeId: snake.id || "",
                     expoId: sale.expoId || ""
                 });
             }
+
+            if (!realizedSale && deposit > 0) {
+                events.push({
+                    date: String(snake.holdDepositDate || "").slice(0, 10),
+                    direction: "in",
+                    category: "hold-deposit",
+                    label: snake.name || "Unnamed snake",
+                    detail: snake.holdBuyer
+                        ? `Hold deposit — ${snake.holdBuyer}`
+                        : "Hold deposit",
+                    amount: deposit,
+                    snakeId: snake.id || ""
+                });
+            }
+
+            // A released hold stops being a current deposit but its cash does
+            // not disappear. The archived hold keeps the deposit event, and a
+            // returned deposit adds the matching refund on the way out.
+            (Array.isArray(snake.holdHistory) ? snake.holdHistory : []).forEach(entry => {
+                if (!entry || typeof entry !== "object") {
+                    return;
+                }
+
+                const releasedDeposit = toMoney(entry.deposit);
+
+                if (releasedDeposit <= 0) {
+                    return;
+                }
+
+                const buyer = String(entry.buyer || "").trim();
+                const disposition = String(entry.disposition || "");
+                const releasedDate = String(entry.releasedDate || "").slice(0, 10);
+                const depositDate = String(entry.depositDate || releasedDate).slice(0, 10);
+                const dispositionLabel = disposition === "return"
+                    ? "returned"
+                    : disposition === "transfer"
+                        ? "transferred"
+                        : "forfeited";
+
+                events.push({
+                    date: depositDate,
+                    direction: "in",
+                    category: "hold-deposit",
+                    label: snake.name || "Unnamed snake",
+                    detail: `Hold deposit — ${buyer || "buyer"} (${dispositionLabel})`,
+                    amount: releasedDeposit,
+                    snakeId: snake.id || ""
+                });
+
+                if (disposition === "return" || entry.refunded) {
+                    events.push({
+                        date: releasedDate || depositDate,
+                        direction: "out",
+                        category: "hold-refund",
+                        label: snake.name || "Unnamed snake",
+                        detail: `Deposit refund — ${buyer || "buyer"}`,
+                        amount: releasedDeposit,
+                        snakeId: snake.id || ""
+                    });
+                }
+            });
         });
 
         (expenses || []).forEach(expense => {
@@ -580,6 +675,10 @@
         KEYS,
         CURRENCIES,
         DEFAULT_CURRENCY,
+        DEFAULT_HOLD_GRACE_DAYS,
+        MIN_HOLD_GRACE_DAYS,
+        MAX_HOLD_GRACE_DAYS,
+        normalizeHoldGraceDays,
         EXPENSE_CATEGORIES,
         FEEDER_SIZES,
         EVENT_LABELS,
@@ -602,6 +701,7 @@
         getSnakePurchase,
         getSnakeSale,
         isMarkedSold,
+        isRealizedSale,
         getSnakeLabel,
         getFeederUsage,
         getExpoTotals,

@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Breeding</title>
-    <link rel="stylesheet" href="style.css?v=61">
+    <link rel="stylesheet" href="style.css?v=72">
 </head>
 
 <body>
@@ -27,6 +27,8 @@
             <a href="snakes.html" class="main-button">Collection</a>
             <a href="goalPlanner.html" class="main-button">Goal Planner</a>
             <a href="breedingOutcomes.html" class="main-button">Outcomes</a>
+            <a href="season-review.html" class="main-button">Season Review</a>
+            <a href="scorecard.html" class="main-button">Scorecard</a>
             <a href="morphGallery.html" class="main-button">Morph Gallery</a>
             <a href="available.html" class="main-button">Available</a>
         </div>
@@ -77,10 +79,31 @@
                         <span>Egg Count</span>
                         <input type="number" id="eggCountInput" min="0" placeholder="Number of eggs">
                     </label>
+
+                    <label class="form-field">
+                        <span>Purpose</span>
+                        <select id="pairPurposeInput">
+                            <option value="sales">Sales pairing</option>
+                            <option value="project">Project pairing</option>
+                        </select>
+                    </label>
+
+                    <label class="form-field">
+                        <span>Step (project)</span>
+                        <input type="number" id="projectStepInput" min="1" placeholder="1">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Target Morph (project)</span>
+                        <input type="text" id="targetMorphInput"
+                            placeholder="e.g. Hurricane Cypress Pin Clown">
+                    </label>
                 </div>
 
                 <div id="pairingReadiness" class="readiness-panel-container" hidden></div>
                 <div id="lineageWarning" class="lineage-warning" hidden></div>
+
+                <p class="empty-message" id="projectNextHint" hidden></p>
 
                 <div class="form-page-actions">
                     <button type="button" class="main-button" onclick="saveBreedingPair()">
@@ -149,8 +172,9 @@
     <script src="health-helpers.js?v=1"></script>
     <script src="readiness.js?v=2"></script>
     <script src="lineage.js?v=1"></script>
-    <script src="breeding-timeline.js?v=1"></script>
-    <script src="breeding.js?v=7"></script>
+    <script src="incubation-helpers.js?v=1"></script>
+    <script src="breeding-timeline.js?v=3"></script>
+    <script src="breeding.js?v=9"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

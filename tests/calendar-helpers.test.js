@@ -24,6 +24,13 @@ vm.runInContext(
     context,
     { filename: "breeding-timeline.js" }
 );
+// Holds and their pickup dates come from sales-helpers.js, the same rules the
+// dashboard and Finance page use.
+vm.runInContext(
+    fs.readFileSync(path.join(projectRoot, "sales-helpers.js"), "utf8"),
+    context,
+    { filename: "sales-helpers.js" }
+);
 vm.runInContext(
     fs.readFileSync(path.join(projectRoot, "calendar-helpers.js"), "utf8"),
     context,
@@ -327,4 +334,95 @@ test("the summary counts today, the coming week and overdue work", () => {
     assert.equal(summary.today, 2);
     assert.equal(summary.overdue, 2);
     assert.equal(summary.byType.feeding, tasks.filter(task => task.type === "feeding").length);
+});
+
+test("a dated hold puts its pickup and a three-day reminder on the calendar", () => {
+    const tasks = calendar.collectTasks({
+        snakes: [snake({
+            status: "On Hold",
+            holdBuyer: "Alex Chen",
+            holdDueDate: "2026-11-10",
+            holdPrice: "400",
+            holdDeposit: "100"
+        })],
+        buyers: [{ id: "buyer-1", name: "Alex Chen", phone: "555-0101", email: "alex@example.com" }],
+        today: TODAY,
+        startDate: "2026-10-01",
+        endDate: "2026-11-30"
+    });
+    const pickups = tasks.filter(task => task.type === "pickup");
+
+    assert.equal(pickups.length, 2);
+
+    // Three days out is the reminder to reach out and make the final
+    // arrangements, and it carries the phone number and the balance.
+    assert.equal(pickups[0].date, "2026-11-07");
+    assert.match(pickups[0].title, /Confirm pickup: Nova/);
+    assert.match(pickups[0].detail, /Pickup in 13 days \(2026-11-10\)/);
+    assert.match(pickups[0].detail, /for Alex Chen/);
+    assert.match(pickups[0].detail, /555-0101/);
+    assert.match(pickups[0].detail, /\$300 balance due/);
+    assert.equal(pickups[0].href, "snake-form.html?uid=snake-1");
+
+    assert.equal(pickups[1].date, "2026-11-10");
+    assert.match(pickups[1].title, /^Pickup: Nova/);
+    assert.equal(pickups[1].overdue, false);
+});
+
+test("inside the reminder window the reminder lands on today", () => {
+    const tasks = calendar.collectTasks({
+        snakes: [snake({ status: "On Hold", holdBuyer: "Sam", holdDueDate: "2026-10-30" })],
+        today: TODAY,
+        startDate: "2026-10-01",
+        endDate: "2026-11-30"
+    });
+    const pickups = tasks.filter(task => task.type === "pickup");
+
+    assert.equal(pickups.length, 2);
+    assert.equal(pickups[0].date, TODAY);
+    assert.match(pickups[0].title, /Confirm pickup/);
+    assert.match(pickups[0].detail, /Pickup in 2 days \(2026-10-30\)/);
+    assert.equal(pickups[1].date, "2026-10-30");
+});
+
+test("an e-mail is used when no phone is on file", () => {
+    const tasks = calendar.collectTasks({
+        snakes: [snake({ status: "On Hold", holdBuyer: "Sam Lee", holdDueDate: "2026-11-10" })],
+        buyers: [{ id: "buyer-2", name: "sam lee", phone: "", email: "sam@example.com" }],
+        today: TODAY,
+        startDate: "2026-11-01",
+        endDate: "2026-11-30"
+    });
+
+    assert.match(tasks.find(task => task.type === "pickup").detail, /sam@example\.com/);
+});
+
+test("a passed pickup is one overdue task on today's list", () => {
+    const tasks = calendar.collectTasks({
+        snakes: [snake({ status: "On Hold", holdBuyer: "Alex", holdDueDate: "2026-10-25" })],
+        today: TODAY,
+        startDate: "2026-10-01",
+        endDate: "2026-11-30"
+    });
+    const pickups = tasks.filter(task => task.type === "pickup");
+
+    assert.equal(pickups.length, 1);
+    assert.equal(pickups[0].date, TODAY);
+    assert.equal(pickups[0].overdue, true);
+    assert.match(pickups[0].title, /Pickup was due: Nova/);
+    assert.match(pickups[0].detail, /3 days late/);
+});
+
+test("a hold without a pickup date, or a sold snake, adds no pickup tasks", () => {
+    const tasks = calendar.collectTasks({
+        snakes: [
+            snake({ id: "snake-1", status: "On Hold", holdBuyer: "Alex", holdDueDate: "" }),
+            snake({ id: "snake-2", name: "Sold one", status: "Sold", holdBuyer: "Alex", holdDueDate: "2026-11-10" })
+        ],
+        today: TODAY,
+        startDate: "2026-10-01",
+        endDate: "2026-11-30"
+    });
+
+    assert.equal(tasks.filter(task => task.type === "pickup").length, 0);
 });

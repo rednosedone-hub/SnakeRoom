@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Snake Room - Pair &amp; Clutch Scorecard</title>
+    <link rel="stylesheet" href="style.css?v=75">
+</head>
+
+<body>
+    <div class="page-container">
+        <div class="hero-section">
+            <img src="Images/TheSnakeRoom.jpg" class="hero-image" alt="The Snake Room logo">
+
+            <div class="container">
+                <h1>The Snake Room</h1>
+                <h2>Pair &amp; Clutch Scorecard</h2>
+            </div>
+        </div>
+
+        <div class="button-row">
+            <a href="index.html" class="main-button">Home</a>
+            <a href="breeding.html" class="main-button">Breeding</a>
+            <a href="breedingOutcomes.html" class="main-button">Outcomes</a>
+            <a href="season-review.html" class="main-button">Season Review</a>
+            <a href="calendar.html" class="main-button">Calendar</a>
+            <a href="snakes.html" class="main-button">Collection</a>
+        </div>
+
+        <div class="divider"></div>
+
+        <main class="snake-form-page">
+            <section class="form-section">
+                <div class="fin-panel-head">
+                    <div>
+                        <h3>Pair &amp; Clutch Scorecard</h3>
+                        <p class="empty-message fin-panel-lead">
+                            Every pairing graded on what it has actually produced: eggs laid, eggs that
+                            hatched, hatchlings worth keeping and sales. The grade is the pooled hatch
+                            rate                            across all of that pairing's hatched clutches &mdash; eggs in, hatchlings
+                            out, nothing weighted behind the scenes. A pairing with a single clutch is
+                            marked as a first result, not a settled reputation.
+                        </p>
+                        <p class="empty-message fin-panel-lead">
+                            Sales per clutch is the money side: realised sales divided by hatched
+                            clutches, before costs, so it is revenue rather than profit. A pairing
+                            marked as a <strong>project</strong> is read differently &mdash; its keepers
+                            are the progress toward the target morph, and sales are only the surplus.
+                        </p>
+                    </div>
+
+                    <div class="fin-toolbar">
+                        <button type="button" class="gene-action-button" id="scorecardRefreshButton">Refresh</button>
+                    </div>
+                </div>
+
+                <div class="season-verdict" id="scorecardVerdict"></div>
+
+                <div class="fin-kpi-grid" id="scorecardKpis"></div>
+            </section>
+
+            <section class="form-section" id="scorecardProjectsSection" hidden>
+                <h3>Projects</h3>
+
+                <p class="empty-message">
+                    Pairings that name the same target morph are read as steps of one project: what
+                    each step hatched, whether it reached the goal, and what the next move is. Record
+                    the step number, outcome and next move on the pair (or its clutch card) on the
+                    <a href="breeding.html">Breeding page</a>.
+                </p>
+
+                <div class="scorecard-projects" id="scorecardProjects"></div>
+            </section>
+
+            <section class="form-section">
+                <h3>Pairings</h3>
+
+                <p class="empty-message">
+                    Working pairings sit at the top, the ones to question next, then pairings with no
+                    hatch result yet. A clutch recorded with both parents is matched to its pairing even
+                    when the old record was never linked by hand. Set a pairing's purpose, target
+                    morph, step number, outcome and next move on the <a href="breeding.html">Breeding
+                    page</a>; a converted pair keeps them all on its clutch card. A project step is
+                    judged on the morph it produced, not on how many eggs hatched.
+                </p>
+
+                <div class="scorecard-pair-grid" id="scorecardPairGrid"></div>
+
+                <p class="empty-message" id="scorecardPairEmpty" hidden>
+                    No pairings on record yet. Create one on the <a href="breeding.html">Breeding page</a>,
+                    and it appears here with its first clutch.
+                </p>
+            </section>
+
+            <section class="form-section">
+                <h3>Clutches</h3>
+
+                <p class="empty-message">
+                    Each clutch scored on its own: eggs in, hatchlings out, what did not hatch, and what
+                    the hatchlings sold for. Money is only counted once an animal is marked Sold or given
+                    a sale date, never from an asking price.
+                </p>
+
+                <div class="fin-table-wrap" id="scorecardClutchTableWrap">
+                    <table class="fin-table scorecard-table">
+                        <thead>
+                            <tr>
+                                <th>Clutch</th>
+                                <th>Pair</th>
+                                <th>Laid</th>
+                                <th>Hatched</th>
+                                <th class="fin-amount-cell">Eggs</th>
+                                <th class="fin-amount-cell">Hatchlings</th>
+                                <th class="fin-amount-cell">Rate</th>
+                                <th class="fin-amount-cell">Grade</th>
+                                <th class="fin-amount-cell">Sales</th>
+                            </tr>
+                        </thead>
+                        <tbody id="scorecardClutchBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="season-clutch-cards" id="scorecardClutchCards"></div>
+
+                <p class="empty-message" id="scorecardClutchEmpty" hidden>
+                    No clutches on record yet. A clutch appears here as soon as it is laid, and earns a
+                    grade when the eggs hatch.
+                </p>
+            </section>
+
+            <p class="fin-status" id="scorecardStatus" role="status"></p>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script src="data-helpers.js"></script>
+    <script src="backup-helpers.js?v=1"></script>
+    <script src="cloud-sync.js?v=18"></script>
+    <script src="auto-sync.js?v=8"></script>
+    <script src="account-gate.js?v=1"></script>
+    <script src="finance-helpers.js?v=6"></script>
+    <script src="season-review-helpers.js?v=4"></script>
+    <script src="pair-scorecard-helpers.js?v=1"></script>
+    <script src="pair-scorecard.js?v=1"></script>
+    <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
+    <script src="nav-scroll.js?v=1"></script>
+</body>
+
+</html>

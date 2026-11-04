@@ -23,6 +23,14 @@ const csvHeaders = [
     "saleDate",
     "soldTo",
     "saleExpoId",
+    "holdBuyer",
+    "holdPrice",
+    "holdDeposit",
+    "holdDepositDate",
+    "holdDueDate",
+    "holdNote",
+    "holdPaymentPlan",
+    "holdHistoryJson",
     "weight",
     "lastFed",
     "feedingIntervalDays",
@@ -163,6 +171,14 @@ function snakeToRow(snake) {
         saleDate: snake.saleDate || "",
         soldTo: snake.soldTo || "",
         saleExpoId: snake.saleExpoId || "",
+        holdBuyer: snake.holdBuyer || "",
+        holdPrice: snake.holdPrice || "",
+        holdDeposit: snake.holdDeposit || "",
+        holdDepositDate: snake.holdDepositDate || "",
+        holdDueDate: snake.holdDueDate || "",
+        holdNote: snake.holdNote || "",
+        holdPaymentPlan: snake.holdPaymentPlan ? "true" : "false",
+        holdHistoryJson: stringifyJsonCell(snake.holdHistory),
         weight: snake.weight || "",
         lastFed: snake.lastFed || "",
         feedingIntervalDays: snake.feedingIntervalDays || "",
@@ -316,6 +332,14 @@ function rowToSnake(rowObject, index) {
         saleDate: getCell(rowObject, "saleDate"),
         soldTo: getCell(rowObject, "soldTo"),
         saleExpoId: getCell(rowObject, "saleExpoId"),
+        holdBuyer: getCell(rowObject, "holdBuyer"),
+        holdPrice: getCell(rowObject, "holdPrice"),
+        holdDeposit: getCell(rowObject, "holdDeposit"),
+        holdDepositDate: getCell(rowObject, "holdDepositDate"),
+        holdDueDate: getCell(rowObject, "holdDueDate"),
+        holdNote: getCell(rowObject, "holdNote"),
+        holdPaymentPlan: getCell(rowObject, "holdPaymentPlan") === "true",
+        holdHistory: parseJsonArrayCell(getCell(rowObject, "holdHistoryJson")),
         weight: getCell(rowObject, "weight"),
         lastFed: getCell(rowObject, "lastFed"),
         feedingIntervalDays: getCell(rowObject, "feedingIntervalDays") || 7,
@@ -378,6 +402,10 @@ function mergeImportedSnake(existingSnake, importedSnake, rowObject) {
         mergedSnake.shedHistory = existingSnake.shedHistory || [];
     }
 
+    if (!getCell(rowObject, "holdHistoryJson")) {
+        mergedSnake.holdHistory = existingSnake.holdHistory || [];
+    }
+
     // A CSV exported before the money or retirement fields existed has no
     // columns for them. Treat a blank cell the same way as the history columns
     // above: keep what this device already knows instead of silently erasing it.
@@ -392,6 +420,13 @@ function mergeImportedSnake(existingSnake, importedSnake, rowObject) {
         "saleDate",
         "soldTo",
         "saleExpoId",
+        "holdBuyer",
+        "holdPrice",
+        "holdDeposit",
+        "holdDepositDate",
+        "holdDueDate",
+        "holdNote",
+        "holdPaymentPlan",
         "retiredDate",
         "retiredReason",
         "retiredNote",
