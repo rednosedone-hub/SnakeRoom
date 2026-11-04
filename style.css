@@ -6831,7 +6831,7 @@ body.has-sync-banner .collection-notice {
     background-color: #0d0b07;
 }
 
-.scorecard-pair::before {
+.scorecard-pair-head::before {
     content: "";
     position: absolute;
     top: -35px;
