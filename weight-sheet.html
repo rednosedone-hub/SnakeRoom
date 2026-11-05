@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Weight Sheet</title>
-    <link rel="stylesheet" href="style.css?v=77">
+    <link rel="stylesheet" href="style.css?v=83">
 </head>
 
 <body>
@@ -24,6 +24,7 @@
         <div class="button-row print-hidden">
             <a href="index.html" class="main-button">Home</a>
             <a href="snakes.html" class="main-button">Collection</a>
+            <a href="scan-session.html?mode=weight" class="main-button">Weigh by Scan</a>
             <a href="data-tools.html" class="main-button">Data Tools</a>
         </div>
 
@@ -98,6 +99,44 @@
                 <tbody id="weightSheetBody"></tbody>
             </table>
         </main>
+
+        <section class="form-section clutch-growth-section print-hidden" id="clutchGrowthSection">
+            <h3>Clutch Growth</h3>
+
+            <p class="gene-help">
+                Hatchlings of one clutch share a hatch date, so their weights can be read
+                against age instead of the calendar. Pick a clutch to see whether the
+                siblings are growing together.
+            </p>
+
+            <label class="form-field">
+                <span>Clutch</span>
+                <select id="clutchGrowthSelect" onchange="setClutchGrowthClutch(this.value)"></select>
+            </label>
+
+            <p class="clutch-growth-verdict" id="clutchGrowthVerdict" role="status"></p>
+
+            <p class="empty-message" id="clutchGrowthNote" hidden></p>
+
+            <div class="clutch-growth-chart" id="clutchGrowthChart">
+                <p class="empty-message">No clutch selected.</p>
+            </div>
+
+            <div class="clutch-growth-table-wrap">
+                <table class="clutch-growth-table">
+                    <thead>
+                        <tr>
+                            <th>Hatchling</th>
+                            <th>Latest</th>
+                            <th>Age</th>
+                            <th>Growth</th>
+                            <th>vs Clutch</th>
+                        </tr>
+                    </thead>
+                    <tbody id="clutchGrowthBody"></tbody>
+                </table>
+            </div>
+        </section>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -108,7 +147,8 @@
     <script src="account-gate.js?v=1"></script>
     <script src="geneCatalog.js?v=4"></script>
     <script src="genes.js?v=11"></script>
-    <script src="weight-sheet.js?v=2"></script>
+    <script src="clutch-growth-helpers.js?v=2"></script>
+    <script src="weight-sheet.js?v=6"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

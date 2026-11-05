@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Snake Record</title>
-    <link rel="stylesheet" href="style.css?v=77">
+    <link rel="stylesheet" href="style.css?v=83">
 </head>
 
 <body>
@@ -445,6 +445,11 @@
                     <div id="weightChartContainer" class="weight-chart-container" style="margin-top:12px;">
                         <p class="empty-message">No chart data yet.</p>
                     </div>
+
+                    <p class="weight-chart-clutch-link" id="weightClutchCompareLink" hidden>
+                        <a class="small-link-button" id="weightClutchCompareAnchor"
+                            href="weight-sheet.html">Compare with clutch mates</a>
+                    </p>
                 </div>
             </section>
 
@@ -827,8 +832,9 @@
     <script src="morphCalculator.js?v=8"></script>
     <script src="morph-gallery.js?v=7"></script>
     <script src="weight-chart.js?v=3"></script>
+    <script src="clutch-growth-helpers.js?v=2"></script>
     <script src="defect-helpers.js?v=1"></script>
-    <script src="snake-form.js?v=38"></script>
+    <script src="snake-form.js?v=39"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

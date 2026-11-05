@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Snake Room - Scan Session</title>
+    <link rel="stylesheet" href="style.css?v=83">
+</head>
+
+<body>
+    <div class="page-container">
+        <div class="hero-section scan-hero">
+            <img src="Images/TheSnakeRoom.jpg" class="hero-image" alt="The Snake Room logo">
+
+            <div class="container">
+                <h1>The Snake Room</h1>
+                <h2>Scan Session</h2>
+            </div>
+        </div>
+
+        <div class="button-row">
+            <a href="index.html" class="main-button">Home</a>
+            <a href="snakes.html" class="main-button">Collection</a>
+            <a href="feeding-session.html" class="main-button">Feeding Session</a>
+            <a href="weight-sheet.html" class="main-button">Weight Sheet</a>
+            <a href="bin-cards.html" class="main-button">Bin Cards</a>
+        </div>
+
+        <div class="divider"></div>
+
+        <main class="scan-page">
+            <section class="form-section">
+                <h3 id="scanModeTitle">Feed by Scan</h3>
+
+                <p class="gene-help">
+                    Pick feed or weigh, start the camera, then scan each bin-card QR code.
+                    The animal's card opens with the date already on today; change the feeder or
+                    weight if needed and save, then scan the next one. Typing a code or name works
+                    too when a label is scuffed or the camera is unavailable.
+                </p>
+
+                <div class="scan-mode-toggle" role="group" aria-label="Session type">
+                    <button type="button" id="scanModeFeed" class="main-button is-active"
+                        onclick="setScanMode('feed')">Feed</button>
+                    <button type="button" id="scanModeWeight" class="secondary-button"
+                        onclick="setScanMode('weight')">Weigh</button>
+                </div>
+
+                <div class="scan-camera" id="scanCamera">
+                    <video id="scanVideo" playsinline muted></video>
+                    <div class="scan-frame" aria-hidden="true"></div>
+                    <canvas id="scanCanvas" hidden></canvas>
+                    <p id="scanCameraMessage" class="scan-camera-message">
+                        Start the camera, then hold a bin-card QR code inside the frame.
+                    </p>
+                </div>
+
+                <div class="scan-actions">
+                    <button type="button" class="main-button" id="scanStartButton" onclick="startScanning()">
+                        Start Camera
+                    </button>
+
+                    <button type="button" class="secondary-button" id="scanStopButton"
+                        onclick="stopScanning()" hidden>
+                        Stop Camera
+                    </button>
+                </div>
+
+                <div class="scan-manual">
+                    <label class="form-field">
+                        <span>Or type a code</span>
+                        <input type="text" id="scanManualInput" autocomplete="off"
+                            placeholder="SS-C26-1-01, a name, or a pasted QR link">
+                    </label>
+
+                    <button type="button" class="secondary-button" id="scanManualButton"
+                        onclick="findTypedSnake()">
+                        Find Snake
+                    </button>
+                </div>
+            </section>
+
+            <section class="form-section scan-entry" id="scanEntrySection" hidden>
+                <h3 id="scanEntryTitle">Feeding</h3>
+
+                <div class="scan-snake-line">
+                    <strong id="scanSnakeName"></strong>
+                    <span id="scanSnakeMeta"></span>
+                </div>
+
+                <p class="empty-message" id="scanSnakeHistory"></p>
+
+                <div class="form-grid" id="scanFeedFields">
+                    <label class="form-field">
+                        <span>Date</span>
+                        <input type="date" id="scanFeedDate">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Feeder</span>
+                        <input type="text" id="scanFeederInput" list="scanFeederOptions" autocomplete="off"
+                            placeholder="Feeder size">
+                        <datalist id="scanFeederOptions"></datalist>
+                    </label>
+
+                    <label class="form-field">
+                        <span>Result</span>
+                        <select id="scanFeedResult" onchange="updateScanReason()">
+                            <option value="Accepted">Accepted</option>
+                            <option value="Refused">Refused</option>
+                            <option value="Regurgitated">Regurgitated</option>
+                        </select>
+                    </label>
+
+                    <label class="form-field" id="scanReasonField" hidden>
+                        <span>Refusal Reason</span>
+                        <select id="scanFeedReason"></select>
+                    </label>
+                </div>
+
+                <div class="form-grid" id="scanWeightFields" hidden>
+                    <label class="form-field">
+                        <span>Date</span>
+                        <input type="date" id="scanWeightDate">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Weight (g)</span>
+                        <input type="number" id="scanWeightInput" inputmode="numeric" min="1" max="10000"
+                            step="1" placeholder="Grams">
+                    </label>
+                </div>
+
+                <p class="import-report" id="scanEntryError" role="alert" hidden></p>
+
+                <div class="scan-actions">
+                    <button type="button" class="main-button" id="scanSaveButton" onclick="saveScannedEntry()">
+                        Save &amp; Scan Next
+                    </button>
+
+                    <button type="button" class="secondary-button" onclick="cancelScannedEntry()">
+                        Cancel
+                    </button>
+                </div>
+            </section>
+
+            <section class="form-section">
+                <h3>This Session</h3>
+
+                <p class="empty-message" id="scanSessionStatus">Nothing saved yet.</p>
+
+                <div class="scan-session-list" id="scanSessionList"></div>
+
+                <div class="scan-actions">
+                    <button type="button" class="secondary-button" id="scanUndoButton" onclick="undoLastScan()"
+                        disabled>
+                        Undo Last
+                    </button>
+                </div>
+
+                <p class="import-report" id="scanToast" role="status" hidden></p>
+            </section>
+        </main>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script src="data-helpers.js?v=2"></script>
+    <script src="backup-helpers.js?v=1"></script>
+    <script src="cloud-sync.js?v=20"></script>
+    <script src="auto-sync.js?v=9"></script>
+    <script src="account-gate.js?v=1"></script>
+    <script src="feed-helpers.js?v=4"></script>
+    <script src="feeder-inventory.js?v=8"></script>
+    <script src="scan-helpers.js?v=3"></script>
+    <script src="scan-session.js?v=6"></script>
+    <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
+    <script src="nav-scroll.js?v=1"></script>
+</body>
+
+</html>

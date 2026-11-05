@@ -1336,6 +1336,7 @@ function fillFormForEdit() {
         renderFeedingHoldNotice();
         renderBreedingHistory(null);
         updateFeedingReasonVisibility(document.getElementById("feedingResultInput").value);
+        updateWeightClutchLink(null);
         return;
     }
 
@@ -1388,6 +1389,7 @@ function fillFormForEdit() {
     renderFeedingHoldNotice();
     renderBreedingHistory(snake);
     updateFeedingReasonVisibility(document.getElementById("feedingResultInput").value);
+    updateWeightClutchLink(snake);
 }
 
 // ---- Breeding history -----------------------------------------------------
@@ -2608,6 +2610,33 @@ function setWeightCompareSnake(value) {
 
 window.setWeightCompareMode = setWeightCompareMode;
 window.setWeightCompareSnake = setWeightCompareSnake;
+
+// A hatchling's growth only means something beside its siblings, so the chart
+// links straight to the clutch comparison on the weight sheet.
+function updateWeightClutchLink(snake) {
+    const wrap = document.getElementById("weightClutchCompareLink");
+    const link = document.getElementById("weightClutchCompareAnchor");
+
+    if (!wrap || !link) {
+        return;
+    }
+
+    const clutchId = String(snake && snake.clutchId || "").trim();
+    const tools = window.ClutchGrowth;
+    const mates = clutchId && tools ? tools.clutchmates(snakes, clutchId) : [];
+    const siblings = mates.filter(mate => mate !== snake && mate.id !== snake.id);
+
+    wrap.hidden = siblings.length === 0;
+
+    if (siblings.length === 0) {
+        return;
+    }
+
+    link.href = `weight-sheet.html#clutch-${encodeURIComponent(clutchId)}`;
+    link.textContent = `Compare with ${siblings.length} clutch mate${siblings.length === 1 ? "" : "s"} (${clutchId})`;
+}
+
+window.updateWeightClutchLink = updateWeightClutchLink;
 
 // The chart maths live in weight-chart.js (dates decide the x axis), so this
 // function only turns its layout into SVG and says what the trend is.

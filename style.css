@@ -7448,3 +7448,419 @@ body.has-sync-banner .collection-notice {
     color: #ffb3b3;
     background-color: rgba(0, 0, 0, 0.28);
 }
+
+/* Scan Session Page */
+
+.scan-page {
+    display: grid;
+    gap: 24px;
+}
+
+.scan-mode-toggle {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.scan-mode-toggle .main-button,
+.scan-mode-toggle .secondary-button {
+    min-width: 120px;
+    font-size: 22px;
+}
+
+.scan-mode-toggle .is-active {
+    outline: 2px solid var(--text-color);
+    outline-offset: 2px;
+}
+
+.scan-camera {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 220px;
+    margin-bottom: 16px;
+    border: 2px dashed #3a3123;
+    border-radius: 10px;
+    background-color: #050505;
+    overflow: hidden;
+}
+
+.scan-camera video {
+    display: none;
+    width: 100%;
+    max-height: 60vh;
+    object-fit: cover;
+}
+
+.scan-camera.is-live video {
+    display: block;
+}
+
+.scan-frame {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: min(240px, 65%);
+    aspect-ratio: 1 / 1;
+    transform: translate(-50%, -50%);
+    border: 3px solid var(--gold-color);
+    border-radius: 12px;
+    box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+}
+
+.scan-camera.is-live .scan-frame {
+    display: block;
+}
+
+.scan-camera-message {
+    margin: 0;
+    padding: 18px;
+    color: var(--text-color);
+    font-size: 16px;
+    line-height: 1.45;
+    text-align: center;
+}
+
+.scan-camera.is-live .scan-camera-message {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    padding: 8px 12px;
+    background-color: rgba(0, 0, 0, 0.7);
+    font-size: 13px;
+}
+
+.scan-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.scan-actions .main-button,
+.scan-actions .secondary-button {
+    font-size: 22px;
+}
+
+.scan-manual {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.scan-manual .form-field {
+    flex: 1 1 240px;
+    margin: 0;
+}
+
+.scan-entry .scan-snake-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.scan-snake-line strong {
+    color: var(--gold-color);
+    font-family: 'CloisterBlack', serif;
+    font-size: 26px;
+    font-weight: normal;
+}
+
+.scan-snake-line span {
+    color: var(--silver-color);
+    font-size: 14px;
+}
+
+.scan-entry .empty-message {
+    margin-top: 6px;
+}
+
+.scan-session-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.scan-session-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 12px;
+    padding: 10px 12px;
+    border-left: 3px solid var(--gold-color);
+    border-radius: 6px;
+    background-color: rgba(0, 0, 0, 0.28);
+}
+
+.scan-session-name {
+    color: var(--text-color);
+    font-size: 17px;
+}
+
+.scan-session-kind {
+    color: var(--silver-color);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-align: right;
+    text-transform: uppercase;
+}
+
+.scan-session-summary {
+    grid-column: 1 / -1;
+    color: var(--silver-color);
+    font-size: 13px;
+}
+
+/* Clutch Growth (weight sheet) */
+
+.clutch-growth-section .form-field {
+    max-width: 360px;
+}
+
+.clutch-growth-verdict {
+    margin: 14px 0 4px;
+    color: var(--text-color);
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+.clutch-growth-chart {
+    margin: 14px 0 18px;
+}
+
+.clutch-growth-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin-bottom: 8px;
+    color: var(--silver-color);
+    font-size: 13px;
+}
+
+.clutch-growth-key {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.clutch-growth-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    background-color: var(--silver-color);
+}
+
+.clutch-growth-swatch.is-empty {
+    background-color: transparent;
+    border: 1px solid #4a4335;
+}
+
+.clutch-growth-line {
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.clutch-growth-dot {
+    stroke: rgba(0, 0, 0, 0.55);
+    stroke-width: 0.8;
+}
+
+.clutch-growth-axis-note {
+    margin: 4px 0 0;
+    color: var(--silver-color);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.clutch-growth-table-wrap {
+    overflow-x: auto;
+}
+
+.clutch-growth-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.clutch-growth-table th {
+    padding: 8px 10px;
+    border-bottom: 1px solid #3a3123;
+    color: var(--gold-color);
+    font-family: 'CloisterBlack', serif;
+    font-size: 13px;
+    font-weight: normal;
+    letter-spacing: 0.04em;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.clutch-growth-table td {
+    padding: 10px;
+    border-bottom: 1px solid rgba(58, 49, 35, 0.6);
+    color: var(--text-color);
+    vertical-align: top;
+}
+
+.clutch-growth-table td strong {
+    display: block;
+    color: #fff3c4;
+    font-weight: normal;
+}
+
+.clutch-growth-table td small {
+    display: block;
+    margin-top: 2px;
+    color: var(--silver-color);
+    font-size: 11px;
+    line-height: 1.3;
+}
+
+.clutch-growth-table tr.is-lagging td {
+    background-color: rgba(184, 92, 92, 0.12);
+}
+
+.clutch-growth-name {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 140px;
+}
+
+.clutch-growth-name .clutch-growth-swatch {
+    margin-top: 5px;
+    flex: none;
+}
+
+.clutch-growth-chip {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.clutch-growth-chip.is-lagging {
+    border: 1px solid #b85c5c;
+    background-color: rgba(184, 92, 92, 0.22);
+    color: #ffd9d9;
+}
+
+.clutch-growth-chip.is-ahead {
+    border: 1px solid #4d7fb8;
+    background-color: rgba(77, 127, 184, 0.2);
+    color: #cfe4ff;
+}
+
+.clutch-growth-chip.is-track {
+    border: 1px solid #5d7a3a;
+    background-color: rgba(93, 122, 58, 0.2);
+    color: #dcecc7;
+}
+
+.clutch-growth-chip.is-neutral {
+    border: 1px solid #4a4335;
+    color: var(--silver-color);
+}
+
+.clutch-growth-chip.is-empty {
+    border: 1px solid #3a3123;
+    color: #8d8574;
+}
+
+.weight-chart-clutch-link {
+    margin: 12px 0 0;
+    font-size: 15px;
+}
+
+
+.clutch-growth-chart svg {
+    display: block;
+    width: 100%;
+    max-width: 560px;
+    height: auto;
+    margin: 0 auto;
+}
+
+.clutch-growth-chart .weight-chart-label {
+    font-size: 13px;
+}
+
+/* On a phone the five-column table becomes one card per hatchling, the same
+   way the feeding session table does, so nothing needs sideways scrolling. */
+@media (max-width: 700px) {
+    .clutch-growth-table-wrap {
+        overflow: visible;
+    }
+
+    .clutch-growth-table {
+        display: block;
+    }
+
+    .clutch-growth-table thead {
+        display: none;
+    }
+
+    .clutch-growth-table tbody,
+    .clutch-growth-table tr,
+    .clutch-growth-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .clutch-growth-table tr {
+        margin: 0 0 12px;
+        padding: 12px 14px;
+        border: 2px solid var(--gold-color);
+        border-radius: 8px;
+        background-color: var(--background-color);
+        box-shadow: 4px 4px 2px 1px var(--goldenrod-color);
+    }
+
+    .clutch-growth-table tr.is-lagging {
+        border-color: #b85c5c;
+    }
+
+    .clutch-growth-table td {
+        padding: 2px 0;
+        border: none;
+        font-size: 14px;
+    }
+
+    .clutch-growth-table td[data-label]::before {
+        content: attr(data-label) ": ";
+        color: var(--gold-color);
+    }
+
+    .clutch-growth-table td strong,
+    .clutch-growth-table td small {
+        display: inline;
+    }
+
+    .clutch-growth-table td small {
+        margin-left: 6px;
+    }
+
+    .clutch-growth-name {
+        margin-bottom: 6px;
+    }
+}
+
+/* A clutch link from a hatchling's chart lands on this section, not the top. */
+#clutchGrowthSection {
+    scroll-margin-top: 16px;
+}
