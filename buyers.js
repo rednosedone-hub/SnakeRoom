@@ -69,9 +69,7 @@
     }
 
     function snakeLink(snake) {
-        const name = escapeHtml(snake.name || "Unnamed");
-
-        return `<a href="snake-form.html?uid=${encodeURIComponent(snake.id || "")}">${name}</a>`;
+        return window.SnakeData.getSnakeLinkHtml(snake);
     }
 
     function setStatus(message, isError = false) {

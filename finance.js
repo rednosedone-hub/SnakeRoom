@@ -295,7 +295,7 @@
     }
 
     function snakeLink(snake) {
-        return `<a href="${snakeProfileUrl(snake)}">${escapeHtml(snake.name || "Unnamed snake")}</a>`;
+        return window.SnakeData.getSnakeLinkHtml(snake);
     }
 
     function renderSnakeLedger() {

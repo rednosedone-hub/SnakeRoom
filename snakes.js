@@ -599,7 +599,7 @@ function renderSnakes() {
 
             <div class="snake-info">
                 <div class="snake-header">
-                    <h3 class="snake-name">${snake.name}</h3>
+                    <h3 class="snake-name">${window.SnakeData.getSnakeLinkHtml(snake)}</h3>
                     <span class="${sexClass}">${photoCountBadge}${sexIcon}</span>
                 </div>
 
@@ -694,7 +694,7 @@ function renderSnakeTable(snakeList) {
                         ${isChecked}
                         onchange="toggleSnakeSelection(${snake.originalIndex}, this.checked)">
                 </td>
-                <td>${snake.name}</td>
+                <td>${window.SnakeData.getSnakeLinkHtml(snake)}</td>
                 <td>${identityText}</td>
                 <td>${snake.sex}</td>
                 <td>${weightText}</td>

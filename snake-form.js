@@ -1510,6 +1510,15 @@ function breedingHistoryPartnerText(info) {
     return `${partner.name || "Unnamed"} - ${window.SnakeData.getSnakeIdentityText(partner)}`;
 }
 
+// The partner is another animal on file, so its name opens that record.
+function breedingHistoryPartnerHtml(info) {
+    if (!info.partner) {
+        return escapeMoneyText(breedingHistoryPartnerText(info));
+    }
+
+    return window.SnakeData.getSnakeLinkHtml(info.partner, { label: breedingHistoryPartnerText(info) });
+}
+
 function breedingHistoryPairCard(pair, snakeId) {
     const partnerInfo = getBreedingPartnerInfo(pair, snakeId);
     const status = getBreedingPairStatus(pair);
@@ -1553,7 +1562,7 @@ function breedingHistoryPairCard(pair, snakeId) {
     const warning = status.key === "active" && partnerRetired
         ? `
             <p class="pair-warning">
-                <strong>Partner retired:</strong> ${escapeMoneyText(breedingHistoryPartnerText(partnerInfo))}
+                <strong>Partner retired:</strong> ${breedingHistoryPartnerHtml(partnerInfo)}
                 is ${escapeMoneyText(partnerInfo.partner.status)}. This pair is still marked active.
             </p>
         `
@@ -1574,7 +1583,7 @@ function breedingHistoryPairCard(pair, snakeId) {
         <article class="breeding-history-card">
             <div class="breeding-history-card-header">
                 <div>
-                    <h4>${escapeMoneyText(breedingHistoryPartnerText(partnerInfo))}</h4>
+                    <h4>${breedingHistoryPartnerHtml(partnerInfo)}</h4>
                     <p class="breeding-history-role">This snake is the ${partnerInfo.role.toLowerCase()}</p>
                 </div>
                 <span class="breeding-history-status is-${status.key}">${escapeMoneyText(status.label)}</span>
@@ -1620,9 +1629,9 @@ function breedingHistoryClutchCard(clutch, snakeId) {
         ? `
             <p class="breeding-history-offspring">
                 <span>Offspring on file:</span>
-                ${offspring.map(snake => escapeMoneyText(
-                    `${snake.name || "Unnamed"} (${window.SnakeData.getSnakeIdentityText(snake)})`
-                )).join(", ")}
+                ${offspring.map(snake => window.SnakeData.getSnakeLinkHtml(snake, {
+                    label: `${snake.name || "Unnamed"} (${window.SnakeData.getSnakeIdentityText(snake)})`
+                })).join(", ")}
             </p>
         `
         : "";
@@ -1633,7 +1642,7 @@ function breedingHistoryClutchCard(clutch, snakeId) {
                 <div>
                     <h4>${escapeMoneyText(clutch.id || "Clutch without an ID")}</h4>
                     <p class="breeding-history-role">
-                        With ${escapeMoneyText(breedingHistoryPartnerText(partnerInfo))} \u00b7
+                        With ${breedingHistoryPartnerHtml(partnerInfo)} \u00b7
                         this snake is the ${partnerInfo.role.toLowerCase()}
                     </p>
                 </div>

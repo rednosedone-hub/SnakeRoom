@@ -173,7 +173,7 @@ function renderFeedingTable(dueItems) {
                         onchange="toggleSnakeSelection(${index}, this.checked)"
                     >
                 </td>
-                <td data-label="Name">${snake.name}</td>
+                <td data-label="Name">${window.SnakeData.getSnakeLinkHtml(snake)}</td>
                 <td data-label="ID">${morphLabel}</td>
                 <td data-label="Feeder">${feederSize}</td>
                 <td data-label="Last Fed">${lastFedText}${refusalNote}</td>
@@ -390,7 +390,7 @@ function renderFeedingHolds() {
     list.innerHTML = held.map(({ snake, index }) => `
         <div class="feeding-hold-item">
             <div>
-                <strong>${snake.name || "Unnamed"}</strong>
+                <strong>${window.SnakeData.getSnakeLinkHtml(snake)}</strong>
                 <span class="feeding-hold-detail">
                     ${window.SnakeData.getSnakeIdentityText(snake)} &middot;
                     ${snake.feedingHold.reason} since ${snake.feedingHold.since || "unknown"}

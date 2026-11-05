@@ -178,11 +178,10 @@ function renderHealthWatch(snakes) {
         const urgent = reasons[0].priority === 0;
         const reasonLine = reasons.slice(0, 2).map(reason => reason.label).join(" \u00b7 ");
         const more = reasons.length > 2 ? ` +${reasons.length - 2} more` : "";
-        const profileUrl = `snake-form.html?uid=${encodeURIComponent(item.snake.id || "")}`;
 
         return `
             <div class="dashboard-list-item health-watch-item${urgent ? " is-urgent" : ""}" title="${escapeHtml(reasons.map(reason => reason.label).join(" \u00b7 "))}">
-                <strong><a href="${profileUrl}">${escapeHtml(item.snake.name || "Unnamed")}</a></strong>
+                <strong>${window.SnakeData.getSnakeLinkHtml(item.snake)}</strong>
                 <span>${escapeHtml(window.SnakeData.getSnakeIdentityText(item.snake))}</span>
                 <span>${escapeHtml(reasonLine)}${more}</span>
             </div>
@@ -320,13 +319,12 @@ function renderHoldDue(activeSnakes) {
 
     list.innerHTML = reminders.holds.map(({ snake, hold }) => {
         const due = describeHoldDue(hold);
-        const profileUrl = `snake-form.html?uid=${encodeURIComponent(snake.id || "")}`;
         const buyerLine = hold.buyer ? `Held for ${hold.buyer}` : "Buyer not recorded";
         const planLine = hold.paymentPlan ? " · payment plan" : "";
 
         return `
             <div class="dashboard-list-item hold-due-item${hold.expired ? " is-urgent" : ""}">
-                <strong><a href="${profileUrl}">${escapeHtml(snake.name || "Unnamed")}</a></strong>
+                <strong>${window.SnakeData.getSnakeLinkHtml(snake)}</strong>
                 <span>${escapeHtml(window.SnakeData.getSnakeIdentityText(snake))}</span>
                 <span>${escapeHtml(buyerLine)}</span>
                 <span>
@@ -558,7 +556,7 @@ function renderDashboard() {
 
         return `
             <div class="dashboard-list-item${status.state === "soon" ? " is-upcoming" : ""}">
-                <strong>${snake.name}</strong>
+                <strong>${window.SnakeData.getSnakeLinkHtml(snake)}</strong>
                 <span>${window.SnakeData.getSnakeIdentityText(snake)}</span>
                 <span>${feederSize}</span>
                 <span>${lastFed} <span class="feed-due-tag ${tagClass}">${escapeHtml(describeDueTag(status))}</span></span>

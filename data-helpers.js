@@ -241,6 +241,26 @@ function getSnakeProfileUrl(snake) {
     return `${baseUrl}?uid=${encodeURIComponent(snake.id || "")}`;
 }
 
+// One link style for an animal's name anywhere in the app. Pages pass the snake
+// record so the label and the profile URL can never point at different animals.
+function getSnakeLinkHtml(snake, options = {}) {
+    if (!snake) {
+        return "";
+    }
+
+    const escape = value => String(value === undefined || value === null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    const label = options.label === undefined
+        ? (snake.name || getSnakeIdentityText(snake) || "Unnamed")
+        : options.label;
+
+    return `<a class="snake-link" href="${escape(getSnakeProfileUrl(snake))}">${escape(label)}</a>`;
+}
+
 function getSnakeQrData(snake) {
     if (window.location.protocol === "http:" || window.location.protocol === "https:") {
         return getSnakeProfileUrl(snake);
@@ -279,6 +299,7 @@ window.SnakeData = {
     getSnakeByReference,
     getSnakeLabelByReference,
     getSnakeProfileUrl,
+    getSnakeLinkHtml,
     getSnakeQrData,
     getSnakeQrImageUrl
 };
