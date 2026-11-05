@@ -80,6 +80,19 @@ function getSnakeLabel(index) {
     return window.SnakeData.getSnakeLabelByReference(snakes, index);
 }
 
+// On the cards the parent names open the animal's profile. Alerts and selects
+// keep the plain label.
+function getSnakeLink(reference) {
+    const snake = window.SnakeData.getSnakeByReference(snakes, reference);
+    const label = getSnakeLabel(reference);
+
+    if (!snake) {
+        return escapePairText(label);
+    }
+
+    return `<a class="snake-link" href="${escapePairText(window.SnakeData.getSnakeProfileUrl(snake))}">${escapePairText(label)}</a>`;
+}
+
 function getExpectedHatchDate(layDate) {
     if (!layDate) {
         return "";
@@ -1094,7 +1107,7 @@ function renderBreedingPairs() {
         return `
         <div class="breeding-card">
             <div>
-                <h4>${getSnakeLabel(pair.femaleSnakeId || pair.femaleIndex)} x ${getSnakeLabel(pair.maleSnakeId || pair.maleIndex)}</h4>
+                <h4>${getSnakeLink(pair.femaleSnakeId || pair.femaleIndex)} x ${getSnakeLink(pair.maleSnakeId || pair.maleIndex)}</h4>
                 <p>Status: ${getPairStatus(pair)}</p>
                 <p>
                     Purpose: ${getPairPurposeLabel(pair)}${pair.targetMorph
@@ -1227,7 +1240,7 @@ function renderPairHistory() {
         return `
             <div class="breeding-card closed-pair-card">
                 <div>
-                    <h4>${getSnakeLabel(pair.femaleSnakeId || pair.femaleIndex)} x ${getSnakeLabel(pair.maleSnakeId || pair.maleIndex)}</h4>
+                    <h4>${getSnakeLink(pair.femaleSnakeId || pair.femaleIndex)} x ${getSnakeLink(pair.maleSnakeId || pair.maleIndex)}</h4>
                     <p>Status: Closed${pair.closedAt ? ` on ${pair.closedAt}` : ""}</p>
                     <p>Reason: ${pair.closedReason || "Not recorded"}</p>
                     <p>Pairings: ${getPairings(pair).length || "None recorded"}</p>
@@ -1278,7 +1291,7 @@ function renderClutches() {
         <div class="breeding-card" id="clutchCard-${clutch.id}">
             <div>
                 <h4>${clutch.id}</h4>
-                <p>${getSnakeLabel(clutch.femaleSnakeId || clutch.femaleIndex)} x ${getSnakeLabel(clutch.maleSnakeId || clutch.maleIndex)}</p>
+                <p>${getSnakeLink(clutch.femaleSnakeId || clutch.femaleIndex)} x ${getSnakeLink(clutch.maleSnakeId || clutch.maleIndex)}</p>
                 <p>Pairings: ${Array.isArray(clutch.pairings) ? clutch.pairings.map(pairing => pairing.date).join(", ") : clutch.pairingDate || "Not recorded"}</p>
                 <p>Ovulation: ${clutch.ovulationObserved ? "Observed" : "Not marked"}${clutch.ovulationDate ? ` on ${clutch.ovulationDate}` : ""}</p>
                 <p>Pre-lay shed: ${clutch.preLayShedDate || "Not recorded"}</p>

@@ -1008,6 +1008,44 @@ p {
     font-size: 20px;
 }
 
+/* Bare links in help text and paragraphs used the browser's blue/purple, which
+   disappears against the navy panels. Buttons and named link styles set their
+   own colours, so only unclassed anchors pick this up. */
+a:not([class]) {
+    color: var(--gold-color);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+a:not([class]):visited {
+    color: var(--text-color);
+}
+
+a:not([class]):hover,
+a:not([class]):focus-visible {
+    color: #fff;
+}
+
+/* A parent's name on a breeding card opens that animal's profile. */
+.snake-link {
+    color: var(--gold-color);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.snake-link:visited {
+    color: var(--text-color);
+}
+
+.snake-link:hover,
+.snake-link:focus-visible {
+    color: #fff;
+}
+
+h4 .snake-link {
+    color: inherit;
+}
+
 /* Divider Styles */
 
 .divider {

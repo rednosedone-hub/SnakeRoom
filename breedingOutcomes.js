@@ -701,6 +701,19 @@ function getSnakeLabelByRef(reference) {
     return window.SnakeData.getSnakeLabelByReference(snakes, reference);
 }
 
+// Parent names on the clutch cards open the animal's profile; the selects and
+// status lines keep the plain label.
+function getSnakeLinkByRef(reference) {
+    const snake = window.SnakeData.getSnakeByReference(snakes, reference);
+    const label = getSnakeLabelByRef(reference);
+
+    if (!snake) {
+        return escapeHtml(label);
+    }
+
+    return `<a class="snake-link" href="${escapeHtml(window.SnakeData.getSnakeProfileUrl(snake))}">${escapeHtml(label)}</a>`;
+}
+
 function escapeHtml(value) {
     return String(value)
         .replace(/&/g, "&amp;")
@@ -1339,7 +1352,7 @@ function renderOutcomeCard(clutch) {
             <div>
                 <h4>Clutch ${escapeHtml(clutch.id)}</h4>
                 <p class="empty-message">Next hatchling ID: ${escapeHtml(nextId)}</p>
-                <p>${escapeHtml(getSnakeLabelByRef(clutch.femaleSnakeId))} x ${escapeHtml(getSnakeLabelByRef(clutch.maleSnakeId))}</p>
+                <p>${getSnakeLinkByRef(clutch.femaleSnakeId)} x ${getSnakeLinkByRef(clutch.maleSnakeId)}</p>
                 <p>Laid: ${escapeHtml(clutch.laidDate || "Not recorded")} / ${escapeHtml(formatCount(clutch))}</p>
             </div>
 
@@ -1531,7 +1544,7 @@ function renderHatchedCard(clutch) {
         <div class="breeding-card outcome-card hatched-card" id="hatchedCard-${clutch.clutchToken}">
             <div>
                 <h4>Clutch ${escapeHtml(clutch.id)}</h4>
-                <p>${escapeHtml(getSnakeLabelByRef(clutch.femaleSnakeId))} x ${escapeHtml(getSnakeLabelByRef(clutch.maleSnakeId))}</p>
+                <p>${getSnakeLinkByRef(clutch.femaleSnakeId)} x ${getSnakeLinkByRef(clutch.maleSnakeId)}</p>
                 <p>Laid: ${escapeHtml(clutch.laidDate || "Not recorded")} / ${escapeHtml(formatCount(clutch))}</p>
                 <p>Hatched: ${escapeHtml(clutch.hatchedDate || "Not recorded")}
                     / Hatchlings: ${clutch.hatchlingCount || 0} (${relatedCount} in collection)</p>
