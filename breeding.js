@@ -93,6 +93,26 @@ function getSnakeLink(reference) {
     return `<a class="snake-link" href="${escapePairText(window.SnakeData.getSnakeProfileUrl(snake))}">${escapePairText(label)}</a>`;
 }
 
+// The offspring line reads better with just the animal's name; the ID is one
+// click away on its profile.
+function getSnakeNameLink(snake) {
+    if (!snake) {
+        return "";
+    }
+
+    const label = escapePairText(snake.name || snake.ID || "Unnamed");
+
+    return `<a class="snake-link" href="${escapePairText(window.SnakeData.getSnakeProfileUrl(snake))}">${label}</a>`;
+}
+
+function getClutchOffspring(clutch) {
+    return snakes
+        .filter(snake => String(snake.clutchId || "") === String((clutch && clutch.id) || ""))
+        .filter(snake => !snake.clutchToken || !clutch.clutchToken || snake.clutchToken === clutch.clutchToken)
+        .sort((left, right) => String(left.ID || left.name || "")
+            .localeCompare(String(right.ID || right.name || "")));
+}
+
 function getExpectedHatchDate(layDate) {
     if (!layDate) {
         return "";
@@ -1286,6 +1306,7 @@ function renderClutches() {
         const hatchlingValue = isHatched
             ? String(clutch.hatchlingCount || 0)
             : (expected === undefined || expected === null || expected === "" ? "" : String(expected));
+        const offspring = getClutchOffspring(clutch);
 
         return `
         <div class="breeding-card" id="clutchCard-${clutch.id}">
@@ -1304,6 +1325,9 @@ function renderClutches() {
                     : clutch.laidDate
                         ? `Waiting to hatch. Expected around ${getExpectedHatchDate(clutch.laidDate)}`
                         : "Waiting to hatch"}</p>
+                ${offspring.length > 0
+                    ? `<p class="clutch-offspring"><strong>Hatchlings:</strong> ${offspring.map(getSnakeNameLink).join(", ")}</p>`
+                    : ""}
             </div>
 
             <div class="form-grid">

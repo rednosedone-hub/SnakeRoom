@@ -714,6 +714,19 @@ function getSnakeLinkByRef(reference) {
     return `<a class="snake-link" href="${escapeHtml(window.SnakeData.getSnakeProfileUrl(snake))}">${escapeHtml(label)}</a>`;
 }
 
+// Offspring read better as names alone, sorted by ID so the clutch stays in the
+// order the eggs hatched.
+function getOffspringLine(hatchlings) {
+    const sorted = [...hatchlings].sort((left, right) => String(left.ID || left.name || "")
+        .localeCompare(String(right.ID || right.name || "")));
+
+    return sorted.map(snake => {
+        const label = escapeHtml(snake.name || snake.ID || "Unnamed");
+
+        return `<a class="snake-link" href="${escapeHtml(window.SnakeData.getSnakeProfileUrl(snake))}">${label}</a>`;
+    }).join(", ");
+}
+
 function escapeHtml(value) {
     return String(value)
         .replace(/&/g, "&amp;")
@@ -1531,7 +1544,8 @@ function renderHatchedIncubationLine(clutch) {
 }
 
 function renderHatchedCard(clutch) {
-    const relatedCount = snakes.filter(snake => snake.clutchId === clutch.id).length;
+    const related = relatedHatchlings(clutch);
+    const relatedCount = related.length;
     const rows = hatchlingPreparation[clutch.clutchToken];
     const linkableCount = getLinkableHatchlings(clutch).length;
     const linkButton = linkableCount > 0
@@ -1548,6 +1562,9 @@ function renderHatchedCard(clutch) {
                 <p>Laid: ${escapeHtml(clutch.laidDate || "Not recorded")} / ${escapeHtml(formatCount(clutch))}</p>
                 <p>Hatched: ${escapeHtml(clutch.hatchedDate || "Not recorded")}
                     / Hatchlings: ${clutch.hatchlingCount || 0} (${relatedCount} in collection)</p>
+                ${related.length > 0
+                    ? `<p class="clutch-offspring"><strong>Hatchlings:</strong> ${getOffspringLine(related)}</p>`
+                    : ""}
                 ${renderHatchedIncubationLine(clutch)}
             </div>
 

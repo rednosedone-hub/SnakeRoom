@@ -1046,6 +1046,19 @@ h4 .snake-link {
     color: inherit;
 }
 
+/* The offspring of a clutch, one link per animal, under the hatch details. */
+.clutch-offspring {
+    margin: 6px 0 0;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--text-color);
+}
+
+.clutch-offspring strong {
+    margin-right: 4px;
+    color: var(--gold-color);
+}
+
 /* Divider Styles */
 
 .divider {
