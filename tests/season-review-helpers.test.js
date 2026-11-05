@@ -319,3 +319,14 @@ test("legacy index references still label a pair", () => {
 
     assert.equal(pair, "Nova x Atlas");
 });
+
+test("a clutch row names both parents so a page can link them", () => {
+    const result = season.review({ ...dataset(), year: 2026 });
+    const row = result.clutches.find(clutch => clutch.id === "2026-01");
+
+    assert.equal(row.pair, "Nova x Atlas");
+    assert.equal(row.femaleId, "dam");
+    assert.equal(row.maleId, "sire");
+    assert.equal(row.femaleName, "Nova");
+    assert.equal(row.maleName, "Atlas");
+});

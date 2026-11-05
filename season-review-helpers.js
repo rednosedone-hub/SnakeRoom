@@ -234,10 +234,19 @@
             : 0;
         const healthy = Math.max(0, hatched - defective);
 
+        // The ids ride along with the label so a page can make each parent name
+        // a link to that animal without matching names by hand.
+        const female = findSnake(snakes, clutch.femaleSnakeId || clutch.femaleIndex);
+        const male = findSnake(snakes, clutch.maleSnakeId || clutch.maleIndex);
+
         return {
             id: text(clutch.id),
             clutchToken: text(clutch.clutchToken),
             pair: pairLabel(clutch, snakes),
+            femaleId: text(female && female.id) || text(clutch.femaleSnakeId),
+            maleId: text(male && male.id) || text(clutch.maleSnakeId),
+            femaleName: text(female && female.name),
+            maleName: text(male && male.name),
             laidDate: text(clutch.laidDate).slice(0, 10),
             hatchedDate: text(clutch.hatchedDate).slice(0, 10),
             isHatched,

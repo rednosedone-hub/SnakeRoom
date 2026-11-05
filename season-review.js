@@ -36,6 +36,29 @@
             .replace(/'/g, "&#39;");
     }
 
+    // A parent or hatchling name that opens that animal's record. The label is
+    // escaped here so callers only pass raw names.
+    function snakeLink(id, name) {
+        const label = escapeHtml(name || "Unnamed");
+        const snake = (data.snakes || []).find(item => String(item.id || "") === String(id || ""));
+
+        if (!id || !snake) {
+            return label;
+        }
+
+        return `<a class="snake-link" href="${escapeHtml(window.SnakeData.getSnakeProfileUrl(snake))}">${label}</a>`;
+    }
+
+    // "Nova x Atlas" with each name linking to its own card; falls back to the
+    // plain label when an old clutch has no parent ids on record.
+    function clutchPair(clutch) {
+        if (!clutch.femaleId && !clutch.maleId) {
+            return escapeHtml(clutch.pair);
+        }
+
+        return `${snakeLink(clutch.femaleId, clutch.femaleName || "Unknown")} x ${snakeLink(clutch.maleId, clutch.maleName || "Unknown")}`;
+    }
+
     function formatMoney(value) {
         if (F && F.formatMoney) {
             return F.formatMoney(value, data.settings.currency);
@@ -182,7 +205,7 @@
             return `
                 <tr>
                     <td><strong>${escapeHtml(clutch.id || "Clutch")}</strong></td>
-                    <td>${escapeHtml(clutch.pair)}</td>
+                    <td>${clutchPair(clutch)}</td>
                     <td>${formatDate(clutch.laidDate, true)}</td>
                     <td>${hatched}</td>
                     <td class="fin-amount-cell">${clutch.eggs}</td>
@@ -212,7 +235,7 @@
                     <div class="season-clutch-card">
                         <div class="season-clutch-card-head">
                             <strong>${escapeHtml(clutch.id || "Clutch")}</strong>
-                            <span>${escapeHtml(clutch.pair)}</span>
+                            <span>${clutchPair(clutch)}</span>
                         </div>
                         <p>${dates}</p>
                         <p>${counts}</p>
@@ -270,9 +293,7 @@
 
         body.innerHTML = result.kept.map(hatchling => `
             <tr>
-                <td>${hatchling.id
-                    ? `<a href="snake-form.html?uid=${encodeURIComponent(hatchling.id)}">${escapeHtml(hatchling.name)}</a>`
-                    : escapeHtml(hatchling.name)}</td>
+                <td>${snakeLink(hatchling.id, hatchling.name)}</td>
                 <td>${escapeHtml(hatchling.morph || "—")}</td>
                 <td>${escapeHtml(hatchling.sex)}</td>
                 <td>${formatDate(hatchling.hatchDate, true)}</td>

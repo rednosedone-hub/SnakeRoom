@@ -64,10 +64,22 @@
 
     function snakeLink(id, name) {
         const label = escapeHtml(name || "Unnamed");
+        const snake = (data.snakes || []).find(item => String(item.id || "") === String(id || ""));
 
-        return id
-            ? `<a href="snake-form.html?uid=${encodeURIComponent(id)}">${label}</a>`
-            : label;
+        if (!id || !snake) {
+            return label;
+        }
+
+        return `<a class="snake-link" href="${escapeHtml(window.SnakeData.getSnakeProfileUrl(snake))}">${label}</a>`;
+    }
+
+    // "Nova x Atlas" with each parent linking to its own card.
+    function clutchPair(clutch) {
+        if (!clutch.femaleId && !clutch.maleId) {
+            return escapeHtml(clutch.pair);
+        }
+
+        return `${snakeLink(clutch.femaleId, clutch.femaleName || "Unknown")} x ${snakeLink(clutch.maleId, clutch.maleName || "Unknown")}`;
     }
 
     function loadAll() {
@@ -216,7 +228,7 @@
                         ${row.purpose === "project" && (row.nextKeeper || row.nextNeeds) ? `
                             <p class="scorecard-target">
                                 ${row.nextKeeper
-                                    ? `Keeper: ${escapeHtml(row.nextKeeper)}${row.nextKeeperDefects.length > 0 ? ` (${row.nextKeeperDefects.map(escapeHtml).join(", ")})` : ""}`
+                                    ? `Keeper: ${snakeLink(row.nextKeeperId, row.nextKeeper)}${row.nextKeeperDefects.length > 0 ? ` (${row.nextKeeperDefects.map(escapeHtml).join(", ")})` : ""}`
                                     : ""}${row.nextKeeper && row.nextNeeds ? " \u00b7 " : ""}${row.nextNeeds ? `Next step needs: ${escapeHtml(row.nextNeeds)}` : ""}
                             </p>
                         ` : ""}
@@ -338,7 +350,7 @@
         return `
             <tr>
                 <td><strong>${escapeHtml(clutch.id || "Clutch")}</strong></td>
-                <td>${escapeHtml(clutch.pair)}</td>
+                <td>${clutchPair(clutch)}</td>
                 <td>${formatDate(clutch.laidDate)}</td>
                 <td>${hatched}</td>
                 <td class="fin-amount-cell">${clutch.eggs}</td>
@@ -373,7 +385,7 @@
             <div class="season-clutch-card">
                 <div class="season-clutch-card-head">
                     <strong>${escapeHtml(clutch.id || "Clutch")}</strong>
-                    <span>${escapeHtml(clutch.pair)}</span>
+                    <span>${clutchPair(clutch)}</span>
                     <span class="scorecard-grade is-${escapeHtml(clutch.grade.key)}"
                         title="${escapeHtml(clutch.grade.note)}">${escapeHtml(clutch.grade.label)}</span>
                 </div>
