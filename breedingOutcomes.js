@@ -1274,6 +1274,16 @@ function relatedHatchlings(clutch) {
     );
 }
 
+// Deleting a clutch removes the evidence of that laying cycle, so the pair goes
+// back to being a plain pairing: the eggs laid date is what puts the female on
+// the post-lay hold, and leaving it behind would keep the Not ready badge on a
+// female who never actually laid.
+function clearPairLayingCycle(pair) {
+    pair.eggsLaidDate = "";
+    pair.eggCount = 0;
+    delete pair.expectedHatchlings;
+}
+
 // A converted pair points at its clutch; deleting the clutch must hand the pair
 // back to the active list rather than leaving it linked to a missing record.
 function releasePair(clutch) {
@@ -1282,6 +1292,7 @@ function releasePair(clutch) {
     breedingPairs.forEach(pair => {
         if (pair.clutchId && pair.clutchId === clutch.id) {
             pair.clutchId = "";
+            clearPairLayingCycle(pair);
             changed = true;
         }
     });
@@ -1302,6 +1313,7 @@ function deleteClutch(token) {
     const lines = [
         `Delete clutch ${clutch.id}?`,
         "The clutch record is removed and its pair goes back to the active list.",
+        "The laying cycle is cleared too, so the female comes off the post-lay hold and can be paired again.",
         "This cannot be undone."
     ];
 

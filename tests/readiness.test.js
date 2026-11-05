@@ -393,6 +393,22 @@ test("a pair's eggs-laid date also starts the post-lay hold", () => {
     assert.equal(result.postLay.holdUntil, "2026-12-20");
 });
 
+test("a pair whose laying cycle was cleared no longer holds the female", () => {
+    // Deleting a clutch clears eggsLaidDate on its pair, so a female who never
+    // really laid must come back as ready rather than keep the six-month hold.
+    const female = snake({ id: "female-5", hatchDate: "2022-06-01" });
+    const result = readiness.getPairingReadiness(female, {
+        today: TODAY,
+        breedingPairs: [
+            { femaleSnakeId: "female-5", eggsLaidDate: "", eggCount: 0 }
+        ]
+    });
+
+    assert.equal(result.postLay, null);
+    assert.equal(blockerCodes(result).includes("post-lay-hold"), false);
+    assert.equal(result.ready, true);
+});
+
 test("the post-lay hold ends after six months", () => {
     const female = snake({ id: "female-3", hatchDate: "2022-06-01" });
     const result = readiness.getPairingReadiness(female, {

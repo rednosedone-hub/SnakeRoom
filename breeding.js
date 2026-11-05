@@ -929,6 +929,33 @@ function addPairingDate(pairId) {
     renderBreedingPairs();
 }
 
+// An active pair can still carry a laying cycle with no clutch behind it, for
+// example after a test clutch was deleted before this reset existed. Clearing it
+// by hand takes the female off the post-lay hold without touching her pairing
+// dates or the pair itself.
+function clearPairLayingCycleFromCard(pairId) {
+    const pair = breedingPairs.find(item => item.id === pairId);
+
+    if (!pair) {
+        return;
+    }
+
+    const female = getSnakeLabel(pair.femaleSnakeId || pair.femaleIndex);
+    const ok = confirm(
+        `Clear the laying cycle on ${female}?\n\n` +
+        "The eggs laid date and egg count on this pair are removed, so she comes off the post-lay hold and can be paired again. Pairing dates are kept."
+    );
+
+    if (!ok) {
+        return;
+    }
+
+    clearPairLayingCycle(pair);
+    saveStorageArray("breedingPairs", breedingPairs);
+    renderBreedingPairs();
+    renderPairHistory();
+}
+
 function removePairingDate(pairId, pairingIndex) {
     const pair = breedingPairs.find(item => item.id === pairId);
 
@@ -1231,6 +1258,12 @@ function renderBreedingPairs() {
                     Close Pair
                 </button>
 
+                ${pair.eggsLaidDate && !pair.clutchId ? `
+                    <button type="button" class="gene-action-button" onclick="clearPairLayingCycleFromCard('${pair.id}')">
+                        Clear Laying Cycle
+                    </button>
+                ` : ""}
+
                 <button type="button" class="edit-button" onclick="convertPairToClutch('${pair.id}')">
                     Convert To Clutch
                 </button>
@@ -1382,6 +1415,16 @@ function renderClutches() {
     }).join("");
 }
 
+// Deleting a clutch removes the evidence of that laying cycle, so the pair goes
+// back to being a plain pairing: the eggs laid date is what puts the female on
+// the post-lay hold, and leaving it behind would keep the Not ready badge on a
+// female who never actually laid.
+function clearPairLayingCycle(pair) {
+    pair.eggsLaidDate = "";
+    pair.eggCount = 0;
+    delete pair.expectedHatchlings;
+}
+
 // A converted pair is linked by clutchId, so deleting the clutch hands the pair
 // back to the active list instead of leaving it pointing at a missing record.
 function releasePairFromClutch(clutch) {
@@ -1390,6 +1433,7 @@ function releasePairFromClutch(clutch) {
     breedingPairs.forEach(pair => {
         if (pair.clutchId && pair.clutchId === clutch.id) {
             pair.clutchId = "";
+            clearPairLayingCycle(pair);
             changed = true;
         }
     });
@@ -1429,6 +1473,7 @@ function deleteClutch(clutchId) {
     const lines = [
         `Delete clutch ${clutch.id}?`,
         "The clutch record is removed and its pair goes back to the active list.",
+        "The laying cycle is cleared too, so the female comes off the post-lay hold and can be paired again.",
         "This cannot be undone."
     ];
 
@@ -1471,6 +1516,7 @@ window.saveBreedingPair = saveBreedingPair;
 window.updatePairField = updatePairField;
 window.addPairingDate = addPairingDate;
 window.removePairingDate = removePairingDate;
+window.clearPairLayingCycleFromCard = clearPairLayingCycleFromCard;
 window.convertPairToClutch = convertPairToClutch;
 window.closePair = closePair;
 window.openClosePairModal = openClosePairModal;
