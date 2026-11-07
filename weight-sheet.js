@@ -259,7 +259,13 @@ function formatRate(rate) {
 
 function growthFlagChip(row) {
     if (!row.flag) {
-        return row.latest ? `<span class="clutch-growth-chip is-neutral">Only weigh-in</span>` : `<span class="clutch-growth-chip is-empty">No weigh-in</span>`;
+        if (!row.latest) {
+            return `<span class="clutch-growth-chip is-empty">No weigh-in</span>`;
+        }
+
+        return row.undated
+            ? `<span class="clutch-growth-chip is-neutral">Current weight</span>`
+            : `<span class="clutch-growth-chip is-neutral">Only weigh-in</span>`;
     }
 
     if (row.flag === "lagging") {
@@ -294,7 +300,11 @@ function renderClutchGrowthChart(result) {
     const plotRows = result.rows.filter(row => row.agePoints.length > 0);
 
     if (laidOut.series.length === 0) {
-        elements.clutchChart.innerHTML = `<p class="empty-message">None of this clutch's hatchlings has a weigh-in yet.</p>`;
+        const hasUndatedWeight = result.rows.some(row => row && row.latest);
+
+        elements.clutchChart.innerHTML = `<p class="empty-message">${hasUndatedWeight
+            ? "None of this clutch's hatchlings has a dated weigh-in yet, so there is nothing to plot by age. The table below still compares the weights on record."
+            : "None of this clutch's hatchlings has a weigh-in yet."}</p>`;
         return;
     }
 
@@ -380,7 +390,7 @@ function renderClutchGrowthTable(result) {
             : `<i class="clutch-growth-swatch is-empty"></i>`;
         const idText = row.ID ? `<small>${escapeHtml(row.ID)}</small>` : "";
         const latest = row.latest
-            ? `<strong>${row.latest.weight} g</strong><small>${escapeHtml(row.latest.date)}</small>`
+            ? `<strong>${row.latest.weight} g</strong><small>${row.latest.date ? escapeHtml(row.latest.date) : "no weigh-in date"}</small>`
             : "—";
         const ratio = Number.isFinite(row.ratio) ? `${Math.round(row.ratio * 100)}% of median` : "—";
 

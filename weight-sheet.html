@@ -79,27 +79,6 @@
             </div>
         </section>
 
-        <main class="weight-print-sheet">
-            <div class="weight-sheet-heading">
-                <h3>Snake Weight Log</h3>
-                <span id="weightSheetDate"></span>
-            </div>
-
-            <table class="weight-sheet-table">
-                <thead>
-                    <tr>
-                        <th>Bin</th>
-                        <th>Sex</th>                        
-                        <th>Name</th>
-                        <th>Genes</th>
-                        <th>Last Weight</th>
-                        <th>New Weight</th>
-                    </tr>
-                </thead>
-                <tbody id="weightSheetBody"></tbody>
-            </table>
-        </main>
-
         <section class="form-section clutch-growth-section print-hidden" id="clutchGrowthSection">
             <h3>Clutch Growth</h3>
 
@@ -137,18 +116,39 @@
                 </table>
             </div>
         </section>
+
+        <main class="weight-print-sheet">
+            <div class="weight-sheet-heading">
+                <h3>Snake Weight Log</h3>
+                <span id="weightSheetDate"></span>
+            </div>
+
+            <table class="weight-sheet-table">
+                <thead>
+                    <tr>
+                        <th>Bin</th>
+                        <th>Sex</th>                        
+                        <th>Name</th>
+                        <th>Genes</th>
+                        <th>Last Weight</th>
+                        <th>New Weight</th>
+                    </tr>
+                </thead>
+                <tbody id="weightSheetBody"></tbody>
+            </table>
+        </main>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <script src="data-helpers.js?v=2"></script>
+    <script src="data-helpers.js?v=3"></script>
     <script src="backup-helpers.js?v=1"></script>
     <script src="cloud-sync.js?v=20"></script>
     <script src="auto-sync.js?v=9"></script>
     <script src="account-gate.js?v=1"></script>
     <script src="geneCatalog.js?v=4"></script>
     <script src="genes.js?v=11"></script>
-    <script src="clutch-growth-helpers.js?v=2"></script>
-    <script src="weight-sheet.js?v=6"></script>
+    <script src="clutch-growth-helpers.js?v=4"></script>
+    <script src="weight-sheet.js?v=7"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

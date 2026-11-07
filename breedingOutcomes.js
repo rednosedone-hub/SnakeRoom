@@ -1334,6 +1334,10 @@ function deleteClutch(token) {
         );
     }
 
+    // Remembered first: a merge or another tab that still holds this clutch
+    // must not put it back on this device.
+    window.SnakeData.rememberDeletedClutch(clutch);
+
     clutches = clutches.filter(item => item !== clutch);
     releasePair(clutch);
 
@@ -1665,6 +1669,18 @@ window.removeCandling = removeCandling;
 
 migrateClutchTokens();
 populatePastClutchSelects();
+
+// Repairs pairs left pointing at a clutch that is gone; without it the pair
+// stays hidden from Active Pairs on the Breeding page.
+if (window.BreedingRepair) {
+    const repair = window.BreedingRepair.repairStorage(window.SnakeData);
+
+    if (repair.released.length > 0) {
+        breedingPairs = window.SnakeData.readStorageArray("breedingPairs", []);
+        clutches = window.SnakeData.readStorageArray("clutches", []);
+    }
+}
+
 renderBreedingOutcomes();
 
 if (hashClutchId) {

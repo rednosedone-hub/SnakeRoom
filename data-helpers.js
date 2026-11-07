@@ -161,6 +161,141 @@ function saveStorageArray(key, items) {
     localStorage.setItem(key, JSON.stringify(items));
 }
 
+// ---- Deleted clutches ------------------------------------------------------
+// Deleting a clutch removes its record, but two other copies can write it
+// straight back: a cloud backup merged on another device, and a tab that still
+// holds the array from before the delete. The clutch id cannot be used to spot
+// those, because ids are reused (2026-01 can exist again next year), so the
+// record's random token is remembered instead. A clutch created after the
+// delete gets a new token and is therefore never hidden.
+//
+// The remembered tokens are kept for a year and capped, so a very old delete
+// cannot quietly suppress anything forever.
+const DELETED_CLUTCHES_KEY = "deletedClutches";
+const DELETED_CLUTCH_LIMIT = 200;
+const DELETED_CLUTCH_MAX_AGE_DAYS = 365;
+
+function readDeletedClutches() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(DELETED_CLUTCHES_KEY));
+        return Array.isArray(saved) ? saved.filter(entry => entry && (entry.token || entry.id)) : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+// A record saved before tokens existed still needs a stable key; the legacy
+// form can only describe it by id and laid date.
+function clutchTokenKey(clutch) {
+    if (!clutch) {
+        return "";
+    }
+
+    const token = String(clutch.clutchToken || "").trim();
+
+    if (token) {
+        return token;
+    }
+
+    const id = String(clutch.id || "").trim();
+
+    return id ? `legacy:${id}|${String(clutch.laidDate || "").slice(0, 10)}` : "";
+}
+
+function saveDeletedClutches(entries) {
+    const cutoff = Date.now() - DELETED_CLUTCH_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+    const kept = entries
+        .filter(entry => entry && (entry.token || entry.id))
+        .filter(entry => {
+            const deletedAt = Date.parse(entry.deletedAt || "");
+
+            return !Number.isFinite(deletedAt) || deletedAt >= cutoff;
+        })
+        .slice(-DELETED_CLUTCH_LIMIT);
+
+    localStorage.setItem(DELETED_CLUTCHES_KEY, JSON.stringify(kept));
+}
+
+function rememberDeletedClutch(clutch) {
+    const token = clutchTokenKey(clutch);
+
+    if (!token) {
+        return;
+    }
+
+    const entries = readDeletedClutches().filter(entry =>
+        String(entry.token || "") !== token && `legacy:${entry.id}|${entry.laidDate || ""}` !== token
+    );
+
+    entries.push({
+        token,
+        id: String(clutch.id || ""),
+        laidDate: String(clutch.laidDate || "").slice(0, 10),
+        deletedAt: new Date().toISOString()
+    });
+
+    saveDeletedClutches(entries);
+}
+
+function isDeletedClutch(clutch, tombstones = readDeletedClutches()) {
+    const token = clutchTokenKey(clutch);
+
+    if (!token) {
+        return false;
+    }
+
+    return tombstones.some(entry =>
+        String(entry.token || "") === token
+        || `legacy:${entry.id}|${entry.laidDate || ""}` === token
+    );
+}
+
+function filterDeletedClutches(clutches, tombstones = readDeletedClutches()) {
+    if (!Array.isArray(clutches) || tombstones.length === 0) {
+        return Array.isArray(clutches) ? clutches : [];
+    }
+
+    return clutches.filter(clutch => !isDeletedClutch(clutch, tombstones));
+}
+
+// The guard sits on storage itself so every reader is covered: pages, the
+// cloud snapshot builder and a restore all see a deleted clutch as gone,
+// without each one having to remember to filter.
+(function guardDeletedClutches() {
+    const nativeGetItem = localStorage.getItem.bind(localStorage);
+    const nativeSetItem = localStorage.setItem.bind(localStorage);
+
+    function withoutDeleted(value) {
+        if (typeof value !== "string" || value === "") {
+            return value;
+        }
+
+        try {
+            const items = JSON.parse(value);
+
+            if (!Array.isArray(items)) {
+                return value;
+            }
+
+            const kept = filterDeletedClutches(items);
+
+            return kept.length === items.length ? value : JSON.stringify(kept);
+        } catch (error) {
+            return value;
+        }
+    }
+
+    localStorage.getItem = function (key) {
+        const value = nativeGetItem(key);
+
+        return String(key) === "clutches" ? withoutDeleted(value) : value;
+    };
+
+    localStorage.setItem = function (key, value) {
+        return nativeSetItem(key, String(key) === "clutches" ? withoutDeleted(value) : value);
+    };
+})();
+
 function getSnakeIdentityText(snake) {
     return snake.ID || snake.morph || snake.name || "Unknown snake";
 }
@@ -291,6 +426,11 @@ window.SnakeData = {
     isActiveSnake,
     readStorageArray,
     saveStorageArray,
+    readDeletedClutches,
+    rememberDeletedClutch,
+    isDeletedClutch,
+    filterDeletedClutches,
+    clutchTokenKey,
     getSnakeIdentityText,
     createSnakeId,
     ensureSnakeIds,

@@ -172,6 +172,7 @@ const geneAliases = {
     "en": "Enchi",
     "cin": "Cinnamon",
     "cinny": "Cinnamon",
+    "bp": "Black Pastel",
     "bpastel": "Black Pastel",
     "hra": "Het Red Axanthic",
     "hgw": "Hidden Gene Woma",

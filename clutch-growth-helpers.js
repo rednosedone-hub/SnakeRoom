@@ -159,9 +159,17 @@
     // and the average gain per week since its first weigh-in.
     function profileFor(snake, hatchDate) {
         const series = seriesFor(snake);
-        const latest = series.length > 0 ? series[series.length - 1] : null;
+        // An animal imported from before the app may only carry a current
+        // weight, with no dated weigh-in. That weight still deserves a place in
+        // the comparison; it just cannot be plotted by age.
+        const currentWeight = Number(snake && snake.weight);
+        const undatedWeight = series.length === 0 && Number.isFinite(currentWeight) && currentWeight > 0
+            ? { date: "", time: 0, weight: Math.round(currentWeight * 10) / 10 }
+            : null;
+        const latest = series.length > 0 ? series[series.length - 1] : undatedWeight;
         const first = series.length > 0 ? series[0] : null;
-        const ageDays = latest ? daysBetween(hatchDate, latest.date) : null;
+        const undated = Boolean(undatedWeight);
+        const ageDays = latest && !undated ? daysBetween(hatchDate, latest.date) : null;
         let ratePerWeek = null;
 
         if (first && latest && first !== latest) {
@@ -179,6 +187,8 @@
             series,
             first,
             latest,
+            // True when the only weight is the record's current-weight field.
+            undated,
             weighIns: series.length,
             ageDays: Number.isFinite(ageDays) ? ageDays : null,
             ratePerWeek,
@@ -291,30 +301,46 @@
             return `${count} hatchling${count === 1 ? " is" : "s are"} on record, but none has a weigh-in yet.`;
         }
 
+        const dated = weighed.filter(row => !row.undated);
+
         if (weighed.length === 1) {
-            return `Only ${weighed[0].label} has a weigh-in, so there is nothing to compare yet. Weigh the rest of the clutch.`;
+            return dated.length === 1
+                ? `Only ${weighed[0].label} has a weigh-in, so there is nothing to compare yet. Weigh the rest of the clutch.`
+                : `Only ${weighed[0].label} has a weight on record, so there is nothing to compare yet. Weigh the rest of the clutch.`;
         }
 
-        const ageText = medianAge !== null && medianAge >= 0
+        // One dated weigh-in is not a median age, so the age only appears once
+        // at least two of the clutch have dates.
+        const ageText = dated.length >= 2 && medianAge !== null && medianAge >= 0
             ? ` at a median age of ${Math.round(medianAge)} day${Math.round(medianAge) === 1 ? "" : "s"}`
             : "";
         const spreadText = spreadPercent !== null
             ? ` The spread is ${spreadPercent}% around a median of ${medianWeight} g.`
             : "";
+        // Say which weights are actually dated: an undated weight cannot be
+        // read as growth for its age, only as a size beside its siblings.
+        const weighersText = dated.length === weighed.length
+            ? `${weighed.length} of ${count} hatchlings have weigh-ins${ageText}`
+            : dated.length === 0
+                ? `${weighed.length} of ${count} hatchlings have a weight on record, none with a weigh-in date`
+                : `${weighed.length} of ${count} hatchlings have a weight on record; ${dated.length} ${dated.length === 1 ? "has a weigh-in date" : "have weigh-in dates"}${ageText}`;
+        const undatedText = dated.length === weighed.length
+            ? ""
+            : " A weight with no date is compared as it stands.";
 
         if (lagging.length > 0) {
             const names = lagging.map(row => `${row.label} (${ratioText(row.ratio)})`).join(", ");
 
-            return `${weighed.length} of ${count} hatchlings have weigh-ins${ageText}.${spreadText} Lagging: ${names}. Check feeding, temps and the last shed on those.`;
+            return `${weighersText}.${spreadText} Lagging: ${names}. Check feeding, temps and the last shed on those.${undatedText}`;
         }
 
         if (ahead.length > 0 && lagging.length === 0) {
             const names = ahead.map(row => `${row.label} (${ratioText(row.ratio)})`).join(", ");
 
-            return `${weighed.length} of ${count} hatchlings have weigh-ins${ageText}.${spreadText} Ahead of the clutch: ${names}; nothing is lagging.`;
+            return `${weighersText}.${spreadText} Ahead of the clutch: ${names}; nothing is lagging.${undatedText}`;
         }
 
-        return `${weighed.length} of ${count} hatchlings have weigh-ins${ageText}.${spreadText} All of them are within ${LAG_PERCENT}% of the clutch median, so they are growing together.`;
+        return `${weighersText}.${spreadText} All of them are within ${LAG_PERCENT}% of the clutch median, so they are growing together.${undatedText}`;
     }
 
     // A stepped axis keeps hatchling weights readable: 5 g steps up to 60 g of
@@ -340,9 +366,9 @@
         };
     }
 
-    function tickLabels(maxAge) {
+    function tickLabels(minAge, maxAge) {
         const steps = [0, 1, 2, 3];
-        const ages = steps.map(step => Math.round((maxAge * step) / 3));
+        const ages = steps.map(step => Math.round(minAge + ((maxAge - minAge) * step) / 3));
 
         // Keep the labels unique even for a very short window.
         return ages
@@ -364,7 +390,14 @@
             return { series: [], ticks: [], width, height, padding, min: 0, max: 0, maxAge: 0 };
         }
 
-        const maxAge = Math.max(1, ...allPoints.map(point => point.age));
+        const ages = allPoints.map(point => point.age);
+        const maxAge = Math.max(1, ...ages);
+        // A clutch that is a year old would otherwise bunch every point against
+        // the right edge, because the axis insisted on starting at day 0. Start
+        // at the first weigh-in instead: the axis still reads as days since
+        // hatching, it just no longer wastes most of the width on empty days.
+        const minAge = Math.max(0, Math.floor(Math.min(...ages)));
+        const spanAge = Math.max(1, maxAge - minAge);
         const range = axisRange(allPoints.map(point => point.weight));
         const innerWidth = width - padding * 2;
         const innerHeight = height - padding * 2;
@@ -375,13 +408,13 @@
             label: row.label,
             points: row.agePoints.map(point => ({
                 ...point,
-                x: padding + (point.age / maxAge) * innerWidth,
+                x: padding + ((point.age - minAge) / spanAge) * innerWidth,
                 y: height - padding - ((point.weight - range.min) / spanGrams) * innerHeight
             }))
         }));
-        const ticks = tickLabels(maxAge).map(tick => ({
+        const ticks = tickLabels(minAge, maxAge).map(tick => ({
             ...tick,
-            x: padding + (tick.age / maxAge) * innerWidth
+            x: padding + ((tick.age - minAge) / spanAge) * innerWidth
         }));
 
         return {
@@ -392,6 +425,7 @@
             padding,
             min: range.min,
             max: range.max,
+            minAge,
             maxAge
         };
     }

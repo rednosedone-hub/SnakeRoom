@@ -2,6 +2,9 @@ const snakes = window.SnakeData.loadSnakesWithIds([]);
 let breedingPairs = window.SnakeData.readStorageArray("breedingPairs", []);
 let clutches = window.SnakeData.readStorageArray("clutches", []);
 let pendingClosePairId = "";
+// Links repaired at load, so the page can say what changed instead of quietly
+// making a pair reappear.
+let repairedLinks = [];
 
 function migrateBreedingReferences() {
     let changedPairs = false;
@@ -952,6 +955,8 @@ function clearPairLayingCycleFromCard(pairId) {
 
     clearPairLayingCycle(pair);
     saveStorageArray("breedingPairs", breedingPairs);
+    // The leftover-laying-cycle line has now been acted on; stop showing it.
+    repairedLinks = [];
     renderBreedingPairs();
     renderPairHistory();
 }
@@ -1139,8 +1144,15 @@ function renderBreedingPairs() {
             : ""
     ].filter(Boolean).join(" \u00b7 ");
 
+    const repairHtml = repairedLinks.length > 0
+        ? `<div class="pair-warning" id="breedingRepairNotice">
+                ${repairedLinks.map(line => `<p>${escapePairText(line)}</p>`).join("")}
+            </div>`
+        : "";
+
     if (activePairs.length === 0) {
-        list.innerHTML = `<p class="empty-message">No active breeding pairs.${historyNote ? ` ${historyNote}.` : ""}</p>`;
+        list.innerHTML = repairHtml
+            + `<p class="empty-message">No active breeding pairs.${historyNote ? ` ${historyNote}.` : ""}</p>`;
         return;
     }
 
@@ -1148,7 +1160,7 @@ function renderBreedingPairs() {
         ? `<p class="empty-message">${historyNote}.</p>`
         : "";
 
-    list.innerHTML = historyHtml + activePairs.map(pair => {
+    list.innerHTML = repairHtml + historyHtml + activePairs.map(pair => {
         const retiredParentText = describeRetiredParents(pair);
 
         return `
@@ -1376,7 +1388,9 @@ function renderClutches() {
                         placeholder="${clutch.eggCount || 0} eggs"
                         value="${hatchlingValue}"
                         onchange="updateClutchHatchlingCount('${clutch.id}', this.value)">
-                    <small class="empty-message">${isHatched ? "More than the eggs means twins." : "Leave blank to use the egg count."}</small>
+                    <small class="empty-message">${isHatched
+                        ? (Number(clutch.eggCount) > 0 ? "More than the eggs means twins." : "No egg count was recorded for this clutch.")
+                        : "Leave blank to use the egg count."}</small>
                 </label>
 
                 ${linkedPair ? `
@@ -1494,6 +1508,10 @@ function deleteClutch(clutchId) {
         );
     }
 
+    // Remember the record before it goes, so a cloud merge or an older tab
+    // cannot write it back into this device's data.
+    window.SnakeData.rememberDeletedClutch(clutch);
+
     clutches = clutches.filter(item => item !== clutch);
     releasePairFromClutch(clutch);
 
@@ -1549,6 +1567,19 @@ window.addEventListener("afterprint", clearClutchTimelinePrint);
 setupSnakeSelects();
 migrateBreedingReferences();
 ensureClutchTokens();
+
+// A pair whose clutch no longer exists is a dead record: it is hidden from
+// Active Pairs and cannot be edited. Clear the link before rendering, then
+// read the repaired arrays back in.
+if (window.BreedingRepair) {
+    const repair = window.BreedingRepair.repairStorage(window.SnakeData);
+
+    if (repair.released.length > 0) {
+        repairedLinks = window.BreedingRepair.describeReleased(repair.released);
+        breedingPairs = window.SnakeData.readStorageArray("breedingPairs", []);
+        clutches = window.SnakeData.readStorageArray("clutches", []);
+    }
+}
 
 ["femaleSelect", "maleSelect"].forEach(id => {
     const select = document.getElementById(id);

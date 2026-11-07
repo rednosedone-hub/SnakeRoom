@@ -176,6 +176,50 @@ test("hatchlings with no weigh-in still appear, last and unmeasured", () => {
     assert.equal(result.verdict.includes("Weighed"), true);
 });
 
+test("an imported hatchling with only a current weight still joins the comparison", () => {
+    const result = plain(growth.compare([
+        hatchling({ id: "1", name: "Mosaic", weightHistory: [], weight: 304 }),
+        hatchling({ id: "2", name: "Mercury", weightHistory: [], weight: 422 }),
+        hatchling({ id: "3", name: "Spice", weightHistory: [], weight: 281 })
+    ], "2026-01"));
+
+    assert.equal(result.comparableCount, 3);
+    assert.equal(result.medianWeight, 304);
+    assert.deepEqual(result.rows.map(row => row.label), ["Mercury", "Mosaic", "Spice"]);
+    // A weight with no date is real data, but it cannot be read as growth.
+    assert.equal(result.rows[0].undated, true);
+    assert.equal(result.rows[0].ageDays, null);
+    assert.equal(result.rows[0].ratePerWeek, null);
+    assert.deepEqual(result.rows[0].agePoints, []);
+    assert.match(result.verdict, /have a weight on record, none with a weigh-in date/);
+    assert.match(result.verdict, /compared as it stands/);
+    assert.deepEqual(result.lagging, []);
+    assert.deepEqual(growth.layout(result.rows).series, []);
+});
+
+test("a mix of dated weigh-ins and current weights says how many are dated", () => {
+    const result = plain(growth.compare([
+        hatchling({ id: "1", name: "Dated", weightHistory: [{ date: "2026-09-01", weight: 300 }] }),
+        hatchling({ id: "2", name: "Imported", weightHistory: [], weight: 310 })
+    ], "2026-01"));
+
+    assert.equal(result.rows.find(row => row.label === "Imported").undated, true);
+    assert.equal(result.rows.find(row => row.label === "Dated").undated, false);
+    assert.match(result.verdict, /2 of 2 hatchlings have a weight on record; 1 has a weigh-in date/);
+    // A lone dated weigh-in is not a median age, so no age is claimed.
+    assert.equal(/median age/.test(result.verdict), false);
+});
+
+test("an undated weight still leaves a group with no dated points unplotted", () => {
+    const result = growth.compare([
+        hatchling({ id: "1", weightHistory: [], weight: 200 }),
+        hatchling({ id: "2", weightHistory: [], weight: 210 })
+    ], "2026-01");
+
+    assert.equal(result.rows.length, 2);
+    assert.deepEqual(growth.layout(result.rows, { width: 460, height: 240, padding: 40 }).series, []);
+});
+
 test("the axis steps by a readable amount and never cuts a point off", () => {
     assert.deepEqual(growth.axisRange([70, 300]), { min: 25, max: 350 });
     assert.deepEqual(growth.axisRange([70, 90]), { min: 65, max: 95 });
@@ -205,6 +249,28 @@ test("every hatchling shares one age axis, with age-day ticks", () => {
     // Fast (330 g) is the first row and sits higher than Slow (200 g).
     assert.equal(laidOut.series[0].label, "Fast");
     assert.ok(laidOut.series[0].points[1].y < laidOut.series[1].points[1].y);
+});
+
+test("an older clutch's axis starts at its first weigh-in, not at day 0", () => {
+    const result = growth.compare([
+        hatchling({
+            id: "1",
+            name: "Old",
+            weightHistory: [
+                { date: "2026-08-30", weight: 300 },
+                { date: "2026-09-20", weight: 330 }
+            ]
+        })
+    ], "2026-01");
+    const laidOut = plain(growth.layout(result.rows, { width: 460, height: 240, padding: 40 }));
+
+    // 60 to 81 days old: the curve uses the whole frame instead of hugging
+    // the right edge of a day-0 axis.
+    assert.equal(laidOut.minAge, 60);
+    assert.equal(laidOut.maxAge, 81);
+    assert.equal(laidOut.series[0].points[0].x, 40);
+    assert.equal(laidOut.series[0].points[1].x, 420);
+    assert.deepEqual(laidOut.ticks.map(tick => tick.label), ["60d", "67d", "74d", "81d"]);
 });
 
 test("a weigh-in dated before hatching is not plotted", () => {
