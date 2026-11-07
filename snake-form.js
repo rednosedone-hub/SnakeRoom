@@ -1521,7 +1521,7 @@ function breedingHistoryPartnerHtml(info) {
     return window.SnakeData.getSnakeLinkHtml(info.partner, { label: breedingHistoryPartnerText(info) });
 }
 
-function breedingHistoryPairCard(pair, snakeId) {
+function breedingHistoryPairCard(pair, snakeId, clutches) {
     const partnerInfo = getBreedingPartnerInfo(pair, snakeId);
     const status = getBreedingPairStatus(pair);
     const pairingDates = getBreedingPairingDates(pair);
@@ -1570,7 +1570,12 @@ function breedingHistoryPairCard(pair, snakeId) {
         `
         : "";
 
-    const clutchLink = pair.clutchId
+    // A link is only shown when the clutch is really on file: a dead "View
+    // Clutch" is worse than no link at all.
+    const linkedClutch = pair.clutchId
+        ? (clutches || []).find(clutch => clutch && String(clutch.id || "") === String(pair.clutchId)) || null
+        : null;
+    const clutchLink = linkedClutch
         ? `
             <div class="breeding-history-links">
                 <a class="secondary-button small-action-button"
@@ -1685,6 +1690,12 @@ function renderBreedingHistory(snake) {
 
     section.hidden = false;
 
+    // Pairs still pointing at a deleted clutch are cleared first, so the
+    // record never shows a clutch that is not on file.
+    if (window.BreedingRepair) {
+        window.BreedingRepair.repairStorage(window.SnakeData);
+    }
+
     const pairs = window.SnakeData.readStorageArray("breedingPairs", [])
         .filter(pair => pair && recordIncludesSnake(pair, snake.id))
         .sort((a, b) => getBreedingPairSortDate(b).localeCompare(getBreedingPairSortDate(a)));
@@ -1712,7 +1723,7 @@ function renderBreedingHistory(snake) {
     }
 
     const pairsHtml = pairs.length > 0
-        ? pairs.map(pair => breedingHistoryPairCard(pair, snake.id)).join("")
+        ? pairs.map(pair => breedingHistoryPairCard(pair, snake.id, clutches)).join("")
         : `<p class="empty-message">No pair records on file for this snake.</p>`;
     const clutchesHtml = clutches.length > 0
         ? clutches.map(clutch => breedingHistoryClutchCard(clutch, snake.id)).join("")
@@ -2623,17 +2634,23 @@ function updateWeightClutchLink(snake) {
 
     const clutchId = String(snake && snake.clutchId || "").trim();
     const tools = window.ClutchGrowth;
-    const mates = clutchId && tools ? tools.clutchmates(snakes, clutchId) : [];
-    const siblings = mates.filter(mate => mate !== snake && mate.id !== snake.id);
 
-    wrap.hidden = siblings.length === 0;
-
-    if (siblings.length === 0) {
+    if (!clutchId || !tools) {
+        wrap.hidden = true;
         return;
     }
 
+    const mates = tools.clutchmates(snakes, clutchId);
+    const siblings = mates.filter(mate => mate !== snake && mate.id !== snake.id);
+
+    wrap.hidden = false;
     link.href = `weight-sheet.html#clutch-${encodeURIComponent(clutchId)}`;
-    link.textContent = `Compare with ${siblings.length} clutch mate${siblings.length === 1 ? "" : "s"} (${clutchId})`;
+
+    // A lone hatchling still gets the link: hiding it left the keeper with no
+    // hint that a clutch comparison exists, or why it has nothing to draw yet.
+    link.textContent = siblings.length === 0
+        ? `Clutch ${clutchId} \u00b7 no clutch mates on file \u2014 open clutch weights`
+        : `Compare with ${siblings.length} clutch mate${siblings.length === 1 ? "" : "s"} (${clutchId})`;
 }
 
 window.updateWeightClutchLink = updateWeightClutchLink;
