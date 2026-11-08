@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room</title>
-    <link rel="stylesheet" href="style.css?v=83">
+    <link rel="stylesheet" href="style.css?v=90">
 </head>
 
 <body>
@@ -52,8 +52,17 @@
                 Update Feeders
             </button>
 
+            <button onclick="snoozeSelectedSnakes()" class="secondary-button"
+                title="Move the selected snakes to their next scheduled feeding without logging a meal">
+                Snooze
+            </button>
+
             <button onclick="clearSelectedSnakes()" class="secondary-button">
                 Clear
+            </button>
+
+            <button type="button" class="wake-lock-button" data-keep-screen hidden>
+                Keep screen on
             </button>
 
         </div>
@@ -62,6 +71,17 @@
 
         <h3>Snakes Due to Feed</h3>
         <div class="snake-table-wrapper" id="snakeTableWrapper"></div>
+
+        <section class="form-section feeding-hold-section" id="feedingSnoozeSection" style="display: none;">
+            <h3>Snoozed</h3>
+
+            <p class="empty-message">
+                Skipped for this feeding without logging a meal. Each one returns to the due list on
+                its next scheduled feeding day, or you can un-snooze it now.
+            </p>
+
+            <div id="feedingSnoozeList" class="feeding-hold-list"></div>
+        </section>
 
         <section class="form-section feeding-hold-section" id="feedingHoldSection" style="display: none;">
             <h3>On Feeding Hold</h3>
@@ -81,9 +101,10 @@
     <script src="cloud-sync.js?v=20"></script>
     <script src="auto-sync.js?v=9"></script>
     <script src="account-gate.js?v=1"></script>
-    <script src="feed-helpers.js?v=4"></script>
-    <script src="feeder-inventory.js?v=8"></script>
-    <script src="feeding-session.js?v=10"></script>
+    <script src="wake-lock.js?v=4"></script>
+    <script src="feed-helpers.js?v=5"></script>
+    <script src="feeder-inventory.js?v=10"></script>
+    <script src="feeding-session.js?v=12"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

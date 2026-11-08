@@ -149,7 +149,18 @@ function updateFeederSuggestion() {
         return;
     }
 
-    suggestionText.textContent = `Suggested feeder: ${suggestedFeederSize}`;
+    // The marker decides whether the meal comes out of the freezer, so say
+    // when it will be kept and mention it when there is none.
+    const currentKind = window.SnakeFeeders
+        ? window.SnakeFeeders.parseFeederSize(document.getElementById("feederSizeInput").value).kind
+        : "";
+    const kindNote = currentKind === "frozen"
+        ? " · F/T will be kept"
+        : currentKind === "live"
+            ? " · live marker will be kept"
+            : " · add F/T for a frozen feeder";
+
+    suggestionText.textContent = `Suggested feeder: ${suggestedFeederSize}${kindNote}`;
 }
 
 function useSuggestedFeederSize() {
@@ -162,7 +173,13 @@ function useSuggestedFeederSize() {
         return;
     }
 
-    document.getElementById("feederSizeInput").value = suggestedFeederSize;
+    const feederSizeInput = document.getElementById("feederSizeInput");
+
+    // Keep an existing F/T (or live) marker: the suggestion is a size, not a
+    // change in how the snake is fed.
+    feederSizeInput.value = window.SnakeFeeders
+        ? window.SnakeFeeders.withFeederMarker(feederSizeInput.value, suggestedFeederSize)
+        : suggestedFeederSize;
 }
 
 function setCollectionView(viewName) {

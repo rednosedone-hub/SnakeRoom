@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Scan Session</title>
-    <link rel="stylesheet" href="style.css?v=83">
+    <link rel="stylesheet" href="style.css?v=90">
 </head>
 
 <body>
@@ -66,6 +66,10 @@
                     <button type="button" class="secondary-button" id="scanStopButton"
                         onclick="stopScanning()" hidden>
                         Stop Camera
+                    </button>
+
+                    <button type="button" class="wake-lock-button" data-keep-screen hidden>
+                        Keep screen on
                     </button>
                 </div>
 
@@ -172,8 +176,9 @@
     <script src="cloud-sync.js?v=20"></script>
     <script src="auto-sync.js?v=9"></script>
     <script src="account-gate.js?v=1"></script>
-    <script src="feed-helpers.js?v=4"></script>
-    <script src="feeder-inventory.js?v=8"></script>
+    <script src="wake-lock.js?v=4"></script>
+    <script src="feed-helpers.js?v=5"></script>
+    <script src="feeder-inventory.js?v=10"></script>
     <script src="scan-helpers.js?v=3"></script>
     <script src="scan-session.js?v=6"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>

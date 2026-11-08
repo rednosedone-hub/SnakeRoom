@@ -133,9 +133,9 @@
         }).join("");
 
         $("feederModeNote").textContent = Feeders.MODES[mode].description
-            + (mode === "live"
-                ? " Live orders are still recorded in Finances, but they never add to a stock count."
-                : " A live feeder order can be recorded too; it just does not change the freezer count.");
+            + " This is the default for every snake whose feeder size has no marker."
+            + " A size like “Small Rat F/T” always draws from the freezer, even in Live mode,"
+            + " and “Small Rat (live)” is bought fresh even in Frozen mode.";
 
         $("feederLeadNote").textContent = mode === "live"
             ? "The lead time decides when a live order shows as “buy now” before its feeding day. Three days is the minimum, so there is time to agree a pickup."
@@ -143,9 +143,11 @@
 
         $("feederKpiMode").textContent = Feeders.MODES[mode].label;
         $("feederKpiModeNote").textContent = mode === "live"
-            ? "No freezer count. Buy for each feeding."
+            ? "Live sizes are bought for each feeding; sizes marked F/T still count down."
             : "Counts down as meals are logged.";
-        $("feederKpiOrderLabel").textContent = mode === "live" ? "Buy now" : "To order";
+        $("feederKpiOrderLabel").textContent = mode === "live" && forecast.totals.frozenFeedings === 0
+            ? "Buy now"
+            : "To order";
     }
 
     function renderSettings() {
@@ -165,7 +167,9 @@
                 return true;
             }
 
-            if (forecast.mode === "frozen") {
+            // A stocked size still belongs on the table even with no meals in
+            // the window: it is stock to count, not a size to order.
+            if (size.kind === "frozen") {
                 return (size.onHand !== null && size.onHand > 0) || size.keepAtLeast > 0;
             }
 
@@ -173,8 +177,14 @@
         });
     }
 
+    // A live and a frozen line can share a name, so the kind has to be visible
+    // in the table rather than inferred from the collection's default.
+    function kindTag(kind) {
+        return `<span class="feeder-type-tag is-${kind}">${kind === "live" ? "Live" : "Frozen"}</span>`;
+    }
+
     function describeSizeStatus(size) {
-        if (forecast.mode === "live") {
+        if (size.kind === "live") {
             if (size.status === "order") {
                 return {
                     tone: "order",
@@ -247,35 +257,27 @@
 
     function renderForecast() {
         const sizes = forecastSizes();
-        const isFrozen = forecast.mode === "frozen";
         const head = $("feederForecastHead");
         const body = $("feederForecastBody");
         const empty = $("feederForecastEmpty");
 
-        head.innerHTML = isFrozen
-            ? `<tr>
-                    <th>Feeder size</th>
-                    <th>On hand</th>
-                    <th>Need in ${forecast.horizonDays} days</th>
-                    <th>Next feeding</th>
-                    <th>Order by</th>
-                    <th>Suggested order</th>
-                    <th>Status</th>
-               </tr>`
-            : `<tr>
-                    <th>Feeder size</th>
-                    <th>Next feeding</th>
-                    <th>Buy for next feed</th>
-                    <th>Feedings in ${forecast.horizonDays} days</th>
-                    <th>Status</th>
-               </tr>`;
+        // One table for both jobs: a live size is bought for its feeding day, a
+        // frozen one is counted down from the freezer. Both can be in the same
+        // size, so the kind is a chip in the size cell.
+        head.innerHTML = `<tr>
+                <th>Feeder size</th>
+                <th>On hand</th>
+                <th>Need in ${forecast.horizonDays} days</th>
+                <th>Next feeding</th>
+                <th>Order by</th>
+                <th>Suggested order</th>
+                <th>Status</th>
+           </tr>`;
 
         if (sizes.length === 0) {
             body.innerHTML = "";
             empty.style.display = "";
-            empty.textContent = isFrozen
-                ? "No feeder sizes or stock yet. Give a snake a feeder size, or log an order below."
-                : "No live feedings in this window. Give a snake a feeder size and a last-fed date to schedule it.";
+            empty.textContent = "No feeder sizes or stock yet. Give a snake a feeder size, or log an order below.";
             renderForecastNotes();
             renderKpis();
             return;
@@ -284,15 +286,21 @@
         empty.style.display = "none";
 
         body.innerHTML = sizes.map(size => {
-            if (!isFrozen) {
+            const nextText = size.nextDate
+                ? `${formatShortDate(size.nextDate)} <small class="feeder-muted">${size.nextCount} needed</small>`
+                : "—";
+            const orderText = size.suggestedOrder > 0 ? `<strong>${size.suggestedOrder}</strong>` : "—";
+            const sizeCell = `${escapeHtml(size.size)} ${kindTag(size.kind)}`;
+
+            if (size.kind === "live") {
                 return `
                     <tr>
-                        <td>${escapeHtml(size.size)}</td>
-                        <td>${size.nextDate
-                            ? `${formatShortDate(size.nextDate)} <small class="feeder-muted">(${describeDayDistance(size.nextDate)})</small>`
-                            : "—"}</td>
-                        <td>${size.suggestedOrder > 0 ? `<strong>${size.suggestedOrder}</strong>` : "—"}</td>
+                        <td>${sizeCell}</td>
+                        <td>—</td>
                         <td>${size.need}</td>
+                        <td>${nextText}</td>
+                        <td>—</td>
+                        <td>${orderText}</td>
                         <td>${statusChip(size)}</td>
                     </tr>
                 `;
@@ -301,23 +309,20 @@
             const orderByText = size.orderByDate
                 ? (size.orderNow ? "Now" : formatDate(size.orderByDate))
                 : "—";
-            const nextText = size.nextDate
-                ? `${formatShortDate(size.nextDate)} <small class="feeder-muted">${size.nextCount} needed</small>`
-                : "—";
             const keepNote = size.keepAtLeast > 0
                 ? `<small class="feeder-muted">keep ${size.keepAtLeast}</small>`
                 : "";
 
             return `
                 <tr>
-                    <td>${escapeHtml(size.size)}</td>
+                    <td>${sizeCell}</td>
                     <td>${size.onHand === null ? "—" : `<strong>${size.onHand}</strong> ${keepNote}`}</td>
                     <td>${size.need}</td>
                     <td>${nextText}</td>
                     <td>${orderByText}${size.runsOutDate
                         ? `<small class="feeder-muted">runs out ${formatShortDate(size.runsOutDate)}</small>`
                         : ""}</td>
-                    <td>${size.suggestedOrder > 0 ? `<strong>${size.suggestedOrder}</strong>` : "—"}</td>
+                    <td>${orderText}</td>
                     <td>${statusChip(size)}</td>
                 </tr>
             `;
@@ -369,9 +374,9 @@
     function renderKpis() {
         const totals = forecast.totals;
         const next = forecast.events[0] || null;
-        const orderSizes = forecast.mode === "live"
-            ? forecast.sizes.filter(size => size.status === "order" && size.suggestedOrder > 0)
-            : forecast.sizes.filter(size => size.suggestedOrder > 0);
+        // A live line only carries a suggested order once it is inside the
+        // buy-now window, so the same test covers both kinds.
+        const orderSizes = forecast.sizes.filter(size => size.suggestedOrder > 0);
 
         $("feederKpiFeedings").textContent = String(totals.feedings);
         $("feederKpiFeedingsNote").textContent = totals.feedings === 0
@@ -393,10 +398,10 @@
 
         $("feederKpiOrder").textContent = String(orderSizes.length);
         $("feederKpiOrderNote").textContent = orderSizes.length > 0
-            ? summarizeNames(orderSizes.map(size => size.size), 4)
-            : (forecast.mode === "live"
-                ? "Nothing needs buying right now."
-                : "Nothing needs ordering right now.");
+            ? summarizeNames(orderSizes.map(size =>
+                size.kind === "live" ? `${size.size} (live)` : size.size
+            ), 4)
+            : "Nothing needs buying or ordering right now.";
     }
 
     // ---- Freezer stock -----------------------------------------------------
@@ -413,7 +418,12 @@
         }
 
         Feeders.getInventory().forEach(row => add(row.size));
-        activeSnakes().forEach(snake => add(snake.feederSize));
+        // Only the sizes that actually come out of a freezer belong here: a live
+        // feeder is bought for its feeding day and never stocked. "Small Rat
+        // F/T" is the freezer row "Small Rat", not a second size.
+        activeSnakes()
+            .filter(snake => Feeders.getFeederKind(snake.feederSize) === "frozen")
+            .forEach(snake => add(Feeders.parseFeederSize(snake.feederSize).base));
 
         return [...sizes.values()].sort((a, b) => a.localeCompare(b));
     }
@@ -425,11 +435,9 @@
             return;
         }
 
-        section.style.display = forecast.mode === "frozen" ? "" : "none";
-
-        if (forecast.mode !== "frozen") {
-            return;
-        }
+        // Freezer stock is worth counting even when most of the collection eats
+        // live: the snakes marked F/T still draw from it.
+        section.style.display = "";
 
         const inventory = Feeders.getInventory();
         const sizes = stockSizes();
@@ -449,7 +457,9 @@
 
         body.innerHTML = sizes.map(size => {
             const row = Feeders.findInventoryRow(inventory, size) || { size, onHand: 0, reorderAt: 0 };
-            const forecastSize = forecast.sizes.find(item => item.size.toLowerCase() === row.size.toLowerCase());
+            const forecastSize = forecast.sizes.find(item =>
+                item.kind === "frozen" && item.size.toLowerCase() === row.size.toLowerCase()
+            );
             const status = forecastSize
                 ? statusChip(forecastSize)
                 : `<span class="feeder-status is-ok" title="No meals in this window">Unused</span>`;
@@ -510,14 +520,17 @@
         const mealCount = forecast.totals.feedings;
         const snakeCount = forecast.totals.snakes;
 
+        const liveMeals = forecast.totals.liveFeedings || 0;
+        const frozenMeals = forecast.totals.frozenFeedings || 0;
+
         $("feederPlanLead").textContent = mealCount === 0
-            ? (forecast.mode === "live"
-                ? "Every live meal inside the forecast window will be grouped here by feeding day."
-                : "Every meal inside the forecast window will be grouped here by feeding day.")
+            ? "Every meal inside the forecast window will be grouped here by feeding day."
             : `${mealCount} meal${mealCount === 1 ? "" : "s"} across ${snakeCount} scheduled snake${snakeCount === 1 ? "" : "s"} in this window, grouped by feeding day. `
-                + (forecast.mode === "live"
-                    ? "Buy the quantity shown for that day."
-                    : "These are the meals that count down freezer stock.");
+                + (liveMeals > 0 && frozenMeals > 0
+                    ? "Live feeders are bought for that day; freezer-fed meals count down stock."
+                    : (liveMeals > 0
+                        ? "Buy the quantity shown for that day."
+                        : "These are the meals that count down freezer stock."));
 
         if (events.length === 0) {
             container.innerHTML = "";
@@ -536,11 +549,13 @@
             }
 
             const sizes = days.get(event.date);
-            const current = sizes.get(event.size) || { size: event.size, count: 0, snakes: [] };
+            // A live and a frozen "Small Rat" are two separate jobs on the day.
+            const key = `${event.kind}|${event.size}`;
+            const current = sizes.get(key) || { size: event.size, kind: event.kind, count: 0, snakes: [] };
 
             current.count += 1;
             current.snakes.push(event.snakeName);
-            sizes.set(event.size, current);
+            sizes.set(key, current);
         });
 
         const dayList = [...days.entries()].sort((a, b) => a[0].localeCompare(b[0]));
@@ -548,13 +563,17 @@
 
         container.innerHTML = visible.map(([date, sizes]) => {
             const items = [...sizes.values()]
-                .sort((a, b) => a.size.localeCompare(b.size))
+                .sort((a, b) => a.size.localeCompare(b.size) || a.kind.localeCompare(b.kind))
                 .map(item => `
                     <span class="feeder-plan-item">
-                        <strong>${item.count}×</strong> ${escapeHtml(item.size)}
+                        <strong>${item.count}×</strong> ${escapeHtml(item.size)} ${kindTag(item.kind)}
                         <small>${escapeHtml(summarizeNames(item.snakes, 4))}</small>
                     </span>
                 `).join("");
+            const kinds = new Set([...sizes.values()].map(item => item.kind));
+            const action = kinds.size > 1
+                ? "Freezer + fresh"
+                : (kinds.has("live") ? "Buy fresh" : "From freezer");
 
             return `
                 <div class="feeder-plan-day">
@@ -563,7 +582,7 @@
                         <span>${describeDayDistance(date)}</span>
                     </div>
                     <div class="feeder-plan-sizes">${items}</div>
-                    <span class="feeder-plan-action">${forecast.mode === "live" ? "Buy fresh" : "From freezer"}</span>
+                    <span class="feeder-plan-action">${action}</span>
                 </div>
             `;
         }).join("") + (dayList.length > visible.length
@@ -587,14 +606,13 @@
 
     function getShoppingItems() {
         return forecast.sizes
-            .filter(size => size.suggestedOrder > 0
-                && (forecast.mode === "live" ? size.status === "order" : size.status !== "ok"))
-            .sort((a, b) => a.size.localeCompare(b.size))
+            .filter(size => size.suggestedOrder > 0 && size.status !== "ok")
+            .sort((a, b) => a.size.localeCompare(b.size) || a.kind.localeCompare(b.kind))
             .map(size => {
                 const price = getFeederPrice(size.size);
                 let when = "";
 
-                if (forecast.mode === "live") {
+                if (size.kind === "live") {
                     when = `For ${formatShortDate(size.nextDate)}`;
                 } else if (size.status === "order") {
                     when = "Order now";
@@ -606,6 +624,7 @@
 
                 return {
                     size: size.size,
+                    kind: size.kind,
                     quantity: size.suggestedOrder,
                     when,
                     cost: Math.round(price * size.suggestedOrder * 100) / 100
@@ -628,17 +647,22 @@
         const items = getShoppingItems();
         const pricedItems = items.filter(item => item.cost > 0);
         const total = pricedItems.reduce((sum, item) => sum + item.cost, 0);
+        const hasLive = items.some(item => item.kind === "live");
+        const hasFrozen = items.some(item => item.kind === "frozen");
+        const liveOnly = hasLive && !hasFrozen;
 
-        note.textContent = forecast.mode === "live"
-            ? "Live feeders are bought for the feeding day. Copy the quantities below and take the list with you."
-            : "Quantities cover the forecast window plus your keep-at-least buffer. Copy the list for a supplier.";
+        note.textContent = hasLive && hasFrozen
+            ? "Live lines are bought for their feeding day; frozen lines cover the forecast window plus your keep-at-least buffer."
+            : (liveOnly
+                ? "Live feeders are bought for the feeding day. Copy the quantities below and take the list with you."
+                : "Quantities cover the forecast window plus your keep-at-least buffer. Copy the list for a supplier.");
 
         copyButton.disabled = items.length === 0;
-        copyButton.title = forecast.mode === "live" ? "Copy live feeding list" : "Copy feeder shopping list";
+        copyButton.title = liveOnly ? "Copy live feeding list" : "Copy feeder shopping list";
 
         if (printButton) {
             printButton.disabled = items.length === 0;
-            printButton.title = forecast.mode === "live" ? "Print live feeding list" : "Print feeder shopping list";
+            printButton.title = liveOnly ? "Print live feeding list" : "Print feeder shopping list";
         }
 
         renderPrintSheet(items);
@@ -646,7 +670,7 @@
         if (items.length === 0) {
             list.innerHTML = "";
             empty.style.display = "";
-            empty.textContent = forecast.mode === "live"
+            empty.textContent = forecast.totals.liveFeedings > 0 && forecast.totals.frozenFeedings === 0
                 ? "No live feeders are needed for the next feeding day."
                 : "Nothing to buy right now. Freezer stock covers the forecast window.";
             totalLine.textContent = "";
@@ -658,7 +682,7 @@
         list.innerHTML = items.map(item => `
             <li class="feeder-shopping-item">
                 <span class="feeder-shopping-qty">${item.quantity}&times;</span>
-                <span class="feeder-shopping-size">${escapeHtml(item.size)}</span>
+                <span class="feeder-shopping-size">${escapeHtml(item.size)} ${kindTag(item.kind)}</span>
                 <span class="feeder-shopping-when">${escapeHtml(item.when)}</span>
                 <span class="feeder-shopping-cost">${item.cost > 0 ? formatMoney(item.cost) : ""}</span>
             </li>
@@ -688,11 +712,19 @@
             return;
         }
 
-        const isLive = forecast.mode === "live";
+        const hasLive = items.some(item => item.kind === "live");
+        const hasFrozen = items.some(item => item.kind === "frozen");
+        const liveOnly = hasLive && !hasFrozen;
         const pricedItems = items.filter(item => item.cost > 0);
         const hasPrices = pricedItems.length > 0;
         const pricedTotal = pricedItems.reduce((sum, item) => sum + item.cost, 0);
-        const title = isLive ? "Live Feeding List" : "Feeder Shopping List";
+        const title = liveOnly ? "Live Feeding List" : "Feeder Shopping List";
+        const dateColumn = liveOnly ? "Feed day" : "Order by";
+        const listNote = hasLive && hasFrozen
+            ? "Live lines are bought for their feeding day; frozen quantities cover the forecast window and your keep-at-least buffer."
+            : (liveOnly
+                ? "Buy fresh; live feeders are not stocked."
+                : "Quantities cover the forecast window and your keep-at-least buffer.");
         const priceNote = hasPrices && pricedItems.length < items.length
             ? " Estimated cost covers priced sizes only."
             : "";
@@ -709,7 +741,7 @@
                         <th class="feeder-print-checkcol"></th>
                         <th>Qty</th>
                         <th>Feeder size</th>
-                        <th>${isLive ? "Feed day" : "Order by"}</th>
+                        <th>${dateColumn}</th>
                         ${hasPrices ? "<th class=\"feeder-print-cost\">Est.</th>" : ""}
                     </tr>
                 </thead>
@@ -718,7 +750,7 @@
                         <tr>
                             <td class="feeder-print-checkcell"><span class="feeder-print-check"></span></td>
                             <td class="feeder-print-qty">${item.quantity}&times;</td>
-                            <td>${escapeHtml(item.size)}</td>
+                            <td>${escapeHtml(item.size)}${item.kind === "live" ? " (live)" : ""}</td>
                             <td>${escapeHtml(item.when)}</td>
                             ${hasPrices ? `<td class="feeder-print-cost">${item.cost > 0 ? formatMoney(item.cost) : ""}</td>` : ""}
                         </tr>
@@ -736,9 +768,7 @@
             </table>
 
             <p class="feeder-print-note">
-                ${isLive
-                    ? "Buy fresh; live feeders are not stocked."
-                    : "Quantities cover the forecast window and your keep-at-least buffer."}
+                ${listNote}
                 ${priceNote}
             </p>
 
@@ -781,19 +811,22 @@
             return "";
         }
 
+        const liveOnly = items.some(item => item.kind === "live")
+            && !items.some(item => item.kind === "frozen");
         const lines = [
-            `${forecast.mode === "live" ? "Live feeding list" : "Feeder shopping list"} — ${formatDate(forecast.today)}`
+            `${liveOnly ? "Live feeding list" : "Feeder shopping list"} — ${formatDate(forecast.today)}`
         ];
         let hasCost = false;
 
         items.forEach(item => {
             const costPart = item.cost > 0 ? ` — ${formatMoney(item.cost)}` : "";
+            const name = item.kind === "live" ? `${item.size} (live)` : item.size;
 
             if (item.cost > 0) {
                 hasCost = true;
             }
 
-            lines.push(`${item.quantity} × ${item.size} — ${item.when}${costPart}`);
+            lines.push(`${item.quantity} × ${name} — ${item.when}${costPart}`);
         });
 
         if (hasCost) {
@@ -950,8 +983,14 @@
 
         // Frozen quantities are the whole forecast window plus the buffer, so
         // say that plainly: 13 feeders for one week of meals would be wrong.
-        const coverage = forecast.mode === "frozen"
-            ? ` Amounts cover the full ${forecast.horizonDays}-day forecast, not just this week.`
+        // Live quantities are only the feeding days inside this week.
+        const hasFrozenLines = order.lines.some(line => line.kind === "frozen");
+        const hasLiveLines = order.lines.some(line => line.kind === "live");
+        const coverage = hasFrozenLines
+            ? ` Frozen amounts cover the full ${forecast.horizonDays}-day forecast, not just this week.`
+            : "";
+        const liveCoverage = hasLiveLines
+            ? " Live amounts are the feeders needed on the feeding days in this week."
             : "";
 
         const pickup = getWeeklyPickup(order);
@@ -963,12 +1002,12 @@
 
         note.textContent = `${order.sizes} feeder size${order.sizes === 1 ? "" : "s"} `
             + `(${order.totalQuantity} feeders) due by ${formatShortDate(order.endDate)}. `
-            + `One supplier run covers the whole week.${coverage}${pickupNote}`;
+            + `One supplier run covers the whole week.${coverage}${liveCoverage}${pickupNote}`;
 
         list.innerHTML = order.lines.map(line => `
             <li class="feeder-weekly-line">
                 <span class="feeder-weekly-qty">${line.quantity}</span>
-                <span class="feeder-weekly-size">${escapeHtml(line.size)}</span>
+                <span class="feeder-weekly-size">${escapeHtml(line.size)} ${kindTag(line.kind)}</span>
                 <span class="feeder-weekly-when">
                     ${line.status === "order"
                         ? "Order now"
@@ -1000,7 +1039,10 @@
         }
 
         container.innerHTML = "";
-        order.lines.forEach(line => addOrderLine({ size: line.size, quantity: line.quantity }));
+        order.lines.forEach(line => addOrderLine({
+            size: orderLineSize(line.size, line.kind),
+            quantity: line.quantity
+        }));
         linesInitialized = true;
 
         $("feederOrderDate").value = Feeders.todayText();
@@ -1055,6 +1097,12 @@
             .join("");
     }
 
+    // A live line is written with its marker so the order itself records that
+    // no freezer stock came out of it, even when frozen is the default.
+    function orderLineSize(size, kind) {
+        return kind === "live" ? `${size} (live)` : size;
+    }
+
     function addOrderLine(defaults = {}) {
         const container = $("feederOrderLines");
 
@@ -1095,16 +1143,21 @@
 
         container.innerHTML = "";
         addOrderLine({
-            size: suggested ? suggested.size : "",
+            size: suggested ? orderLineSize(suggested.size, suggested.kind) : "",
             quantity: suggested && suggested.suggestedOrder > 0 ? suggested.suggestedOrder : ""
         });
         linesInitialized = true;
     }
 
     function renderOrderForm() {
-        $("feederOrderModeNote").textContent = forecast.mode === "live"
-            ? "Live feeders are bought for a feeding, so this order is recorded in Finances but does not add to freezer stock."
-            : "Saving this order adds the quantities to freezer stock and records the cost in Finances.";
+        const hasLive = forecast.sizes.some(size => size.kind === "live");
+        const hasFrozen = forecast.sizes.some(size => size.kind === "frozen");
+
+        $("feederOrderModeNote").textContent = hasLive && hasFrozen
+            ? "Frozen lines add to freezer stock and record the cost in Finances; lines marked live are recorded in Finances only."
+            : (hasFrozen
+                ? "Saving this order adds the quantities to freezer stock and records the cost in Finances."
+                : "Live feeders are bought for a feeding, so this order is recorded in Finances but does not add to freezer stock.");
 
         if (!linesInitialized) {
             resetOrderLines();
@@ -1148,19 +1201,42 @@
             .map(line => `${line.quantity} × ${line.size}`)
             .join(", ");
 
+        // Each line says how it is fed: a marked F/T or live size decides for
+        // itself. An unmarked size follows the forecast line for that size, and
+        // only then the collection's default.
+        const stockLines = [];
+        const liveLines = [];
+
+        lines.forEach(line => {
+            const parsed = Feeders.parseFeederSize(line.size);
+            const base = parsed.base.toLowerCase();
+            const frozenLine = forecast.sizes.some(size =>
+                size.kind === "frozen" && size.size.toLowerCase() === base
+            );
+            const kind = parsed.kind
+                || (frozenLine || forecast.mode === "frozen" ? "frozen" : "live");
+
+            if (kind === "frozen") {
+                Feeders.addStock(line.size, line.quantity);
+                stockLines.push(line);
+            } else {
+                liveLines.push(line);
+            }
+        });
+
+        const orderKind = stockLines.length === 0
+            ? "live"
+            : (liveLines.length === 0 ? "frozen" : forecast.mode);
+
         F.addExpense({
             date: $("feederOrderDate").value || Feeders.todayText(),
             category: "Feeders",
             vendor: $("feederOrderVendor").value,
             amount,
             note: [lineNote, note].filter(Boolean).join(" · "),
-            feederType: forecast.mode,
+            feederType: orderKind,
             feederLines: lines
         });
-
-        if (forecast.mode === "frozen") {
-            lines.forEach(line => Feeders.addStock(line.size, line.quantity));
-        }
 
         load();
         renderSizeOptions();
@@ -1171,12 +1247,15 @@
         $("feederOrderNote").value = "";
         resetOrderLines();
 
-        const stockNote = forecast.mode === "frozen"
-            ? ` Added ${lines.map(line => `${line.quantity} ${line.size}`).join(", ")} to freezer stock.`
-            : " Live feeders are not added to freezer stock.";
+        const stockNote = stockLines.length > 0
+            ? ` Added ${stockLines.map(line => `${line.quantity} ${line.size}`).join(", ")} to freezer stock.`
+            : "";
+        const liveNote = liveLines.length > 0
+            ? ` Recorded ${liveLines.map(line => `${line.quantity} ${line.size}`).join(", ")} as live feeders, so no stock was added.`
+            : "";
 
-        setStatus("feederOrderStatus", `Order saved.${stockNote}`);
-        report(`Feeder order saved.${stockNote}`);
+        setStatus("feederOrderStatus", `Order saved.${stockNote}${liveNote}`);
+        report(`Feeder order saved.${stockNote}${liveNote}`);
     }
 
     function renderOrders() {
@@ -1242,8 +1321,8 @@
         load();
         renderAll();
         report(mode === "frozen"
-            ? "Frozen mode: orders add to freezer stock and meals count it down."
-            : "Live mode: no stock is counted; the forecast shows what to buy for each feeding day.");
+            ? "Frozen mode: orders add to freezer stock and meals count it down. Sizes marked live are still bought fresh."
+            : "Live mode: feeders are bought for each feeding day. Sizes marked F/T still draw from freezer stock.");
     }
 
     function bindEvents() {

@@ -72,6 +72,57 @@
         return Number.isFinite(number) ? number : 0;
     }
 
+    // ---- Feeder kind -------------------------------------------------------
+    //
+    // A feeder size can carry a marker so one collection can feed both ways:
+    //   "Small Rat F/T"      — out of the freezer, even when live is the default
+    //   "Small Rat (live)"   — bought fresh, even when frozen is the default
+    // The marker is not part of the item's name. Stock and the forecast key off
+    // the base size, so "Small Rat F/T" draws down the "Small Rat" freezer
+    // count and a live "Small Rat" meal never does.
+    const FROZEN_MARKER = /(?:\(|\[)?\s*\b(f\s*\/\s*t|ft|fzn|frozen(?:\s*\/\s*thawed)?|thawed|defrosted)\b\s*(?:\)|\])?/gi;
+    const LIVE_MARKER = /(?:\(|\[)?\s*\blive\b\s*(?:\)|\])?/gi;
+
+    function parseFeederSize(value) {
+        const raw = text(value);
+
+        if (!raw) {
+            return { raw: "", base: "", kind: "", frozen: false };
+        }
+
+        const withoutFrozen = raw.replace(FROZEN_MARKER, " ");
+        const withoutLive = withoutFrozen.replace(LIVE_MARKER, " ");
+        const hasFrozen = withoutFrozen !== raw;
+        const hasLive = withoutLive !== withoutFrozen;
+        const base = withoutLive.replace(/\s+/g, " ").trim();
+
+        return {
+            raw,
+            base: base || raw,
+            kind: hasFrozen ? "frozen" : (hasLive ? "live" : ""),
+            frozen: hasFrozen
+        };
+    }
+
+    // Replace a snake's feeder size while keeping the way it is fed. "Use
+    // Suggested" should not quietly turn a freezer-fed snake into a live one.
+    function withFeederMarker(reference, size) {
+        const next = text(size);
+        const current = parseFeederSize(reference);
+
+        if (!next || !current.kind || parseFeederSize(next).kind) {
+            return next;
+        }
+
+        return current.kind === "frozen" ? `${next} (F/T)` : `${next} (live)`;
+    }
+
+    // How one meal is fed: the marker on the size wins, otherwise the
+    // collection's default mode decides.
+    function getFeederKind(value) {
+        return parseFeederSize(value).kind || getMode();
+    }
+
     function parseDate(value) {
         const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text(value));
 
@@ -219,7 +270,9 @@
         const bySize = new Map();
 
         rows.forEach(row => {
-            const size = text(row.size);
+            // "Small Rat F/T" and "Small Rat" are the same thing in the freezer,
+            // so one stock row is kept for both.
+            const size = parseFeederSize(row.size).base;
 
             if (!size) {
                 return;
@@ -257,17 +310,19 @@
     }
 
     function findInventoryRow(inventory, size) {
-        const clean = text(size).toLowerCase();
+        const clean = parseFeederSize(size).base.toLowerCase();
 
         if (!clean) {
             return null;
         }
 
-        return (inventory || []).find(row => row.size.toLowerCase() === clean) || null;
+        return (inventory || []).find(row =>
+            parseFeederSize(row.size).base.toLowerCase() === clean
+        ) || null;
     }
 
     function setStock(size, onHand, reorderAt) {
-        const clean = text(size);
+        const clean = parseFeederSize(size).base;
 
         if (!clean) {
             return getInventory();
@@ -293,7 +348,7 @@
     // Adds (or removes, with a negative quantity) stock without touching the
     // keep-at-least line. Used by the order form and by feeding records.
     function addStock(size, quantity) {
-        const clean = text(size);
+        const clean = parseFeederSize(size).base;
         const amount = Math.round(toNumber(quantity));
 
         if (!clean || amount === 0) {
@@ -316,20 +371,41 @@
         return saveInventory(inventory);
     }
 
+    // Whether one meal should come out of the freezer. An explicit flag on the
+    // item wins, then the feeder marker, then the collection's default mode.
+    function usesFreezerStock(source) {
+        if (source && typeof source === "object" && typeof source.frozen === "boolean") {
+            return source.frozen;
+        }
+
+        const size = source && typeof source === "object" ? source.size : source;
+        const kind = parseFeederSize(size).kind;
+
+        if (kind === "frozen") {
+            return true;
+        }
+
+        if (kind === "live") {
+            return false;
+        }
+
+        return isFrozen();
+    }
+
     // A meal came out of the freezer. Returns one boolean per item so callers
     // can remember which feeding records actually changed stock.
     function consumeFeeders(items) {
         const list = Array.isArray(items) ? items : [items];
-
-        if (!isFrozen()) {
-            return list.map(() => false);
-        }
-
         const inventory = getInventory();
         const results = list.map(item => {
             const source = item && typeof item === "object" ? item : { size: item };
             const size = text(source.size);
             const quantity = Math.max(1, Math.round(toNumber(source.quantity) || 1));
+
+            if (!size || !usesFreezerStock(source)) {
+                return false;
+            }
+
             const row = findInventoryRow(inventory, size);
 
             if (!row) {
@@ -354,7 +430,7 @@
 
     // Undo a consumption (deleting a feeding record that had taken stock).
     function restoreFeeder(size, quantity = 1) {
-        if (!isFrozen()) {
+        if (!usesFreezerStock({ size })) {
             return false;
         }
 
@@ -388,7 +464,10 @@
 
         (includeDefaults ? DEFAULT_FEEDER_SIZES : []).forEach(add);
         normalizeInventory(inventory).forEach(row => add(row.size));
-        (Array.isArray(snakes) ? snakes : []).forEach(snake => add(snake && snake.feederSize));
+        // The marker is how the snake is fed, not a separate size to order.
+        (Array.isArray(snakes) ? snakes : []).forEach(snake =>
+            add(parseFeederSize(snake && snake.feederSize).base)
+        );
 
         return [...sizes.values()].sort((a, b) => a.localeCompare(b));
     }
@@ -470,9 +549,9 @@
                 return;
             }
 
-            const size = text(snake.feederSize);
+            const feeder = parseFeederSize(snake.feederSize);
 
-            if (!size) {
+            if (!feeder.base) {
                 skipped.noFeederSize.push(label);
                 return;
             }
@@ -484,8 +563,13 @@
                 return;
             }
 
+            // A snoozed feeding starts the schedule from the day it was
+            // skipped, so the plan buys for the next slot instead of a meal the
+            // keeper has already decided not to offer.
+            const snoozedOn = parseDate(text(snake.feedingSnoozedOn).slice(0, 10));
+            const anchor = snoozedOn && snoozedOn > lastFed ? snoozedOn : lastFed;
             const interval = getFeedingInterval(snake);
-            let due = addDays(lastFed, interval);
+            let due = addDays(anchor, interval);
 
             // An overdue snake is counted from today: that is the next meal it
             // could actually eat, not a stack of meals in the past.
@@ -496,7 +580,9 @@
             while (due <= endDate) {
                 events.push({
                     date: dateText(due),
-                    size,
+                    size: feeder.base,
+                    kind: feeder.kind || settings.mode,
+                    feederSize: feeder.raw,
                     snakeId: text(snake.id),
                     snakeName: label,
                     snakeIdentity: getSnakeIdentity(snake)
@@ -508,6 +594,7 @@
         events.sort((a, b) =>
             a.date.localeCompare(b.date)
             || a.size.localeCompare(b.size)
+            || a.kind.localeCompare(b.kind)
             || a.snakeName.localeCompare(b.snakeName)
         );
 
@@ -610,6 +697,7 @@
 
         return {
             size: entry.size,
+            kind: entry.kind || mode,
             onHand,
             keepAtLeast,
             events: entry.events,
@@ -638,35 +726,56 @@
         const mode = settings.mode;
         const sizeIndex = new Map();
 
-        inventory.forEach(row => {
-            sizeIndex.set(row.size.toLowerCase(), {
-                size: row.size,
-                onHand: row.onHand,
-                reorderAt: row.reorderAt,
-                events: []
-            });
-        });
+        // Live and frozen meals of the same size are two different jobs: one is
+        // bought for a feeding day, the other counts down the freezer. They get
+        // their own forecast line so neither hides behind the other.
+        function lineKey(size, kind) {
+            return `${kind}|${text(size).toLowerCase()}`;
+        }
+
+        function createLine(size, kind, onHand, reorderAt) {
+            const line = { size, kind, onHand, reorderAt, events: [] };
+
+            sizeIndex.set(lineKey(size, kind), line);
+
+            return line;
+        }
 
         plan.events.forEach(event => {
-            const key = event.size.toLowerCase();
-            let entry = sizeIndex.get(key);
+            const kind = event.kind === "live" ? "live" : "frozen";
+            let entry = sizeIndex.get(lineKey(event.size, kind));
 
             if (!entry) {
-                entry = {
-                    size: event.size,
-                    onHand: mode === "frozen" ? 0 : null,
-                    reorderAt: 0,
-                    events: []
-                };
-                sizeIndex.set(key, entry);
+                const stockRow = findInventoryRow(inventory, event.size);
+
+                // An unstocked freezer-fed size is a size to order, not a size
+                // with an unknown count.
+                entry = kind === "frozen"
+                    ? createLine(event.size, kind, 0, 0)
+                    : createLine(event.size, kind, stockRow ? stockRow.onHand : null, 0);
             }
 
             entry.events.push(event);
         });
 
+        // Stock belongs to the frozen line for that size. A row nothing eats in
+        // this window only gets a line of its own in frozen mode, where the
+        // freezer count is the whole point of the forecast.
+        inventory.forEach(row => {
+            const entry = sizeIndex.get(lineKey(row.size, "frozen"));
+
+            if (entry) {
+                entry.onHand = row.onHand;
+                entry.reorderAt = row.reorderAt;
+            } else if (mode === "frozen") {
+                createLine(row.size, "frozen", row.onHand, row.reorderAt);
+            }
+        });
+
         const sizes = [...sizeIndex.values()]
-            .map(entry => summarizeSize(entry, mode, plan.today, settings.horizonDays, settings.leadDays))
-            .sort((a, b) => a.size.localeCompare(b.size));
+            .map(entry => summarizeSize(entry, entry.kind, plan.today, settings.horizonDays, settings.leadDays))
+            .sort((a, b) => a.size.localeCompare(b.size)
+                || (a.kind === b.kind ? 0 : a.kind === "live" ? -1 : 1));
 
         const orderSizes = sizes.filter(size => size.status === "order");
         const watchSizes = sizes.filter(size => size.status === "watch");
@@ -688,7 +797,9 @@
                 sizes: sizes.length,
                 toOrder: orderSizes.length,
                 watch: watchSizes.length,
-                onHand: mode === "frozen" ? getTotalOnHand(inventory) : null
+                onHand: getTotalOnHand(inventory),
+                frozenFeedings: plan.events.filter(event => event.kind !== "live").length,
+                liveFeedings: plan.events.filter(event => event.kind === "live").length
             }
         };
     }
@@ -713,16 +824,16 @@
         // meal inside the week, not just the next day's suggested number.
         const liveQuantities = new Map();
 
-        if (forecast.mode === "live") {
-            (forecast.events || []).forEach(event => {
-                if (event.date <= endDate) {
-                    liveQuantities.set(event.size, (liveQuantities.get(event.size) || 0) + 1);
-                }
-            });
-        }
+        (forecast.events || []).forEach(event => {
+            if (event.kind === "live" && event.date <= endDate) {
+                const key = text(event.size).toLowerCase();
 
-        const quantityFor = size => (forecast.mode === "live"
-            ? liveQuantities.get(size.size) || 0
+                liveQuantities.set(key, (liveQuantities.get(key) || 0) + 1);
+            }
+        });
+
+        const quantityFor = size => (size.kind === "live"
+            ? liveQuantities.get(text(size.size).toLowerCase()) || 0
             : size.suggestedOrder);
 
         const lines = forecast.sizes
@@ -734,7 +845,7 @@
 
                 // Live feeders are bought for a feeding day, not stocked, so
                 // the feeding date is the only deadline that matters.
-                if (forecast.mode === "live") {
+                if (size.kind === "live") {
                     return Boolean(size.nextDate && size.nextDate <= endDate);
                 }
 
@@ -748,18 +859,19 @@
             .map(size => {
                 // When stock runs out is the only hard date: a pickup can happen
                 // on any day before it, which is what two busy schedules need.
-                const collectBy = forecast.mode === "live"
+                const collectBy = size.kind === "live"
                     ? (size.nextDate || "")
                     : (size.runsOutDate || "");
 
                 return {
                     size: size.size,
+                    kind: size.kind,
                     quantity: quantityFor(size),
                     status: size.status,
                     nextDate: size.nextDate,
                     collectBy,
                     collectSlackDays: collectBy ? daysBetween(today, collectBy) : null,
-                    neededBy: forecast.mode === "live"
+                    neededBy: size.kind === "live"
                         ? (size.nextDate || today)
                         : (size.orderByDate || size.nextDate || today)
                 };
@@ -797,7 +909,9 @@
         // it: a pickup can slide up to this date without a schedule change.
         // Once stock is already gone there is no window to offer, only urgency.
         const collectByText = String(opts.collectByText || "").trim();
-        const lines = order.lines.map(line => `${line.quantity} x ${line.size}`);
+        const lines = order.lines.map(line =>
+            `${line.quantity} x ${line.kind === "live" ? `${line.size} (live)` : line.size}`
+        );
         const total = `Total: ${order.totalQuantity} feeder${order.totalQuantity === 1 ? "" : "s"}`
             + (costText ? ` (about ${costText})` : "");
         const pickup = collectByText
@@ -819,6 +933,10 @@
         MIN_LEAD_DAYS,
         DEFAULT_FEEDER_SIZES,
         MODES,
+        parseFeederSize,
+        withFeederMarker,
+        getFeederKind,
+        usesFreezerStock,
         getSettings,
         saveSettings,
         getMode,

@@ -426,3 +426,16 @@ test("a hold without a pickup date, or a sold snake, adds no pickup tasks", () =
 
     assert.equal(tasks.filter(task => task.type === "pickup").length, 0);
 });
+
+test("a snoozed feeding is not chased today, and the next meal follows its slot", () => {
+    const tasks = calendar.collectTasks({
+        snakes: [snake({ lastFed: "2026-10-10", feedingSnoozedOn: TODAY })],
+        today: TODAY,
+        startDate: "2026-10-01",
+        endDate: "2026-11-30"
+    });
+    const feedings = tasks.filter(task => task.type === "feeding");
+
+    assert.equal(feedings.some(task => task.overdue), false);
+    assert.equal(feedings[0].date, "2026-11-04");
+});

@@ -489,3 +489,103 @@ test("an order that has already run out asks for the feeders now, not a date", (
         "Feeder order\n3 x Small Rat\nTotal: 3 feeders\nNeed these as soon as possible."
     );
 });
+
+test("a feeder marked F/T draws from the freezer even when the collection feeds live", () => {
+    store.clear();
+    feeders.saveSettings({ mode: "live" });
+    feeders.setStock("Small Rat", 5, 0);
+
+    // The marker decides how that one snake is fed; the live default does not
+    // count the rest of the collection down.
+    assert.equal(feeders.consumeFeeder("Small Rat F/T"), true);
+    assert.equal(feeders.getInventory()[0].onHand, 4);
+    assert.equal(feeders.consumeFeeder("Small Rat"), false);
+    assert.equal(feeders.getInventory()[0].onHand, 4);
+
+    // Deleting the record puts the frozen feeder back.
+    assert.equal(feeders.restoreFeeder("Small Rat F/T", 1), true);
+    assert.equal(feeders.getInventory()[0].onHand, 5);
+});
+
+test("the F/T marker is a way of feeding, not part of the feeder's name", () => {
+    assert.deepEqual(
+        (({ base, kind }) => ({ base, kind }))(feeders.parseFeederSize("Small Rat F/T")),
+        { base: "Small Rat", kind: "frozen" }
+    );
+    assert.deepEqual(
+        (({ base, kind }) => ({ base, kind }))(feeders.parseFeederSize("Weaned Rat (f/t)")),
+        { base: "Weaned Rat", kind: "frozen" }
+    );
+    assert.deepEqual(
+        (({ base, kind }) => ({ base, kind }))(feeders.parseFeederSize("Small Rat (live)")),
+        { base: "Small Rat", kind: "live" }
+    );
+    assert.equal(feeders.parseFeederSize("F/T").base, "F/T");
+    assert.equal(feeders.withFeederMarker("Small Rat F/T", "Medium Rat"), "Medium Rat (F/T)");
+    assert.equal(feeders.withFeederMarker("Small Rat", "Medium Rat"), "Medium Rat");
+});
+
+test("mixed live and frozen eaters of one size are forecast as two jobs", () => {
+    const result = forecastFor(
+        [
+            snake({ id: "frozen", name: "Frozen eater", feederSize: "Small Rat F/T" }),
+            snake({ id: "live", name: "Live eater", feederSize: "Small Rat" })
+        ],
+        [{ size: "Small Rat", onHand: 3, reorderAt: 0 }],
+        inventory({ mode: "live" })
+    );
+    const frozenLine = result.sizes.find(size => size.kind === "frozen");
+    const liveLine = result.sizes.find(size => size.kind === "live");
+
+    assert.ok(frozenLine);
+    assert.ok(liveLine);
+    assert.equal(frozenLine.need, 5);
+    assert.equal(frozenLine.onHand, 3);
+    assert.equal(frozenLine.status, "watch");
+    // Five meals, no buffer, three already frozen.
+    assert.equal(frozenLine.suggestedOrder, 2);
+    assert.deepEqual(Array.from(frozenLine.events, event => event.snakeName), [
+        "Frozen eater", "Frozen eater", "Frozen eater", "Frozen eater", "Frozen eater"
+    ]);
+
+    // The live meals never touch the freezer count: its suggested order is the
+    // one snake it needs to buy for, not the freezer re-order.
+    assert.equal(liveLine.need, 5);
+    assert.equal(liveLine.suggestedOrder, 1);
+    assert.deepEqual(Array.from(liveLine.events, event => event.snakeName), [
+        "Live eater", "Live eater", "Live eater", "Live eater", "Live eater"
+    ]);
+    assert.equal(result.totals.frozenFeedings, 5);
+    assert.equal(result.totals.liveFeedings, 5);
+});
+
+test("a live buy and a freezer re-order can share one weekly order", () => {
+    const result = forecastFor(
+        [
+            snake({ id: "frozen", name: "Frozen eater", feederSize: "Small Rat F/T", lastFed: "2026-10-22" }),
+            snake({ id: "live", name: "Live eater", feederSize: "Small Rat", lastFed: "2026-10-26" })
+        ],
+        [{ size: "Small Rat", onHand: 1, reorderAt: 0 }],
+        inventory({ mode: "live" })
+    );
+    const weekly = feeders.buildWeeklyOrder({ forecast: result, days: 7 });
+    const kinds = Array.from(weekly.lines, line => [line.kind, line.size]).sort();
+
+    assert.deepEqual(kinds, [["frozen", "Small Rat"], ["live", "Small Rat"]]);
+    assert.equal(feeders.formatWeeklyOrderText(weekly).includes("Small Rat (live)"), true);
+});
+
+test("a snoozed feeding is planned from its next slot, not from today", () => {
+    const result = forecastFor(
+        [
+            snake({ id: "snake-1", name: "Snoozed", lastFed: "2026-10-20", feedingSnoozedOn: TODAY })
+        ],
+        [],
+        inventory({ mode: "live" })
+    );
+    const row = sizeRow(result, "Small Rat");
+
+    // Weekly snake snoozed on 27 Oct: the next meal is 3 Nov, not today.
+    assert.equal(row.events[0].date, "2026-11-03");
+    assert.equal(row.nextDate, "2026-11-03");
+});

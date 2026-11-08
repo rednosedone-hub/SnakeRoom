@@ -127,6 +127,21 @@
         return Number.isNaN(interval) || interval <= 0 ? 7 : interval;
     }
 
+    // A snoozed feeding counts from the day it was skipped, the same rule the
+    // feeding list and the feeder forecast use. Without it the calendar would
+    // still show a meal the keeper has decided not to offer.
+    function feedingAnchorDate(snake) {
+        const lastFed = text(snake && snake.lastFed).slice(0, 10);
+        const snoozedOn = text(snake && snake.feedingSnoozedOn).slice(0, 10);
+        const isDate = value => Boolean(parseDate(value));
+
+        if (isDate(snoozedOn) && (!isDate(lastFed) || snoozedOn > lastFed)) {
+            return { date: snoozedOn, snoozed: true };
+        }
+
+        return { date: isDate(lastFed) ? lastFed : "", snoozed: false };
+    }
+
     function snakeLabel(snake) {
         return text(snake && snake.name) || text(snake && snake.ID) || "Unnamed snake";
     }
@@ -153,14 +168,16 @@
                 return;
             }
 
-            if (!parseDate(snake.lastFed)) {
+            const anchor = feedingAnchorDate(snake);
+
+            if (!anchor.date) {
                 return;
             }
 
             const interval = feedingInterval(snake);
             const label = snakeLabel(snake);
             const size = text(snake.feederSize);
-            const baseDue = addDays(snake.lastFed, interval);
+            const baseDue = addDays(anchor.date, interval);
             let due = baseDue;
             let occurrences = 0;
 

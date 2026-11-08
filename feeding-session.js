@@ -127,6 +127,21 @@ function toggleSnakeSelection(index, isSelected) {
     updateBulkActionBar();
 }
 
+// A frozen feeder is drawn from the freezer even when the collection mostly
+// eats live, so the row says so before anything is marked fed.
+function describeFeederForRow(snake) {
+    const raw = snake.feederSize || "No feeder size";
+    const parsed = window.SnakeFeeders ? window.SnakeFeeders.parseFeederSize(raw) : null;
+
+    if (!parsed || !parsed.kind) {
+        return raw;
+    }
+
+    const tag = parsed.kind === "frozen" ? "F/T · freezer" : "live";
+
+    return `${parsed.base} <span class="feeder-type-tag is-${parsed.kind}">${tag}</span>`;
+}
+
 function renderFeedingTable(dueItems) {
     const snakeTableWrapper = document.getElementById("snakeTableWrapper");
 
@@ -152,7 +167,7 @@ function renderFeedingTable(dueItems) {
     const rows = dueItems.map(item => {
         const snake = item.snake;
         const index = item.originalIndex;
-        const feederSize = snake.feederSize || "No feeder size";
+        const feederCell = describeFeederForRow(snake);
         const morphLabel = window.SnakeData.getSnakeIdentityText(snake);
         const lastFedText = snake.lastFed ? snake.lastFed : "No feeding record";
         const pendingResult = pendingFeedingResults.get(index) || "";
@@ -175,7 +190,7 @@ function renderFeedingTable(dueItems) {
                 </td>
                 <td data-label="Name">${window.SnakeData.getSnakeLinkHtml(snake)}</td>
                 <td data-label="ID">${morphLabel}</td>
-                <td data-label="Feeder">${feederSize}</td>
+                <td data-label="Feeder">${feederCell}</td>
                 <td data-label="Last Fed">${lastFedText}${refusalNote}</td>
                 <td data-label="Result" class="feeding-result-cell">
                     <select aria-label="Feeding result for ${snake.name || "snake"}" onchange="updateFeedingResult(${index}, this.value)">
@@ -193,6 +208,14 @@ function renderFeedingTable(dueItems) {
                         `).join("")}
                     </select>
                 </td>
+                <td class="feeding-snooze-cell">
+                    <button
+                        type="button"
+                        class="gene-action-button feeding-snooze-button"
+                        title="Skip this feeding and move ${snake.name || "this snake"} to the next scheduled one"
+                        onclick="snoozeSnake(${index})"
+                    >Snooze</button>
+                </td>
             </tr>
         `;
     }).join("");
@@ -208,6 +231,7 @@ function renderFeedingTable(dueItems) {
                     <th>Last Fed</th>
                     <th>Result</th>
                     <th>Reason</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
@@ -250,6 +274,10 @@ function markSelectedFed() {
             if (result !== "Refused") {
                 snakes[index].lastFed = fedDate;
             }
+
+            // Logging the result settles any snooze: the schedule starts again
+            // from what actually happened.
+            window.clearFeedingSnooze(snakes[index]);
 
             if (!Array.isArray(snakes[index].feedingHistory)) {
                 snakes[index].feedingHistory = [];
@@ -347,7 +375,10 @@ function updateSelectedFeederSizes() {
         const suggestedFeederSize = getSuggestedFeederSize(snake.weight, snake.sex);
 
         if (suggestedFeederSize) {
-            snake.feederSize = suggestedFeederSize;
+            // Keep the F/T marker: changing the size must not change how it is fed.
+            snake.feederSize = window.SnakeFeeders
+                ? window.SnakeFeeders.withFeederMarker(snake.feederSize, suggestedFeederSize)
+                : suggestedFeederSize;
             updatedCount += 1;
         }
     });
@@ -431,6 +462,7 @@ function logFedFromHold(index) {
     const fedDate = getTodayText();
 
     delete snake.feedingHold;
+    window.clearFeedingSnooze(snake);
     snake.lastFed = fedDate;
 
     if (!Array.isArray(snake.feedingHistory)) {
@@ -453,9 +485,165 @@ function logFedFromHold(index) {
     showFeedingReport(`${snake.name || "That snake"} logged as fed on ${fedDate} and taken off the feeding hold.`);
 }
 
+// ---- Snoozed feedings ------------------------------------------------------
+//
+// A snake that is not eating today is not always a snake to chase. Snoozing
+// moves it to the next scheduled feeding without logging a meal, and the list
+// below is the way back: feed it after all, or un-snooze it.
+
+function describeSnoozeStatus(status) {
+    if (status.daysUntil === null) {
+        return "No feeding date to schedule from";
+    }
+
+    if (status.daysUntil < 0) {
+        const late = Math.abs(status.daysUntil);
+
+        return `Overdue again by ${late} day${late === 1 ? "" : "s"}`;
+    }
+
+    if (status.daysUntil === 0) {
+        return "Due again today";
+    }
+
+    return `Next due ${window.formatFeedDayText(status.daysUntil)} (in ${status.daysUntil} day${status.daysUntil === 1 ? "" : "s"})`;
+}
+
+function renderFeedingSnoozes() {
+    const section = document.getElementById("feedingSnoozeSection");
+    const list = document.getElementById("feedingSnoozeList");
+
+    if (!section || !list) {
+        return;
+    }
+
+    const snoozed = snakes
+        .map((snake, index) => ({ snake, index }))
+        .filter(item => window.isFeedSnoozed(item.snake)
+            && !window.SnakeData.isInactiveSnake(item.snake));
+
+    if (snoozed.length === 0) {
+        section.style.display = "none";
+        list.innerHTML = "";
+        return;
+    }
+
+    section.style.display = "";
+    list.innerHTML = snoozed.map(({ snake, index }) => {
+        const status = window.getFeedingStatus(snake);
+        const lastFedText = snake.lastFed ? `last fed ${snake.lastFed}` : "no meal recorded";
+
+        return `
+            <div class="feeding-hold-item">
+                <div>
+                    <strong>${window.SnakeData.getSnakeLinkHtml(snake)}</strong>
+                    <span class="feeding-hold-detail">
+                        ${window.SnakeData.getSnakeIdentityText(snake)} ·
+                        snoozed on ${window.getFeedSnoozeDate(snake)} · ${lastFedText}
+                    </span>
+                    <span class="feeding-snooze-status">${describeSnoozeStatus(status)}</span>
+                </div>
+                <div class="feeding-hold-actions">
+                    <button type="button" class="gene-action-button" onclick="logFedFromSnooze(${index})">
+                        Fed Now
+                    </button>
+                    <button type="button" class="gene-action-button" onclick="unsnoozeSnake(${index})">
+                        Un-snooze
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
+function snoozeSnake(index) {
+    const snake = snakes[index];
+
+    if (!snake || !window.snoozeFeeding) {
+        return;
+    }
+
+    const snoozed = window.snoozeFeeding(snake);
+
+    window.SnakeData.saveStorageArray("snakes", snakes);
+    refreshFeedingViews();
+    showFeedingReport(
+        `${snake.name || "That snake"} snoozed to ${window.formatFeedDayText(snoozed.daysUntil)}`
+        + ` (${snoozed.daysUntil} day${snoozed.daysUntil === 1 ? "" : "s"}) without logging a meal.`
+    );
+}
+
+function snoozeSelectedSnakes() {
+    if (selectedSnakeIndexes.size === 0) {
+        alert("Select at least one snake first.");
+        return;
+    }
+
+    let snoozedCount = 0;
+
+    selectedSnakeIndexes.forEach(index => {
+        if (snakes[index] && window.snoozeFeeding(snakes[index])) {
+            snoozedCount += 1;
+        }
+    });
+
+    window.SnakeData.saveStorageArray("snakes", snakes);
+    selectedSnakeIndexes.clear();
+    refreshFeedingViews();
+    showFeedingReport(
+        `Snoozed ${snoozedCount} snake${snoozedCount === 1 ? "" : "s"} to the next scheduled feeding.`
+        + " No meals were logged."
+    );
+}
+
+function unsnoozeSnake(index) {
+    const snake = snakes[index];
+
+    if (!snake || !window.clearFeedingSnooze(snake)) {
+        return;
+    }
+
+    window.SnakeData.saveStorageArray("snakes", snakes);
+    refreshFeedingViews();
+    showFeedingReport(`${snake.name || "That snake"} is back on the normal feeding schedule.`);
+}
+
+function logFedFromSnooze(index) {
+    const snake = snakes[index];
+
+    if (!snake) {
+        return;
+    }
+
+    const fedDate = getTodayText();
+
+    window.clearFeedingSnooze(snake);
+    snake.lastFed = fedDate;
+
+    if (!Array.isArray(snake.feedingHistory)) {
+        snake.feedingHistory = [];
+    }
+
+    const entry = {
+        date: fedDate,
+        feederSize: snake.feederSize || "",
+        result: "Accepted"
+    };
+
+    if (entry.feederSize && window.SnakeFeeders && window.SnakeFeeders.consumeFeeder(entry.feederSize)) {
+        entry.stockCounted = true;
+    }
+
+    snake.feedingHistory.push(entry);
+    window.SnakeData.saveStorageArray("snakes", snakes);
+    refreshFeedingViews();
+    showFeedingReport(`${snake.name || "That snake"} logged as fed on ${fedDate}.`);
+}
+
 function refreshFeedingViews() {
     renderFeedingTable(getSnakesDueToFeed(snakes));
     renderFeedingHolds();
+    renderFeedingSnoozes();
 }
 
 window.toggleSnakeSelection = toggleSnakeSelection;
@@ -466,6 +654,11 @@ window.updateSelectedFeederSizes = updateSelectedFeederSizes;
 window.clearSelectedSnakes = clearSelectedSnakes;
 window.endFeedingHold = endFeedingHold;
 window.logFedFromHold = logFedFromHold;
+window.snoozeSnake = snoozeSnake;
+window.snoozeSelectedSnakes = snoozeSelectedSnakes;
+window.unsnoozeSnake = unsnoozeSnake;
+window.logFedFromSnooze = logFedFromSnooze;
 
 renderFeedingTable(getSnakesDueToFeed(snakes));
 renderFeedingHolds();
+renderFeedingSnoozes();

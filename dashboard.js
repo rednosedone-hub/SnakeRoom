@@ -119,6 +119,58 @@ function describeDaysAgo(days) {
     return `Last fed ${days} day${days === 1 ? "" : "s"} ago`;
 }
 
+// The feeder cell names the item and how it is fed: a snake marked F/T eats
+// from the freezer, so an order for live feeders is not for it.
+function describeSnakeFeeder(snake) {
+    const raw = snake.feederSize || "No feeder size";
+    const parsed = window.SnakeFeeders ? window.SnakeFeeders.parseFeederSize(raw) : null;
+
+    if (!parsed || !parsed.kind) {
+        return escapeHtml(raw);
+    }
+
+    const label = parsed.kind === "frozen" ? "F/T" : "live";
+
+    return `${escapeHtml(parsed.base)} <span class="feeder-type-tag is-${parsed.kind}">${label}</span>`;
+}
+
+// Snoozing is offered on the overdue rows, where the decision is made: skip
+// this feeding and move the snake to its next scheduled slot.
+function bindFeedingDueActions() {
+    const list = document.getElementById("feedingDueList");
+
+    if (!list || list.dataset.snoozeBound === "true") {
+        return;
+    }
+
+    list.dataset.snoozeBound = "true";
+    list.addEventListener("click", event => {
+        const button = event.target.closest("[data-snooze-snake]");
+
+        if (!button || !window.snoozeFeeding) {
+            return;
+        }
+
+        const snakeId = button.getAttribute("data-snooze-snake");
+        const snakes = window.SnakeData.loadSnakesWithIds(window.SnakeData.defaultSnakes);
+        const snake = snakes.find(item => item.id === snakeId);
+
+        if (!snake) {
+            return;
+        }
+
+        const snoozed = window.snoozeFeeding(snake);
+
+        window.SnakeData.saveStorageArray("snakes", snakes);
+        renderDashboard();
+        setText(
+            "feedingDueStatus",
+            `${snake.name || "That snake"} snoozed to ${window.formatFeedDayText(snoozed.daysUntil)}.`
+            + " No meal was logged."
+        );
+    });
+}
+
 // One row per snake, with the reason it is on the list. A snake due in two days
 // is here so its feeders can be ordered, not so it can be fed early.
 function describeDueTag(status) {
@@ -377,11 +429,13 @@ function renderFeederWatch(snakes) {
         settings: window.SnakeFeeders.getSettings(),
         inventory: window.SnakeFeeders.getInventory()
     });
-    const isLive = forecast.mode === "live";
+    // Each size can need two different jobs: buy live feeders for a feeding
+    // day, and re-order the frozen ones before the freezer runs out.
     const attention = forecast.sizes.filter(size => size.suggestedOrder > 0
-        && (isLive ? size.status === "order" : size.status !== "ok"));
+        && size.status !== "ok");
     const urgent = attention.filter(size => size.status === "order");
     const watch = attention.filter(size => size.status === "watch");
+    const hasLive = forecast.sizes.some(size => size.kind === "live");
 
     countBadge.textContent = String(attention.length);
     countBadge.classList.toggle("visible", attention.length > 0);
@@ -389,26 +443,18 @@ function renderFeederWatch(snakes) {
         ? "1 feeder size needs attention"
         : `${attention.length} feeder sizes need attention`;
 
-    if (isLive) {
-        lead.textContent = attention.length > 0
-            ? `Live feeders: buy for the next feeding day (${attention.length} size${attention.length === 1 ? "" : "s"}).`
-            : (forecast.events.length > 0
-                ? `No live order needed yet. Next feeding ${formatFeederWatchDate(forecast, forecast.events[0].date)}.`
-                : "No live feedings scheduled. Give a snake a feeder size and a last-fed date to forecast one.");
-
-        if (attention.length === 0) {
-            list.innerHTML = `<p class="empty-message">Nothing needs buying for the next feeding day.</p>`;
-            return;
+    if (attention.length === 0) {
+        if (forecast.events.length === 0) {
+            lead.textContent = "No feedings scheduled. Give a snake a feeder size and a last-fed date to forecast one.";
+        } else if (hasLive) {
+            lead.textContent = `Nothing to buy for the next feeding day. Next feeding ${formatFeederWatchDate(forecast, forecast.events[0].date)}.`;
+        } else if (forecast.totals.onHand > 0) {
+            lead.textContent = `Freezer stock covers the next ${forecast.horizonDays} days of feedings.`;
+        } else {
+            lead.textContent = "No freezer stock recorded yet. Set what is on hand, or log a frozen order, on the Feeders page.";
         }
 
-        list.innerHTML = attention.map(size => `
-            <div class="dashboard-list-item feeder-watch-item is-urgent">
-                <strong>${escapeHtml(size.size)}</strong>
-                <span>${size.nextCount} needed</span>
-                <span>Buy fresh</span>
-                <span>For ${escapeHtml(formatFeederWatchDate(forecast, size.nextDate))} \u00b7 ${size.need} meal${size.need === 1 ? "" : "s"} in ${forecast.horizonDays} days</span>
-            </div>
-        `).join("");
+        list.innerHTML = `<p class="empty-message">Nothing needs ordering right now.</p>`;
         return;
     }
 
@@ -416,21 +462,25 @@ function renderFeederWatch(snakes) {
         lead.textContent = `Order ${urgent.length} size${urgent.length === 1 ? "" : "s"} now; ${watch.length} more will run low in the next ${forecast.horizonDays} days.`;
     } else if (urgent.length > 0) {
         lead.textContent = `Order ${urgent.length} size${urgent.length === 1 ? "" : "s"} now to keep the feeding schedule covered.`;
-    } else if (watch.length > 0) {
-        lead.textContent = `${watch.length} size${watch.length === 1 ? " is" : "s are"} running low in the next ${forecast.horizonDays} days.`;
-    } else if (forecast.totals.onHand > 0) {
-        lead.textContent = `Freezer stock covers the next ${forecast.horizonDays} days of feedings.`;
     } else {
-        lead.textContent = "No freezer stock recorded yet. Set what is on hand, or log a frozen order, on the Feeders page.";
-    }
-
-    if (attention.length === 0) {
-        list.innerHTML = `<p class="empty-message">Nothing needs ordering right now.</p>`;
-        return;
+        lead.textContent = `${watch.length} size${watch.length === 1 ? " is" : "s are"} running low in the next ${forecast.horizonDays} days.`;
     }
 
     list.innerHTML = attention.map(size => {
         const isUrgent = size.status === "order";
+        const kindTag = `<span class="feeder-type-tag is-${size.kind}">${size.kind === "live" ? "Live" : "Frozen"}</span>`;
+
+        if (size.kind === "live") {
+            return `
+                <div class="dashboard-list-item feeder-watch-item${isUrgent ? " is-urgent" : ""}">
+                    <strong>${escapeHtml(size.size)} ${kindTag}</strong>
+                    <span>${size.nextCount} needed</span>
+                    <span>Buy fresh</span>
+                    <span>For ${escapeHtml(formatFeederWatchDate(forecast, size.nextDate))} \u00b7 ${size.need} meal${size.need === 1 ? "" : "s"} in ${forecast.horizonDays} days</span>
+                </div>
+            `;
+        }
+
         const action = `<span class="feeder-watch-action"><button type="button" class="feeder-stock-in-button" data-stock-size="${escapeHtml(size.size)}" data-stock-quantity="${size.suggestedOrder}" title="Add ${size.suggestedOrder} ${escapeHtml(size.size)} to freezer stock">Stock in ${size.suggestedOrder}</button></span>`;
         const stockLine = `${size.onHand} on hand${size.keepAtLeast > 0 ? ` \u00b7 keep ${size.keepAtLeast}` : ""}`;
         const timingParts = [];
@@ -451,7 +501,7 @@ function renderFeederWatch(snakes) {
 
         return `
             <div class="dashboard-list-item feeder-watch-item${isUrgent ? " is-urgent" : ""}">
-                <strong>${escapeHtml(size.size)}</strong>
+                <strong>${escapeHtml(size.size)} ${kindTag}</strong>
                 <span>${escapeHtml(stockLine)}</span>
                 ${action}
                 <span>${escapeHtml(timingParts.join(" \u00b7 "))}</span>
@@ -534,6 +584,8 @@ function renderDashboard() {
 
     const list = document.getElementById("feedingDueList");
 
+    bindFeedingDueActions();
+
     if (dueStatuses.length === 0 && soonStatuses.length === 0) {
         const nextDueText = window.describeNextDue(activeSnakes);
 
@@ -550,16 +602,23 @@ function renderDashboard() {
 
     list.innerHTML = window.getSnakesDueOrComingUp(activeSnakes).map(status => {
         const snake = status.snake;
-        const feederSize = snake.feederSize || "No feeder size";
         const lastFed = status.daysSinceFed === null ? "No feeding record" : describeDaysAgo(status.daysSinceFed);
         const tagClass = status.state === "due" ? "is-due" : "is-soon";
+        const snoozeNote = status.snoozedOn && status.state !== "due"
+            ? ` <span class="feed-due-tag is-snoozed">Snoozed</span>`
+            : "";
+        const snoozeButton = status.state === "due" && window.snoozeFeeding
+            ? `<button type="button" class="feeding-snooze-button dashboard-snooze-button"`
+                + ` data-snooze-snake="${escapeHtml(snake.id || "")}"`
+                + ` title="Skip this feeding and move to the next scheduled one">Snooze</button>`
+            : "";
 
         return `
             <div class="dashboard-list-item${status.state === "soon" ? " is-upcoming" : ""}">
                 <strong>${window.SnakeData.getSnakeLinkHtml(snake)}</strong>
                 <span>${window.SnakeData.getSnakeIdentityText(snake)}</span>
-                <span>${feederSize}</span>
-                <span>${lastFed} <span class="feed-due-tag ${tagClass}">${escapeHtml(describeDueTag(status))}</span></span>
+                <span>${describeSnakeFeeder(snake)}</span>
+                <span>${lastFed} <span class="feed-due-tag ${tagClass}">${escapeHtml(describeDueTag(status))}</span>${snoozeNote}${snoozeButton}</span>
             </div>
         `;
     }).join("");

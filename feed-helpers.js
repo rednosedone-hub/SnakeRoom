@@ -55,19 +55,83 @@ function isOnFeedingHold(snake) {
 // starts showing a snake this many days ahead of its due date.
 const FEEDING_LEAD_DAYS = 3;
 
+// ---- Snoozing a feeding ----------------------------------------------------
+//
+// Snoozing is not a meal. The last-fed date stays honest (no food was taken),
+// and the schedule counts from the day it was snoozed instead, which moves the
+// snake straight to its next feeding slot. The marker clears itself once the
+// snake is fed or the schedule is reset, and it never hides a snake that has
+// gone overdue again.
+
+function normalizeDateText(value) {
+    const clean = String(value === undefined || value === null ? "" : value).trim().slice(0, 10);
+
+    return /^\d{4}-\d{2}-\d{2}$/.test(clean) ? clean : "";
+}
+
+function getFeedSnoozeDate(snake) {
+    return normalizeDateText(snake && snake.feedingSnoozedOn);
+}
+
+// The date the feeding interval counts from: the last meal, or a later snooze.
+function getFeedingAnchor(snake) {
+    const lastFed = normalizeDateText(snake && snake.lastFed);
+    const snoozedOn = getFeedSnoozeDate(snake);
+
+    if (snoozedOn && (!lastFed || snoozedOn >= lastFed)) {
+        return { date: snoozedOn, snoozed: true };
+    }
+
+    return { date: lastFed, snoozed: false };
+}
+
+function isFeedSnoozed(snake) {
+    return getFeedingAnchor(snake).snoozed;
+}
+
+// Moves the snake to its next scheduled feeding without logging a meal.
+function snoozeFeeding(snake, dateValue) {
+    if (!snake) {
+        return null;
+    }
+
+    const snoozedOn = normalizeDateText(dateValue) || getTodayText();
+
+    snake.feedingSnoozedOn = snoozedOn;
+
+    const status = getFeedingStatus(snake);
+
+    return {
+        snoozedOn,
+        dueDate: status.dueDate,
+        daysUntil: status.daysUntil,
+        interval: status.interval
+    };
+}
+
+function clearFeedingSnooze(snake) {
+    if (snake && snake.feedingSnoozedOn) {
+        delete snake.feedingSnoozedOn;
+
+        return true;
+    }
+
+    return false;
+}
+
 function isSnakeDueToFeed(snake) {
     if (window.SnakeData.isInactiveSnake(snake) || isOnFeedingHold(snake)) {
         return false;
     }
 
     const feedingIntervalDays = getFeedingInterval(snake);
-    const daysSinceFed = getDaysSince(snake.lastFed);
+    const daysSinceAnchor = getDaysSince(getFeedingAnchor(snake).date);
 
-    if (daysSinceFed === null) {
+    if (daysSinceAnchor === null) {
         return false;
     }
 
-    return daysSinceFed >= feedingIntervalDays;
+    return daysSinceAnchor >= feedingIntervalDays;
 }
 
 // Where a snake sits relative to its next meal:
@@ -79,7 +143,15 @@ function isSnakeDueToFeed(snake) {
 function getFeedingStatus(snake) {
     const interval = getFeedingInterval(snake);
     const daysSinceFed = getDaysSince(snake.lastFed);
-    const base = { snake, interval, daysSinceFed, daysUntil: null, dueDate: null };
+    const anchor = getFeedingAnchor(snake);
+    const base = {
+        snake,
+        interval,
+        daysSinceFed,
+        snoozedOn: anchor.snoozed ? anchor.date : "",
+        daysUntil: null,
+        dueDate: null
+    };
 
     // A retired record keeps its feeding history but never appears as due.
     if (window.SnakeData.isInactiveSnake(snake)) {
@@ -90,11 +162,13 @@ function getFeedingStatus(snake) {
         return { ...base, state: "hold" };
     }
 
-    if (daysSinceFed === null) {
+    const daysSinceAnchor = getDaysSince(anchor.date);
+
+    if (daysSinceAnchor === null) {
         return { ...base, state: "unscheduled" };
     }
 
-    const daysUntil = interval - daysSinceFed;
+    const daysUntil = interval - daysSinceAnchor;
 
     return {
         ...base,
@@ -198,6 +272,11 @@ window.FEEDING_LEAD_DAYS = FEEDING_LEAD_DAYS;
 window.getDaysSince = getDaysSince;
 window.getFeedingInterval = getFeedingInterval;
 window.isOnFeedingHold = isOnFeedingHold;
+window.getFeedSnoozeDate = getFeedSnoozeDate;
+window.getFeedingAnchor = getFeedingAnchor;
+window.isFeedSnoozed = isFeedSnoozed;
+window.snoozeFeeding = snoozeFeeding;
+window.clearFeedingSnooze = clearFeedingSnooze;
 window.isSnakeDueToFeed = isSnakeDueToFeed;
 window.getSnakesDueToFeed = getSnakesDueToFeed;
 window.getFeedingStatus = getFeedingStatus;
