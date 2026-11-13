@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ball Python Morph Calculator | Soulless Serpents</title>
+    <meta name="description" content="Ball python morph calculator: pick the genes of two parents and see the possible offspring, with the odds for each morph. No account needed.">
+    <meta name="theme-color" content="#050506">
+    <link rel="icon" href="assets/logo.jpg">
+    <link rel="stylesheet" href="css/site.css?v=3">
+</head>
+
+<body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header">
+        <div class="wrap nav">
+            <a class="brand" href="index.html">
+                <img class="brand__crest" src="assets/logo.jpg" alt="">
+                <span class="brand__name">Soulless Serpents<span class="brand__tag">Ball Pythons</span></span>
+            </a>
+
+            <button class="nav__toggle" type="button" aria-expanded="false" aria-controls="nav-links" aria-label="Open menu">
+                <span></span>
+            </button>
+
+            <ul class="nav__links" id="nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="available.html">Available</a></li>
+                <li><a href="calculator.html">Calculator</a></li>
+                <li><a href="education.html">Education</a></li>
+                <li><a class="btn nav__cta" href="index.html#contact">Enquire</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <main id="main">
+        <section class="page-hero">
+            <div class="wrap">
+                <p class="eyebrow">Genetics</p>
+                <h1>Morph Calculator</h1>
+                <p>
+                    Pick the genes each parent carries and see what the clutch can produce, with the
+                    odds for every outcome. No account, no collection &mdash; just the genes.
+                </p>
+            </div>
+        </section>
+
+        <section class="section section--tight">
+            <div class="wrap">
+                <div class="calc-grid">
+                    <div class="calc-panel">
+                        <h2>Dam <span class="calc-sex">female</span></h2>
+
+                        <div class="field">
+                            <label for="dam-gene">Add a gene</label>
+                            <input id="dam-gene" type="text" list="gene-options"
+                                placeholder="Morph or shortcut: YB, OD, Pied" autocomplete="off">
+                        </div>
+
+                        <div class="btn-row">
+                            <button class="btn btn--sm" type="button" data-add="dam">Add gene</button>
+                        </div>
+
+                        <ul class="calc-chips" data-chips="dam"></ul>
+                    </div>
+
+                    <div class="calc-panel">
+                        <h2>Sire <span class="calc-sex">male</span></h2>
+
+                        <div class="field">
+                            <label for="sire-gene">Add a gene</label>
+                            <input id="sire-gene" type="text" list="gene-options"
+                                placeholder="Morph or shortcut: YB, OD, Pied" autocomplete="off">
+                        </div>
+
+                        <div class="btn-row">
+                            <button class="btn btn--sm" type="button" data-add="sire">Add gene</button>
+                        </div>
+
+                        <ul class="calc-chips" data-chips="sire"></ul>
+                    </div>
+                </div>
+
+                <p class="calc-help">
+                    One copy is a het (recessive) or a single-gene animal (co-dominant); two copies is a
+                    visual recessive or a super. Tap a chip to switch between one and two copies.
+                </p>
+
+                <div class="center mt-40">
+                    <button class="btn" id="calc-button" type="button">Calculate pairing</button>
+                    <button class="btn btn--ghost" id="calc-clear" type="button">Clear</button>
+                </div>
+
+                <div id="calc-results" class="calc-results" aria-live="polite"></div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="wrap">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <a class="brand" href="index.html">
+                        <img class="brand__crest" src="assets/logo.jpg" alt="">
+                        <span class="brand__name">Soulless Serpents</span>
+                    </a>
+                    <p class="footer-tagline">Crafted in Darkness, Bred for Excellence.</p>
+                    <p>
+                        Ball python breeding with documented genetics, quarantine and health records.
+                        Available animals are published from The Snake Room breeding software.
+                    </p>
+                </div>
+
+                <div>
+                    <h4>Site</h4>
+                    <ul>
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="available.html">Available</a></li>
+                        <li><a href="calculator.html">Calculator</a></li>
+                        <li><a href="education.html">Education</a></li>
+                        <li><a href="index.html#contact">Enquire</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4>Contact</h4>
+                    <ul>
+                        <li><a href="mailto:SoullessSerpents@outlook.com">SoullessSerpents@outlook.com</a></li>
+                        <li><a href="https://instagram.com/SoullessSerpents" rel="noopener">Instagram</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <p>&copy; <span data-year>2026</span> Soulless Serpents. All rights reserved.</p>
+                <p>Records &amp; available list powered by The Snake Room.</p>
+            </div>
+        </div>
+    </footer>
+
+    <datalist id="gene-options"></datalist>
+
+    <script src="data/snakes.js?v=1794540000000"></script>
+    <script src="js/site.js?v=6"></script>
+    <script src="js/gene-catalog.js?v=1"></script>
+    <script src="js/genes.js?v=1"></script>
+    <script src="js/morph-calculator.js?v=1"></script>
+    <script src="js/calculator.js?v=1"></script>
+</body>
+
+</html>
