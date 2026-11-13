@@ -11,14 +11,14 @@
     <link rel="stylesheet" href="css/site.css?v=3">
 </head>
 
-<body>
+<body data-page-title="">
     <a class="skip-link" href="#main">Skip to content</a>
 
     <header class="site-header">
         <div class="wrap nav">
             <a class="brand" href="index.html">
                 <img class="brand__crest" src="assets/logo.jpg" alt="">
-                <span class="brand__name">Soulless Serpents<span class="brand__tag">Ball Pythons</span></span>
+                <span class="brand__name"><span data-shop-name>Soulless Serpents</span><span class="brand__tag" data-nav-label>Ball Pythons</span></span>
             </a>
 
             <button class="nav__toggle" type="button" aria-expanded="false" aria-controls="nav-links" aria-label="Open menu">
@@ -41,8 +41,8 @@
                 <div class="hero__inner">
                     <div>
                         <p class="eyebrow">Selective ball python breeding</p>
-                        <h1 class="hero__title">Soulless <span>Serpents</span></h1>
-                        <p class="hero__tagline">Crafted in Darkness, Bred for Excellence.</p>
+                        <h1 class="hero__title" data-hero-title>Soulless <span>Serpents</span></h1>
+                        <p class="hero__tagline" data-shop-tagline>Crafted in Darkness, Bred for Excellence.</p>
                         <p class="hero__body">
                             A small, deliberately limited collection. Every pairing is planned around a real
                             goal, every hatchling is weighed, fed, shed and documented from day one, and
@@ -64,13 +64,14 @@
                         <span class="stat__value" data-count-available>0</span>
                         <span class="stat__label">Animals available</span>
                     </div>
-                    <!-- Keep this number in step with the gene count on education.html#morphs. -->
+                    <!-- Both numbers come from js/site-config.js (stats). The available
+                         count above is counted from data/snakes.js, never typed. -->
                     <div class="stat">
-                        <span class="stat__value">34</span>
+                        <span class="stat__value" data-stat-genes>34</span>
                         <span class="stat__label">Genes in the collection</span>
                     </div>
                     <div class="stat">
-                        <span class="stat__value">60 d</span>
+                        <span class="stat__value" data-stat-quarantine>60 d</span>
                         <span class="stat__label">Quarantine before listing</span>
                     </div>
                 </div>
@@ -184,19 +185,19 @@
                         <ul class="contact-list">
                             <li>
                                 <span class="label">Email</span>
-                                <span class="value"><a href="mailto:SoullessSerpents@outlook.com">SoullessSerpents@outlook.com</a></span>
+                                <span class="value"><a href="mailto:SoullessSerpents@outlook.com" data-contact-email>SoullessSerpents@outlook.com</a></span>
                             </li>
                             <li>
                                 <span class="label">Instagram</span>
-                                <span class="value"><a href="https://instagram.com/SoullessSerpents" rel="noopener">@SoullessSerpents</a></span>
+                                <span class="value"><a href="https://instagram.com/SoullessSerpents" rel="noopener" data-contact-instagram="handle">@SoullessSerpents</a></span>
                             </li>
                             <li>
                                 <span class="label">Pickup</span>
-                                <span class="value">By appointment — ask for the current collection address.</span>
+                                <span class="value" data-contact-pickup>By appointment — ask for the current collection address.</span>
                             </li>
                             <li>
                                 <span class="label">Reply</span>
-                                <span class="value">Within 24 hours, usually the same evening.</span>
+                                <span class="value" data-contact-reply>Within 24 hours, usually the same evening.</span>
                             </li>
                         </ul>
                     </div>
@@ -226,10 +227,10 @@
                 <div class="footer-brand">
                     <a class="brand" href="index.html">
                         <img class="brand__crest" src="assets/logo.jpg" alt="">
-                        <span class="brand__name">Soulless Serpents</span>
+                        <span class="brand__name" data-shop-name>Soulless Serpents</span>
                     </a>
-                    <p class="footer-tagline">Crafted in Darkness, Bred for Excellence.</p>
-                    <p>
+                    <p class="footer-tagline" data-shop-tagline>Crafted in Darkness, Bred for Excellence.</p>
+                    <p data-footer-blurb>
                         Ball python breeding with documented genetics, quarantine and health records.
                         Available animals are published from The Snake Room breeding software.
                     </p>
@@ -249,21 +250,22 @@
                 <div>
                     <h4>Contact</h4>
                     <ul>
-                        <li><a href="mailto:SoullessSerpents@outlook.com">SoullessSerpents@outlook.com</a></li>
-                        <li><a href="https://instagram.com/SoullessSerpents" rel="noopener">Instagram</a></li>
+                        <li><a href="mailto:SoullessSerpents@outlook.com" data-contact-email>SoullessSerpents@outlook.com</a></li>
+                        <li><a href="https://instagram.com/SoullessSerpents" rel="noopener" data-contact-instagram="label">Instagram</a></li>
                     </ul>
                 </div>
             </div>
 
             <div class="footer-bottom">
-                <p>&copy; <span data-year>2026</span> Soulless Serpents. All rights reserved.</p>
+                <p>&copy; <span data-year>2026</span> <span data-shop-name>Soulless Serpents</span>. All rights reserved.</p>
                 <p>Records &amp; available list powered by The Snake Room.</p>
             </div>
         </div>
     </footer>
 
     <script src="data/snakes.js?v=1794548351689"></script>
-    <script src="js/site.js?v=6"></script>
+    <script src="js/site-config.js?v=1"></script>
+    <script src="js/site.js?v=7"></script>
     <script src="js/home.js?v=2"></script>
 </body>
 

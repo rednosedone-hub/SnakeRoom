@@ -2,8 +2,16 @@
 (function () {
     "use strict";
 
-    var CONTACT_EMAIL = "SoullessSerpents@outlook.com";
-    var CONTACT_INSTAGRAM = "https://instagram.com/SoullessSerpents";
+    /* ---------- Shop settings ---------- */
+
+    // Every shop-specific string lives in js/site-config.js, so a breeder with
+    // their own name, tagline and contact never edits this file.
+    var config = window.SS_CONFIG || {};
+    var contact = config.contact || {};
+    var stats = config.stats || {};
+    var shopName = String(config.shopName || "The Snake Room").trim();
+    var CONTACT_EMAIL = String(contact.email || "").trim();
+    var CONTACT_INSTAGRAM = String(contact.instagramUrl || "").trim();
 
     /* ---------- Navigation ---------- */
 
@@ -193,6 +201,97 @@
             "<small>Photo coming soon</small>";
         img.replaceWith(plate);
     }, true);
+
+    /* ---------- Shop identity ---------- */
+
+    // Everything marked data-* below is filled from site-config.js, so a new
+    // breeder edits one file instead of hunting through four pages.
+    function applyBrand() {
+        var tagline = String(config.tagline || "").trim();
+        var blurb = String(config.footerBlurb || "").trim();
+
+        document.querySelectorAll("[data-shop-name]").forEach(function (node) {
+            node.textContent = shopName;
+        });
+
+        document.querySelectorAll("[data-nav-label]").forEach(function (node) {
+            node.textContent = config.navLabel || "";
+        });
+
+        // The last word of the shop name takes the gold accent in the hero.
+        var heroTitle = document.querySelector("[data-hero-title]");
+        if (heroTitle) {
+            var words = shopName.split(/\s+/);
+            heroTitle.innerHTML = words.length > 1
+                ? escapeHtml(words.slice(0, -1).join(" ")) + " <span>" + escapeHtml(words[words.length - 1]) + "</span>"
+                : escapeHtml(shopName);
+        }
+
+        document.querySelectorAll("[data-shop-tagline]").forEach(function (node) {
+            if (tagline) {
+                node.textContent = tagline;
+            } else {
+                node.hidden = true;
+            }
+        });
+
+        document.querySelectorAll("[data-footer-blurb]").forEach(function (node) {
+            if (blurb) {
+                node.textContent = blurb;
+            } else {
+                node.hidden = true;
+            }
+        });
+
+        document.querySelectorAll("[data-contact-email]").forEach(function (node) {
+            if (!CONTACT_EMAIL) {
+                node.hidden = true;
+                return;
+            }
+            node.textContent = CONTACT_EMAIL;
+            node.setAttribute("href", "mailto:" + CONTACT_EMAIL);
+        });
+
+        document.querySelectorAll("[data-contact-instagram]").forEach(function (node) {
+            if (!CONTACT_INSTAGRAM) {
+                node.hidden = true;
+                return;
+            }
+            node.setAttribute("href", CONTACT_INSTAGRAM);
+            node.textContent = node.getAttribute("data-contact-instagram") === "handle"
+                ? (contact.instagramHandle || "Instagram")
+                : "Instagram";
+        });
+
+        [["[data-contact-pickup]", contact.pickup], ["[data-contact-reply]", contact.reply]].forEach(function (pair) {
+            document.querySelectorAll(pair[0]).forEach(function (node) {
+                var value = String(pair[1] || "").trim();
+
+                if (value) {
+                    node.textContent = value;
+                } else {
+                    (node.closest("li") || node).hidden = true;
+                }
+            });
+        });
+
+        var genesNode = document.querySelector("[data-stat-genes]");
+        if (genesNode) genesNode.textContent = stats.genesInCollection || "";
+
+        var quarantineNode = document.querySelector("[data-stat-quarantine]");
+        if (quarantineNode) quarantineNode.textContent = stats.quarantine || "";
+
+        // data-page-title="" on the home page means shop name plus the tagline
+        // fragment; any other page names itself before the shop name.
+        var pageTitle = document.body.getAttribute("data-page-title");
+        if (pageTitle !== null) {
+            document.title = pageTitle
+                ? pageTitle + " | " + shopName
+                : shopName + (config.titleSuffix ? " | " + config.titleSuffix : "");
+        }
+    }
+
+    applyBrand();
 
     /* ---------- Public helpers ---------- */
 

@@ -6,10 +6,9 @@
 // never see this page — the public list is the Soulless Serpents storefront,
 // built from the same records by site-tools/build-available.js.
 (function () {
-    // The storefront ships in this repository today, so the relative path works
-    // from the same deploy. Point this at the custom domain once Soulless
-    // Serpents is its own repo and website.
-    const STOREFRONT_URL = "soulless-serpents/available.html";
+    // Live storefront. Change this one line when a custom domain replaces the
+    // workers.dev address.
+    const STOREFRONT_URL = "https://soulless-serpents.red-nosed-one.workers.dev/available";
     const LISTED_STATUSES = ["Available", "On Hold"];
 
     function escapeHtml(value) {
