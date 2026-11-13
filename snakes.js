@@ -245,6 +245,21 @@ function getDefectBadgeHtml(snake) {
     return `<span class="defect-badge" title="Recorded defect: ${escapeHealthText(text)}">${escapeHealthText(text)}</span>`;
 }
 
+// A male Banana or Coral Glow is a maker, and which sex his hatchlings will be
+// is the first thing a buyer asks. The badge follows the recorded maker, or the
+// one its parents point to when nothing was written on the record.
+function getBananaMakerBadgeHtml(snake) {
+    const badge = window.BananaMaker && window.BananaMaker.getBadge
+        ? window.BananaMaker.getBadge(snake, snakes)
+        : null;
+
+    if (!badge) {
+        return "";
+    }
+
+    return `<span class="maker-pill ${escapeHealthText(badge.className)}" title="${escapeHealthText(badge.title)}">${escapeHealthText(badge.label)}</span>`;
+}
+
 function getGeneDescription(geneRecord) {
     if (window.GeneTools) {
         return window.GeneTools.describeGene(geneRecord);
@@ -640,7 +655,7 @@ function renderSnakes() {
                 </div>
 
                 <div class="snake-genes">
-                    ${genePills}
+                    ${genePills}${getBananaMakerBadgeHtml(snake)}
                 </div>
 
                 <div class="card-buttons">
@@ -713,7 +728,7 @@ function renderSnakeTable(snakeList) {
                 </td>
                 <td>${window.SnakeData.getSnakeLinkHtml(snake)}</td>
                 <td>${identityText}</td>
-                <td>${snake.sex}</td>
+                <td>${snake.sex}${getBananaMakerBadgeHtml(snake)}</td>
                 <td>${weightText}</td>
                 <td>${snake.lastFed || ""}</td>
                 <td>${feedingInterval}</td>

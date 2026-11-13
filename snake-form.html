@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Snake Record</title>
-    <link rel="stylesheet" href="style.css?v=90">
+    <link rel="stylesheet" href="style.css?v=95">
 </head>
 
 <body>
@@ -78,7 +78,7 @@
                     <label class="form-field">
                         <span>Snake ID</span>
                         <input type="text" id="snakeIDInput" 
-                        placeholder="Snake ID">
+                        placeholder="Snake ID" oninput="updateBananaMakerField()">
                     </label>
 
                     <label class="form-field">
@@ -88,7 +88,7 @@
 
                     <label class="form-field">
                         <span>Sex</span>
-                        <select id="sexInput" onchange="updateFeederSuggestion()">
+                        <select id="sexInput" onchange="updateFeederSuggestion(); updateBananaMakerField()">
                             <option value="Female">Female</option>
                             <option value="Male">Male</option>
                             <option value="Unknown">Unknown</option>
@@ -301,6 +301,23 @@
                             <select id="saleExpoInput">
                                 <option value="">Not at a show</option>
                             </select>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="listing-block" id="listingFields" hidden>
+                    <h4>For sale</h4>
+                    <p class="empty-message">
+                        The asking price is what the public Available list shows for this
+                        animal. It is not income &mdash; only the sale price counts in
+                        Finances once the snake actually sells.
+                    </p>
+
+                    <div class="form-grid">
+                        <label class="form-field">
+                            <span>Asking price</span>
+                            <input type="number" id="askingPriceInput" min="0" step="0.01"
+                                placeholder="0.00" oninput="updateMoneySummary()">
                         </label>
                     </div>
                 </div>
@@ -693,10 +710,11 @@
                 </div>
 
                 <p class="gene-help" style="margin-top:12px;">
-                    Each photo below can be published to the shared Morph Gallery on its own, and
-                    taken out again the same way. Only the morph and the photo are shared &mdash;
-                    never a name or any record. A photo has to be uploaded to your cloud storage
-                    and the snake needs its genes before it can be published.
+                    Photos are published to the shared Morph Gallery automatically when the snake is
+                    marked <strong>Available</strong>, filed by its morph so buyers can find it. Only
+                    the morph and the photo are shared &mdash; never a name or any record. You can
+                    still publish or take a photo out by hand below. A photo has to be uploaded to
+                    your cloud storage, and the snake needs its genes, before it can be shared.
                 </p>
 
                 <div class="form-field" style="margin-top:12px;">
@@ -747,6 +765,19 @@
 
                     <div class="gene-button-row" id="geneButtonRow"></div>
                     <div class="gene-list" id="geneList"></div>
+
+                    <div class="banana-maker-block" id="bananaMakerBlock" hidden>
+                        <label class="form-field">
+                            <span>Banana / Coral Glow maker</span>
+                            <select id="bananaMakerInput" onchange="setBananaMakerChoice(this.value)">
+                                <option value="">Not recorded</option>
+                                <option value="male">Male maker</option>
+                                <option value="female">Female maker</option>
+                            </select>
+                        </label>
+
+                        <p class="gene-help" id="bananaMakerHint"></p>
+                    </div>
 
                     <details class="gene-shortcuts" id="geneShortcutsPanel">
                         <summary>Your gene shortcuts</summary>
@@ -817,11 +848,12 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="data-helpers.js?v=3"></script>
     <script src="backup-helpers.js?v=1"></script>
-    <script src="cloud-sync.js?v=20"></script>
+    <script src="cloud-sync.js?v=21"></script>
     <script src="auto-sync.js?v=9"></script>
     <script src="account-gate.js?v=1"></script>
-    <script src="geneCatalog.js?v=4"></script>
+    <script src="geneCatalog.js?v=5"></script>
     <script src="genes.js?v=11"></script>
+    <script src="banana-maker-helpers.js?v=5"></script>
     <script src="feed-helpers.js?v=5"></script>
     <script src="finance-helpers.js?v=6"></script>
     <script src="sales-helpers.js?v=5"></script>
@@ -835,7 +867,7 @@
     <script src="clutch-growth-helpers.js?v=4"></script>
     <script src="defect-helpers.js?v=1"></script>
     <script src="breeding-repair-helpers.js?v=1"></script>
-    <script src="snake-form.js?v=42"></script>
+    <script src="snake-form.js?v=46"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

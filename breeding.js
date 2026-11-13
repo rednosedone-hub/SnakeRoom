@@ -471,6 +471,59 @@ function getPairHealthNotices(female, male) {
         `);
 }
 
+// Banana and Coral Glow are sex-linked, so the pairing card can say which sex
+// the Banana hatchlings will be. A Banana dam does not decide that: her Banana
+// fry can be either sex. A Banana sire's maker decides it; when both parents
+// carry it, the Super Banana fry are the male ones. The wording comes from the
+// same helper as the calculator.
+function getBananaMakerNotice(female, male) {
+    if (!male || !window.BananaMaker) {
+        return "";
+    }
+
+    const damCopies = female ? window.BananaMaker.getBananaCopies(female.genes) : 0;
+    const sireCopies = window.BananaMaker.getBananaCopies(male.genes);
+
+    if (!damCopies && !sireCopies) {
+        return "";
+    }
+
+    const resolved = sireCopies ? window.BananaMaker.resolveMaker(male, snakes) : null;
+    const split = window.BananaMaker.getPairSexSplit({
+        damBananaCopies: damCopies,
+        sireBananaCopies: sireCopies,
+        sireMaker: resolved ? resolved.maker : ""
+    });
+
+    if (split) {
+        return `
+            <p class="pair-note">
+                <strong>Expected sex.</strong>
+                ${escapePairText(window.BananaMaker.describeSexSplit(split))}
+            </p>
+        `;
+    }
+
+    if (damCopies > 0 && sireCopies === 0) {
+        return `
+            <p class="pair-note">
+                <strong>Banana dam.</strong>
+                ${escapePairText(window.BananaMaker.describeDamOnlySexNote())}
+            </p>
+        `;
+    }
+
+    const name = escapePairText(male.name || "This male");
+
+    return `
+        <p class="pair-note">
+            <strong>Banana / Coral Glow male.</strong>
+            ${name} has no maker recorded, so the sex of the Banana hatchlings is still a
+            guess. Set Male maker or Female maker on the snake record.
+        </p>
+    `;
+}
+
 function getReadinessContext() {
     return { snakes, breedingPairs, clutches };
 }
@@ -810,7 +863,12 @@ function renderPairCheck() {
     const male = getPairParentSnake(document.getElementById("maleSelect").value, null);
     const readinessHtml = getReadinessPanelHtml(female, male);
     const notices = [...getPairHealthNotices(female, male)];
+    const makerNotice = getBananaMakerNotice(female, male);
     const lineage = getLineageNotice(female, male);
+
+    if (makerNotice) {
+        notices.push(makerNotice);
+    }
 
     if (readinessContainer) {
         readinessContainer.hidden = readinessHtml === "";
@@ -829,7 +887,12 @@ function getPairNotices(pair) {
     const female = getPairParentSnake(pair.femaleSnakeId, pair.femaleIndex);
     const male = getPairParentSnake(pair.maleSnakeId, pair.maleIndex);
     const notices = [...getPairHealthNotices(female, male)];
+    const makerNotice = getBananaMakerNotice(female, male);
     const lineage = getLineageNotice(female, male);
+
+    if (makerNotice) {
+        notices.push(makerNotice);
+    }
 
     if (lineage) {
         notices.unshift(lineage.html);

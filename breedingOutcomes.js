@@ -878,6 +878,37 @@ function getClutchOutcomes(clutch) {
     return outcomes;
 }
 
+// Banana and Coral Glow are sex-linked, so this clutch's sire can decide which
+// sex its Banana hatchlings will be. The clutch predictions carry that sex next
+// to each morph so a keeper knows what to expect when the eggs pip.
+function getClutchSexSplit(clutch) {
+    if (!clutch || !window.BananaMaker || typeof window.BananaMaker.getPairSexSplit !== "function") {
+        return null;
+    }
+
+    const dam = window.SnakeData.getSnakeByReference(snakes, clutch.femaleSnakeId);
+    const sire = window.SnakeData.getSnakeByReference(snakes, clutch.maleSnakeId);
+    const makerState = sire ? window.BananaMaker.resolveMaker(sire, snakes) : null;
+
+    return window.BananaMaker.getPairSexSplit({
+        damBananaCopies: dam ? window.BananaMaker.getBananaCopies(dam.genes) : 0,
+        sireBananaCopies: sire ? window.BananaMaker.getBananaCopies(sire.genes) : 0,
+        sireMaker: makerState ? makerState.maker : ""
+    });
+}
+
+function getOutcomeSexForSplit(split, outcome) {
+    if (!split || !outcome || !window.BananaMaker) {
+        return "";
+    }
+
+    return window.BananaMaker.getOutcomeSexForGenes(split, outcome.geneDetails);
+}
+
+function describeOutcomeSexLower(sex) {
+    return sex === "both" ? "male / female" : sex;
+}
+
 function storeOutcomeGenes(outcome) {
     if (!outcome) {
         return [];
@@ -971,7 +1002,13 @@ async function previewHatchlingMorph(clutchToken, index) {
         return;
     }
 
-    target.innerHTML = `<span class="gene-pill">${escapeHtml(outcome.morphName)}</span>`;
+    const clutch = clutches.find(item => item.clutchToken === clutchToken);
+    const sex = getOutcomeSexForSplit(getClutchSexSplit(clutch), outcome);
+    const sexChip = sex && window.BananaMaker
+        ? ` <span class="sex-pill is-${sex}">${escapeHtml(window.BananaMaker.describeSex(sex))}</span>`
+        : "";
+
+    target.innerHTML = `<span class="gene-pill">${escapeHtml(outcome.morphName)}</span>${sexChip}`;
 
     if (!window.MorphGallery || typeof window.MorphGallery.fetchExamples !== "function") {
         return;
@@ -1020,6 +1057,16 @@ function createHatchlingRecord(clutch, row, hatchDate) {
     const random = Math.random().toString(36).slice(2, 8);
     const hatchlingId = `snake-hatch-${stamp}-${random}`;
     const animalId = String(row.hatchlingId || clutch.id || "").trim();
+    // A male Banana/Coral Glow hatchling already knows its maker from this very
+    // pairing, so it is written on the record instead of asked for again later.
+    const makerState = window.BananaMaker
+        ? window.BananaMaker.deriveMaker({
+            sex: row.sex,
+            genes: row.genes,
+            dam: window.SnakeData.getSnakeByReference(snakes, clutch.femaleSnakeId),
+            sire: window.SnakeData.getSnakeByReference(snakes, clutch.maleSnakeId)
+        })
+        : { maker: "" };
 
     return {
         id: hatchlingId,
@@ -1030,6 +1077,7 @@ function createHatchlingRecord(clutch, row, hatchDate) {
         ID: animalId,
         morph: animalId,
         sex: row.sex,
+        bananaMaker: makerState.maker || "",
         weight: "",
         binNumber: row.binNumber,
         hatchDate: hatchDate || "",
@@ -1366,6 +1414,59 @@ function updateOutcomesStatus() {
         : `${activeCount} clutch${activeCount === 1 ? "" : "es"} waiting to hatch.`;
 }
 
+// The morph table says what the eggs can be; this says which sex the Banana
+// hatchlings will be, which is the other half of planning a clutch.
+function renderClutchMakerLine(clutch) {
+    if (!clutch || !window.BananaMaker) {
+        return "";
+    }
+
+    const sire = window.SnakeData.getSnakeByReference(snakes, clutch.maleSnakeId);
+
+    if (!sire || !window.BananaMaker.snakeHasBanana(sire)) {
+        return "";
+    }
+
+    const resolved = window.BananaMaker.resolveMaker(sire, snakes);
+    const dam = window.SnakeData.getSnakeByReference(snakes, clutch.femaleSnakeId);
+    const damHasBanana = Boolean(dam) && window.BananaMaker.hasBananaVisual(dam.genes);
+
+    if (resolved.maker) {
+        // With Banana on both sides the split line below is the honest answer;
+        // the maker's "mostly one sex" shorthand would contradict it.
+        const offspring = damHasBanana ? "" : ` ${escapeHtml(resolved.offspring)}`;
+
+        return `<p class="empty-message clutch-maker-line"><strong>${escapeHtml(resolved.label)}.</strong>${offspring}</p>`;
+    }
+
+    return `<p class="empty-message clutch-maker-line">Banana / Coral Glow male with no maker recorded, so the sex of its Banana hatchlings is still a guess.</p>`;
+}
+
+// A Banana dam can set the split even when the sire carries no Banana of his
+// own, so this line is independent of the maker line above.
+function renderClutchSexLine(clutch) {
+    if (!clutch || !window.BananaMaker) {
+        return "";
+    }
+
+    const split = getClutchSexSplit(clutch);
+
+    if (split) {
+        return `<p class="empty-message clutch-sex-line">${escapeHtml(window.BananaMaker.describeSexSplit(split))}</p>`;
+    }
+
+    const dam = window.SnakeData.getSnakeByReference(snakes, clutch.femaleSnakeId);
+    const sire = window.SnakeData.getSnakeByReference(snakes, clutch.maleSnakeId);
+    const damCopies = dam ? window.BananaMaker.getBananaCopies(dam.genes) : 0;
+    const sireCopies = sire ? window.BananaMaker.getBananaCopies(sire.genes) : 0;
+
+    if (damCopies > 0 && sireCopies === 0) {
+        return `<p class="empty-message clutch-sex-line">${escapeHtml(window.BananaMaker.describeDamOnlySexNote())}</p>`;
+    }
+
+    return "";
+}
+
 function renderOutcomeCard(clutch) {
     const token = clutch.clutchToken;
     const rows = prepareHatchlings(clutch);
@@ -1383,6 +1484,8 @@ function renderOutcomeCard(clutch) {
                 <p class="empty-message">Next hatchling ID: ${escapeHtml(nextId)}</p>
                 <p>${getSnakeLinkByRef(clutch.femaleSnakeId)} x ${getSnakeLinkByRef(clutch.maleSnakeId)}</p>
                 <p>Laid: ${escapeHtml(clutch.laidDate || "Not recorded")} / ${escapeHtml(formatCount(clutch))}</p>
+                ${renderClutchMakerLine(clutch)}
+                ${renderClutchSexLine(clutch)}
             </div>
 
             ${renderIncubationPanel(clutch)}
@@ -1466,6 +1569,14 @@ function renderHatchlingDefects(token, row) {
 function renderHatchlingEditorRow(clutch, row) {
     const token = `${clutch.clutchToken}-${row.index}`;
     const outcomes = getClutchOutcomes(clutch);
+    const sexSplit = getClutchSexSplit(clutch);
+    const previewSex = row.morphName && window.BananaMaker
+        ? window.BananaMaker.getOutcomeSexForGenes(sexSplit, row.genes)
+        : "";
+    const previewSexChip = previewSex && window.BananaMaker
+        ? ` <span class="sex-pill is-${previewSex}">${escapeHtml(window.BananaMaker.describeSex(previewSex))}</span>`
+        : "";
+
     return `
         <div class="hatchling-editor-row">
             <div class="hatchling-editor-heading">
@@ -1515,12 +1626,12 @@ function renderHatchlingEditorRow(clutch, row) {
                     <option value="">Not recorded</option>
                     ${outcomes.map((outcome, index) => `
                         <option value="${index}" ${String(row.morphChoice) === String(index) ? "selected" : ""}>
-                            ${escapeHtml(outcome.morphName)} — ${Math.round(outcome.probability * 1000) / 10}%
+                            ${escapeHtml(outcome.morphName)} — ${Math.round(outcome.probability * 1000) / 10}%${getOutcomeSexForSplit(sexSplit, outcome) ? ` (${describeOutcomeSexLower(getOutcomeSexForSplit(sexSplit, outcome))})` : ""}
                         </option>
                     `).join("")}
                 </select>
                 <span class="hatchling-morph-example" id="hatchMorphExample-${token}">
-                    ${row.morphName ? `<span class="gene-pill">${escapeHtml(row.morphName)}</span>` : ""}
+                    ${row.morphName ? `<span class="gene-pill">${escapeHtml(row.morphName)}</span>${previewSexChip}` : ""}
                 </span>
                 ${outcomes.length === 0
                     ? `<small class="empty-message">Add genes to both parents to list this clutch's morphs.</small>`

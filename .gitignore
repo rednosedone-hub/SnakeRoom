@@ -19,3 +19,6 @@ Images/**/*.json
 # Local scratch files and preview screenshots
 .tmp/
 screenshots/
+
+# Build artifact for uploading the storefront; regenerated from the source folder
+soulless-serpents-site.zip

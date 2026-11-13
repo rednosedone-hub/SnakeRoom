@@ -276,7 +276,9 @@
 
     function loadSnakeGenes(parent, snakeIndex) {
         const snakes = readSnakes();
-        const snake = snakes[Number(snakeIndex)];
+        // An empty select is "no animal", not index 0: Number("") is 0, which
+        // used to quietly load the first snake when a parent was cleared.
+        const snake = String(snakeIndex) === "" ? null : snakes[Number(snakeIndex)];
 
         selectedSnakeIds[parent] = snake ? String(snake.id || "") : "";
 
@@ -320,7 +322,72 @@
         `;
     }
 
-    function renderResults(outcomes, hasGenesEntered) {
+    // Banana and Coral Glow are sex-linked, so a maker sire decides which sex
+    // its Banana hatchlings will be. The calculator can only say that when the
+    // male came from the collection and his maker is known, so an unknown
+    // pairing simply shows nothing. A Banana dam never decides it: her Banana
+    // hatchlings can be either sex, which the hint below says in words.
+    function getSelectedSnake(parent) {
+        const id = selectedSnakeIds[parent];
+
+        if (!id) {
+            return null;
+        }
+
+        return window.SnakeData.loadSnakesWithIds([])
+            .find(snake => String(snake.id) === String(id)) || null;
+    }
+
+    function getPairSexContext() {
+        if (!window.BananaMaker || typeof window.BananaMaker.getPairSexSplit !== "function") {
+            return { split: null, hint: "" };
+        }
+
+        const allSnakes = window.SnakeData.loadSnakesWithIds([]);
+        const maleSnake = getSelectedSnake("male");
+        const damCopies = window.BananaMaker.getBananaCopies(parentGenes.female);
+        const sireCopies = window.BananaMaker.getBananaCopies(parentGenes.male);
+        const makerState = maleSnake
+            && maleSnake.sex === "Male"
+            && window.BananaMaker.snakeHasBanana(maleSnake)
+            ? window.BananaMaker.resolveMaker(maleSnake, allSnakes)
+            : null;
+        const split = window.BananaMaker.getPairSexSplit({
+            damBananaCopies: damCopies,
+            sireBananaCopies: sireCopies,
+            sireMaker: makerState ? makerState.maker : ""
+        });
+
+        let hint = "";
+
+        if (!split) {
+            if (sireCopies > 0 && maleSnake && !(makerState && makerState.maker)) {
+                // A Banana male with no maker is the case the keeper can fix by
+                // filling it in on the snake record.
+                hint = `${maleSnake.name || "This male"}'s maker is not recorded, so the sex of its Banana/Coral Glow hatchlings is still unknown.`;
+            } else if (damCopies > 0 && sireCopies === 0) {
+                hint = window.BananaMaker.describeDamOnlySexNote();
+            }
+        }
+
+        return { split, hint };
+    }
+
+    function getSexPillHtml(sex) {
+        if (!sex) {
+            return "";
+        }
+
+        const label = sex === "male"
+            ? "&male; Male"
+            : sex === "female"
+                ? "&female; Female"
+                : "&male; &female; Male / Female";
+
+        return `<span class="sex-pill is-${sex}">${label}</span>`;
+    }
+
+    function renderResults(outcomes, hasGenesEntered, sexContext) {
         if (outcomes.length === 0) {
             elements.results.innerHTML = hasGenesEntered
                 ? `<p>Every egg is normal — neither parent has a gene entered.</p>`
@@ -328,18 +395,38 @@
             return;
         }
 
+        const split = sexContext ? sexContext.split : null;
+        const hint = sexContext ? sexContext.hint : "";
+        const sexNote = split
+            ? `<p class="sex-split-note">${split.note}</p>`
+            : hint
+                ? `<p class="sex-split-note is-hint">${hint}</p>`
+                : "";
+
         elements.results.innerHTML = `
+            ${sexNote}
+
+            <div class="snake-table-wrapper">
             <table class="snake-table">
                 <thead>
                     <tr>
                         <th>Chance</th>
                         <th>Morph</th>
                         <th>Genes</th>
+                        ${split ? "<th>Expected sex</th>" : ""}
                         <th>Notes</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${outcomes.map((outcome, index) => `
+                    ${outcomes.map((outcome, index) => {
+                        const bananaCopies = window.BananaMaker
+                            ? window.BananaMaker.getBananaCopies(outcome.geneDetails)
+                            : 0;
+                        const sex = window.BananaMaker
+                            ? window.BananaMaker.getOutcomeSex(split, bananaCopies)
+                            : "";
+
+                        return `
                         <tr>
                             <td class="probability-cell">${formatProbability(outcome.probability)}</td>
                             <td class="morph-name-cell" data-outcome-index="${index}">${outcome.morphName}</td>
@@ -350,11 +437,14 @@
                                     `).join("")
                                     : "Normal"}
                             </td>
+                            ${split ? `<td>${getSexPillHtml(sex)}</td>` : ""}
                             <td>${outcome.warnings.length ? outcome.warnings.join("; ") : ""}</td>
                         </tr>
-                    `).join("")}
+                    `;
+                    }).join("")}
                 </tbody>
             </table>
+            </div>
 
             <p class="morph-example-note">
                 Morphs someone has photographed show a photo count &mdash; click the name to see
@@ -424,7 +514,11 @@
         );
 
         savePairing();
-        renderResults(outcomes, parentGenes.female.length + parentGenes.male.length > 0);
+        renderResults(
+            outcomes,
+            parentGenes.female.length + parentGenes.male.length > 0,
+            getPairSexContext()
+        );
     }
 
     // The pairing now survives a visit to the gallery, so there has to be one

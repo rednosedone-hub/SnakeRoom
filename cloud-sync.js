@@ -13,9 +13,10 @@
 // Storage keys that make up a snapshot:
 //   snakes, breedingPairs, clutches, breedingGoals, customGeneCatalog,
 //   customGeneAliases, financeSettings, financeExpenses, financeExpos,
-//   feederSettings, feederInventory, buyers
+//   feederSettings, feederInventory, buyers, storefrontContact
 // (Gene catalog is starter + custom; only custom genes need backup. Shortcuts
-// are the keeper's own, so they travel with the collection too.)
+// are the keeper's own, so they travel with the collection too. The storefront
+// contact is the seller identity every published listing carries.)
 
 (function () {
     const SNAPSHOT_KEYS = [
@@ -30,7 +31,8 @@
         "financeExpos",
         "feederSettings",
         "feederInventory",
-        "buyers"
+        "buyers",
+        "storefrontContact"
     ];
 
     const SETTINGS_KEY = "cloudSyncSettings";

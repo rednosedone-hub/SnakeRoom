@@ -526,6 +526,7 @@ function renderGeneList() {
             <span class="gene-pill">No genes entered</span>
         `;
         renderPhotoGallery();
+        updateBananaMakerField();
         return;
     }
 
@@ -553,6 +554,167 @@ function renderGeneList() {
     // The gallery files photos by genotype, so adding or removing a gene
     // changes whether each thumbnail can be published.
     renderPhotoGallery();
+    updateBananaMakerField();
+}
+
+// ---- Banana / Coral Glow maker -------------------------------------------
+//
+// The maker is not a gene of its own: a male Banana or Coral Glow throws mostly
+// one sex, and which one follows his own parents. The form fills it in from the
+// dam and sire and still lets the keeper override it, because a keeper who has
+// bred the animal knows better than a rule.
+
+let bananaMakerChosen = false;
+let bananaMakerAutoFilled = false;
+
+function getFormParentSnake(selectId) {
+    const select = document.getElementById(selectId);
+
+    if (!select || !select.value) {
+        return null;
+    }
+
+    return snakes.find(candidate => candidate && candidate.id === select.value) || null;
+}
+
+function getParentSelectLabel(selectId) {
+    const select = document.getElementById(selectId);
+
+    if (!select || !select.value || select.selectedIndex < 0) {
+        return "";
+    }
+
+    return select.options[select.selectedIndex]?.textContent || "";
+}
+
+function getFormBananaMakerState() {
+    if (!window.BananaMaker) {
+        return null;
+    }
+
+    return window.BananaMaker.deriveMaker({
+        sex: document.getElementById("sexInput")?.value || "Unknown",
+        genes: currentGenes,
+        morph: document.getElementById("snakeIDInput")?.value || "",
+        dam: getFormParentSnake("damInput"),
+        sire: getFormParentSnake("sireInput"),
+        damLabel: getParentSelectLabel("damInput"),
+        sireLabel: getParentSelectLabel("sireInput")
+    });
+}
+
+function useParentageMaker() {
+    const state = getFormBananaMakerState();
+    const select = document.getElementById("bananaMakerInput");
+
+    if (!state || !state.maker || !select) {
+        return;
+    }
+
+    select.value = state.maker;
+    bananaMakerChosen = true;
+    bananaMakerAutoFilled = false;
+    updateBananaMakerField();
+}
+
+function setBananaMakerChoice(value) {
+    const select = document.getElementById("bananaMakerInput");
+
+    if (select && select.value !== value) {
+        select.value = value;
+    }
+
+    bananaMakerChosen = true;
+    bananaMakerAutoFilled = false;
+    updateBananaMakerField();
+}
+
+function updateBananaMakerField() {
+    const block = document.getElementById("bananaMakerBlock");
+    const select = document.getElementById("bananaMakerInput");
+    const hint = document.getElementById("bananaMakerHint");
+
+    if (!block || !select || !hint || !window.BananaMaker) {
+        return;
+    }
+
+    const isBananaMale = window.BananaMaker.isMaleBanana({
+        sex: document.getElementById("sexInput")?.value || "Unknown",
+        genes: currentGenes,
+        morph: document.getElementById("snakeIDInput")?.value || ""
+    });
+
+    block.hidden = !isBananaMale;
+
+    if (!isBananaMale) {
+        hint.textContent = "";
+        return;
+    }
+
+    const state = getFormBananaMakerState();
+    const derivedMaker = state ? state.maker : "";
+
+    // A value the form filled in follows the parents when they change (including
+    // back to no maker); a value the keeper picked is never overwritten.
+    if (!bananaMakerChosen && bananaMakerAutoFilled && select.value !== derivedMaker) {
+        select.value = derivedMaker;
+    }
+
+    if (!bananaMakerChosen && !select.value && derivedMaker) {
+        select.value = derivedMaker;
+        bananaMakerAutoFilled = true;
+    }
+
+    const current = window.BananaMaker.normalizeMaker(select.value);
+    const description = window.BananaMaker.describeMaker(current);
+    const pieces = [];
+
+    if (current && current === derivedMaker) {
+        pieces.push(state.note);
+        pieces.push(description.offspring);
+    } else if (current) {
+        pieces.push(`Recorded as a ${description.label.toLowerCase()}.`);
+        pieces.push(description.offspring);
+
+        if (derivedMaker) {
+            pieces.push(`Its parents point to a ${window.BananaMaker.describeMaker(derivedMaker).label.toLowerCase()} instead.`);
+        }
+    } else if (derivedMaker) {
+        pieces.push(`No maker recorded; its parents point to a ${window.BananaMaker.describeMaker(derivedMaker).label.toLowerCase()}.`);
+    } else if (state && state.note) {
+        pieces.push(state.note);
+    } else {
+        pieces.push("Only a male Banana or Coral Glow is a maker: a Banana dam makes him a female maker, a Banana sire a male maker. Record the parents, or pick one by hand.");
+    }
+
+    hint.textContent = pieces.filter(Boolean).join(" ");
+
+    if (derivedMaker && derivedMaker !== current) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "gene-action-button maker-use-parentage";
+        button.textContent = "Use parentage";
+        button.addEventListener("click", useParentageMaker);
+        hint.appendChild(document.createTextNode(" "));
+        hint.appendChild(button);
+    }
+}
+
+// Runs after the parent selects are filled, so a saved record can show the
+// maker its own parents point to without the keeper opening the money section.
+function initBananaMakerField() {
+    const select = document.getElementById("bananaMakerInput");
+
+    if (!select || !window.BananaMaker) {
+        return;
+    }
+
+    const snake = editingIndex !== null && snakes[editingIndex] ? snakes[editingIndex] : null;
+
+    select.value = window.BananaMaker.normalizeMaker(snake ? snake.bananaMaker : "");
+    bananaMakerChosen = false;
+    bananaMakerAutoFilled = false;
+    updateBananaMakerField();
 }
 
 function updateImagePreview() {
@@ -600,7 +762,7 @@ async function savePhotoAsDataUrl(file, reason) {
     const keepLocal = confirm(
         reason + "\n\n" +
         "Keep this photo on this device only? It will not be in your cloud backup " +
-        "until you're signed in and online \u2014 the app syncs automatically."
+        "until you're signed in and online - the app syncs automatically."
     );
 
     if (!keepLocal) {
@@ -896,6 +1058,37 @@ async function publishPhotoFromForm(index) {
     }
 
     renderPhotoGallery();
+}
+
+// A snake marked Available is stock, and stock photos belong in the shared
+// Morph Gallery so a buyer browsing that morph finds a picture of it. Only the
+// genotype travels: the gallery row carries the morph and the photo, never the
+// animal's name or any other record. Signed out, offline or an unpublished
+// gallery simply skips; the listing still saves.
+async function publishListingPhotos(snake) {
+    if (!snake || snake.status !== "Available") {
+        return;
+    }
+
+    if (!window.MorphGallery || typeof window.MorphGallery.publish !== "function") {
+        return;
+    }
+
+    const urls = typeof window.MorphGallery.photoUrlsForSnake === "function"
+        ? window.MorphGallery.photoUrlsForSnake(snake)
+        : [];
+
+    for (const photoUrl of urls) {
+        if (!/^https?:\/\//i.test(photoUrl)) {
+            continue;
+        }
+
+        try {
+            await window.MorphGallery.publish({ snake, photoUrl });
+        } catch (error) {
+            // Not signed in, offline, or the gallery table is not created yet.
+        }
+    }
 }
 
 async function unpublishPhotoFromForm(index) {
@@ -3379,6 +3572,8 @@ function updateMoneySummary() {
     const source = document.getElementById("acquisitionSourceInput").value;
     const purchase = source === "produced" ? 0 : Number(document.getElementById("purchasePriceInput").value) || 0;
     const sale = Number(document.getElementById("salePriceInput").value) || 0;
+    const askingInput = document.getElementById("askingPriceInput");
+    const asking = askingInput ? Number(askingInput.value) || 0 : 0;
     const parts = [];
 
     if (source === "produced") {
@@ -3389,6 +3584,8 @@ function updateMoneySummary() {
 
     if (sale > 0) {
         parts.push(`<span class="money-summary-item">Sold for <strong>${formatSnakeMoney(sale)}</strong></span>`);
+    } else if (asking > 0) {
+        parts.push(`<span class="money-summary-item">Asking <strong>${formatSnakeMoney(asking)}</strong> &mdash; not counted until it sells</span>`);
     }
 
     if (sale > 0) {
@@ -3420,6 +3617,20 @@ function getHoldDraft() {
         holdPaymentPlan: document.getElementById("holdPaymentPlanInput").checked,
         salePrice: document.getElementById("salePriceInput").value
     };
+}
+
+// The asking price is the public listing price, not ledger money: it is what the
+// Available page on the website shows while the animal is for sale. On Hold
+// keeps it so a held animal can still show a price if no agreed price is set.
+function updateListingFields() {
+    const block = document.getElementById("listingFields");
+    const statusInput = document.getElementById("statusInput");
+
+    if (!block || !statusInput) {
+        return;
+    }
+
+    block.hidden = !["Available", "On Hold"].includes(statusInput.value);
 }
 
 function updateHoldVisibility() {
@@ -3513,6 +3724,7 @@ function initMoneySection() {
     document.getElementById("purchasePriceInput").value = snake && snake.purchasePrice ? snake.purchasePrice : "";
     document.getElementById("purchaseDateInput").value = snake ? snake.purchaseDate || snake.acquiredDate || "" : "";
     document.getElementById("soldToInput").value = snake ? snake.soldTo || "" : "";
+    document.getElementById("askingPriceInput").value = snake && snake.askingPrice ? snake.askingPrice : "";
     document.getElementById("salePriceInput").value = snake && snake.salePrice ? snake.salePrice : "";
     document.getElementById("saleDateInput").value = snake ? snake.saleDate || "" : "";
     document.getElementById("holdBuyerInput").value = snake ? snake.holdBuyer || "" : "";
@@ -3529,8 +3741,19 @@ function initMoneySection() {
     fillSaleExpoSelect(snake ? snake.saleExpoId || "" : "");
     fillMoneyDatalists();
     updateAcquisitionFields();
+    updateListingFields();
     updateHoldVisibility();
     updateHoldSummary();
+
+    // A parent picked here can decide the maker, so the Genetics section is
+    // refreshed as soon as the choice changes.
+    ["sireInput", "damInput"].forEach(id => {
+        const select = document.getElementById(id);
+
+        if (select) {
+            select.addEventListener("change", updateBananaMakerField);
+        }
+    });
 
     const statusInput = document.getElementById("statusInput");
 
@@ -3554,6 +3777,7 @@ function initMoneySection() {
             }
 
             updateRetirementFields(true);
+            updateListingFields();
             updateMoneySummary();
             updateHoldVisibility();
             updateHoldSummary();
@@ -3650,6 +3874,17 @@ async function saveSnakeFromPage() {
         purchaseDate: source === "produced"
             ? ""
             : document.getElementById("purchaseDateInput").value,
+        // Only a male Banana/Coral Glow can be a maker. The field is cleared on
+        // a female or a non-Banana record so a stale value never follows a
+        // record whose sex or genes changed.
+        bananaMaker: (() => {
+            const block = document.getElementById("bananaMakerBlock");
+            const makerSelect = document.getElementById("bananaMakerInput");
+
+            return block && !block.hidden && makerSelect && window.BananaMaker
+                ? window.BananaMaker.normalizeMaker(makerSelect.value)
+                : "";
+        })(),
         sireId,
         damId,
         sire: sireSnake
@@ -3660,6 +3895,7 @@ async function saveSnakeFromPage() {
             : (damId ? existingSnake.dam || "" : (existingSnake.damId ? "" : existingSnake.dam || "")),
         clutchId: document.getElementById("clutchInput").value,
         soldTo: document.getElementById("soldToInput").value.trim(),
+        askingPrice: moneyOrBlank(document.getElementById("askingPriceInput").value),
         salePrice: moneyOrBlank(document.getElementById("salePriceInput").value),
         saleDate: document.getElementById("saleDateInput").value,
         saleExpoId: document.getElementById("saleExpoInput").value,
@@ -3696,12 +3932,15 @@ async function saveSnakeFromPage() {
     }
 
     saveSnakes();
+    await publishListingPhotos(snake);
     window.location.href = "snakes.html";
 }
 
 window.updateFeederSuggestion = updateFeederSuggestion;
 window.useSuggestedFeederSize = useSuggestedFeederSize;
 window.updateGeneButtons = updateGeneButtons;
+window.updateBananaMakerField = updateBananaMakerField;
+window.setBananaMakerChoice = setBananaMakerChoice;
 window.addGene = addGene;
 window.addParsedGenes = addParsedGenes;
 window.addCustomGene = addCustomGene;
@@ -3739,6 +3978,7 @@ setupHealthOptions();
 fillFormForEdit();
 setupPairingReadinessPanel();
 initMoneySection();
+initBananaMakerField();
 expandSnakeSectionFromHash();
 window.addEventListener("hashchange", expandSnakeSectionFromHash);
 

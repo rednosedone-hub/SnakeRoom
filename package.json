@@ -4,7 +4,7 @@
   "private": true,
   "description": "Local-first ball python collection manager.",
   "scripts": {
-    "test": "node --test tests/gene-labels.test.js tests/combo-names.test.js tests/health-helpers.test.js tests/lineage.test.js tests/readiness.test.js tests/feeder-inventory.test.js tests/feed-helpers.test.js tests/wake-lock.test.js tests/finance-feeders.test.js tests/morph-gallery.test.js tests/backup-helpers.test.js tests/calendar-helpers.test.js tests/calculator-state.test.js tests/incubation-helpers.test.js tests/weight-chart.test.js tests/breeding-timeline.test.js tests/season-review-helpers.test.js tests/sales-helpers.test.js tests/pair-scorecard.test.js tests/buyer-helpers.test.js tests/defect-helpers.test.js tests/gene-aliases.test.js tests/hatchling-ids.test.js tests/scan-helpers.test.js tests/clutch-growth.test.js tests/breeding-repair.test.js"
+    "test": "node --test tests/banana-maker.test.js tests/gene-labels.test.js tests/combo-names.test.js tests/health-helpers.test.js tests/lineage.test.js tests/readiness.test.js tests/feeder-inventory.test.js tests/feed-helpers.test.js tests/wake-lock.test.js tests/finance-feeders.test.js tests/morph-gallery.test.js tests/backup-helpers.test.js tests/calendar-helpers.test.js tests/calculator-state.test.js tests/incubation-helpers.test.js tests/weight-chart.test.js tests/breeding-timeline.test.js tests/season-review-helpers.test.js tests/sales-helpers.test.js tests/pair-scorecard.test.js tests/buyer-helpers.test.js tests/defect-helpers.test.js tests/gene-aliases.test.js tests/hatchling-ids.test.js tests/scan-helpers.test.js tests/clutch-growth.test.js tests/breeding-repair.test.js"
   },
   "engines": {
     "node": ">=18"

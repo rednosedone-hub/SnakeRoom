@@ -5,6 +5,7 @@ const csvHeaders = [
     "ID",
     "morph",
     "sex",
+    "bananaMaker",
     "status",
     "retiredDate",
     "retiredReason",
@@ -19,6 +20,11 @@ const csvHeaders = [
     "purchaseDate",
     "sireId",
     "damId",
+    "contactName",
+    "contactEmail",
+    "contactPhone",
+    "contactInstagram",
+    "askingPrice",
     "salePrice",
     "saleDate",
     "soldTo",
@@ -186,6 +192,14 @@ function parseJsonArrayCell(text) {
     }
 }
 
+// The seller's public contact rides on every exported row. The publish build
+// refuses animals without it, so an enquiry can never fall back to this shop.
+function storefrontContact() {
+    return window.StorefrontContact
+        ? window.StorefrontContact.read()
+        : { name: "", email: "", phone: "", instagram: "" };
+}
+
 function snakeToRow(snake) {
     return {
         id: snake.id || "",
@@ -194,6 +208,7 @@ function snakeToRow(snake) {
         ID: snake.ID || "",
         morph: snake.morph || snake.ID || "",
         sex: snake.sex || "Unknown",
+        bananaMaker: snake.bananaMaker || "",
         status: snake.status || "",
         retiredDate: snake.retiredDate || "",
         retiredReason: snake.retiredReason || "",
@@ -208,6 +223,11 @@ function snakeToRow(snake) {
         purchaseDate: snake.purchaseDate || "",
         sireId: snake.sireId || "",
         damId: snake.damId || "",
+        contactName: storefrontContact().name,
+        contactEmail: storefrontContact().email,
+        contactPhone: storefrontContact().phone,
+        contactInstagram: storefrontContact().instagram,
+        askingPrice: snake.askingPrice || "",
         salePrice: snake.salePrice || "",
         saleDate: snake.saleDate || "",
         soldTo: snake.soldTo || "",
@@ -415,6 +435,7 @@ function rowToSnake(rowObject, index) {
         ID: getCell(rowObject, "ID") || identity,
         morph: getCell(rowObject, "morph") || identity,
         sex: getCell(rowObject, "sex") || "Unknown",
+        bananaMaker: getCell(rowObject, "bananaMaker"),
         status: getCell(rowObject, "status") || "Holdback",
         retiredDate: getCell(rowObject, "retiredDate"),
         retiredReason: getCell(rowObject, "retiredReason"),
@@ -429,6 +450,7 @@ function rowToSnake(rowObject, index) {
         purchaseDate: getCell(rowObject, "purchaseDate"),
         sireId: getCell(rowObject, "sireId"),
         damId: getCell(rowObject, "damId"),
+        askingPrice: getCell(rowObject, "askingPrice"),
         salePrice: getCell(rowObject, "salePrice"),
         saleDate: getCell(rowObject, "saleDate"),
         soldTo: getCell(rowObject, "soldTo"),
@@ -536,8 +558,10 @@ function mergeImportedSnake(existingSnake, importedSnake, rowObject) {
         "purchasedFrom",
         "purchasePrice",
         "purchaseDate",
+        "bananaMaker",
         "sireId",
         "damId",
+        "askingPrice",
         "salePrice",
         "saleDate",
         "soldTo",

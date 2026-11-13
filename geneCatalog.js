@@ -189,6 +189,10 @@ const geneAliases = {
     "ultra": "Ultramel",
     "um": "Ultramel",
     "ban": "Banana",
+    // Coral Glow is the same morph under another breeder's name, so both spellings
+    // land on one gene instead of becoming separate codominant entries.
+    "coral glow": "Banana",
+    "cg": "Banana",
     "moj": "Mojave",
     "les": "Lesser",
     "but": "Butter",
