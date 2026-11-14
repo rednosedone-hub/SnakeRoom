@@ -291,6 +291,11 @@ function markSelectedFed() {
                 result
             };
 
+            // Cost the meal now, at today's price.
+            if (typeof window !== "undefined" && window.SnakeFinance) {
+                window.SnakeFinance.priceFeedingEntry(entry);
+            }
+
             if (reason) {
                 entry.reason = reason;
             }
@@ -475,6 +480,10 @@ function logFedFromHold(index) {
         result: "Accepted"
     };
 
+    if (typeof window !== "undefined" && window.SnakeFinance) {
+        window.SnakeFinance.priceFeedingEntry(entry);
+    }
+
     if (entry.feederSize && window.SnakeFeeders && window.SnakeFeeders.consumeFeeder(entry.feederSize)) {
         entry.stockCounted = true;
     }
@@ -629,6 +638,10 @@ function logFedFromSnooze(index) {
         feederSize: snake.feederSize || "",
         result: "Accepted"
     };
+
+    if (typeof window !== "undefined" && window.SnakeFinance) {
+        window.SnakeFinance.priceFeedingEntry(entry);
+    }
 
     if (entry.feederSize && window.SnakeFeeders && window.SnakeFeeders.consumeFeeder(entry.feederSize)) {
         entry.stockCounted = true;

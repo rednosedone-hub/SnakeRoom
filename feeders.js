@@ -1196,7 +1196,14 @@
         }
 
         const amount = F.toMoney($("feederOrderAmount").value);
+        const shipping = F.toMoney($("feederOrderShipping").value);
+        const tax = F.toMoney($("feederOrderTax").value);
         const note = $("feederOrderNote").value.trim();
+
+        if (shipping + tax > amount) {
+            setStatus("feederOrderStatus", "Shipping and tax come to more than the total paid. Check the amounts.", true);
+            return;
+        }
         const lineNote = lines
             .map(line => `${line.quantity} × ${line.size}`)
             .join(", ");
@@ -1234,6 +1241,8 @@
             vendor: $("feederOrderVendor").value,
             amount,
             note: [lineNote, note].filter(Boolean).join(" · "),
+            shipping,
+            tax,
             feederType: orderKind,
             feederLines: lines
         });
@@ -1244,6 +1253,8 @@
 
         $("feederOrderVendor").value = "";
         $("feederOrderAmount").value = "";
+        $("feederOrderShipping").value = "";
+        $("feederOrderTax").value = "";
         $("feederOrderNote").value = "";
         resetOrderLines();
 
@@ -1254,7 +1265,21 @@
             ? ` Recorded ${liveLines.map(line => `${line.quantity} ${line.size}`).join(", ")} as live feeders, so no stock was added.`
             : "";
 
-        setStatus("feederOrderStatus", `Order saved.${stockNote}${liveNote}`);
+        const extras = [];
+
+        if (shipping > 0) {
+            extras.push(`${F.formatMoney(shipping)} shipping`);
+        }
+
+        if (tax > 0) {
+            extras.push(`${F.formatMoney(tax)} tax`);
+        }
+
+        const costNote = amount > 0 && extras.length > 0
+            ? ` Total ${F.formatMoney(amount)} (${extras.join(", ")}).`
+            : "";
+
+        setStatus("feederOrderStatus", `Order saved.${stockNote}${liveNote}${costNote}`);
         report(`Feeder order saved.${stockNote}${liveNote}`);
     }
 
@@ -1282,6 +1307,16 @@
             const type = expense.feederType === "live" || expense.feederType === "frozen"
                 ? expense.feederType
                 : "";
+            const money = F && typeof F.getFeederOrderBreakdown === "function"
+                ? F.getFeederOrderBreakdown(expense)
+                : null;
+            const split = money && (money.shipping > 0 || money.tax > 0)
+                ? [
+                    `Feeders ${formatMoney(money.feeders)}`,
+                    money.shipping > 0 ? `Shipping ${formatMoney(money.shipping)}` : "",
+                    money.tax > 0 ? `Tax ${formatMoney(money.tax)}` : ""
+                ].filter(Boolean).join(" · ")
+                : "";
 
             return `
                 <div class="feeder-order-row">
@@ -1289,7 +1324,7 @@
                         <strong>${formatDate(expense.date)}</strong>
                         <span>${escapeHtml(expense.vendor || "No supplier")}</span>
                     </div>
-                    <div class="feeder-order-detail">${escapeHtml(detail)}</div>
+                    <div class="feeder-order-detail">${escapeHtml(detail)}${split ? `<small class="feeder-order-breakdown">${escapeHtml(split)}</small>` : ""}</div>
                     ${type ? `<span class="feeder-type-tag is-${type}">${type === "live" ? "Live" : "Frozen"}</span>` : ""}
                     <strong class="feeder-order-amount">${expense.amount > 0 ? formatMoney(expense.amount) : "No cost"}</strong>
                 </div>

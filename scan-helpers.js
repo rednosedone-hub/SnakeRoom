@@ -108,6 +108,11 @@
 
         const entry = { date, feederSize, result };
 
+        // Cost the meal now, at today's price.
+        if (typeof window !== "undefined" && window.SnakeFinance) {
+            window.SnakeFinance.priceFeedingEntry(entry);
+        }
+
         if (reason) {
             entry.reason = reason;
         }

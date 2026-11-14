@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Finances</title>
-    <link rel="stylesheet" href="style.css?v=96">
+    <link rel="stylesheet" href="style.css?v=101">
 </head>
 
 <body>
@@ -266,11 +266,18 @@
                         <h4>Price per feeder</h4>
                         <p class="empty-message">
                             Set what you pay for each size, in the currency chosen on Overview.
-                            Feeding records use these prices to estimate what your collection is
-                            eating through.
+                            Each meal is costed at the price on the day it was logged, so raising a
+                            price keeps past feeding costs accurate. If you feed something that is not
+                            listed — ASF, your own mouse size — add it below.
                         </p>
 
                         <div class="feeder-price-grid" id="feederPriceRows"></div>
+
+                        <div class="feeder-type-add">
+                            <input type="text" id="newFeederTypeInput"
+                                placeholder="Add a feeder type — e.g. ASF Weaner" aria-label="New feeder type">
+                            <button type="button" class="small-link-button" id="addFeederTypeButton">Add type</button>
+                        </div>
 
                         <div class="fin-actions">
                             <button type="button" class="main-button" id="saveFeederPricesButton">
@@ -376,8 +383,13 @@
                     </label>
 
                     <label class="form-field">
-                        <span>Show date</span>
+                        <span>First day</span>
                         <input type="date" id="expoDateInput">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Last day</span>
+                        <input type="date" id="expoEndDateInput">
                     </label>
 
                     <label class="form-field">
@@ -400,11 +412,15 @@
                         <input type="number" id="expoOtherCostInput" min="0" step="0.01" placeholder="0.00">
                     </label>
 
-                    <label class="form-field">
-                        <span>Other revenue at the show</span>
-                        <input type="number" id="expoOtherRevenueInput" min="0" step="0.01"
-                            placeholder="e.g. supplies sold">
-                    </label>
+                    <div class="form-field fin-span-all">
+                        <span>Other sales at the show</span>
+                        <p class="fin-muted expo-sale-hint">
+                            Merch and extras, one line each — hats, shirts, stickers — so you can
+                            see which ones are worth bringing back.
+                        </p>
+                        <div class="expo-sale-rows" id="expoOtherSalesRows"></div>
+                        <button type="button" class="small-link-button" id="expoAddSaleButton">Add another item</button>
+                    </div>
 
                     <label class="form-field fin-span-all">
                         <span>Notes</span>
@@ -558,9 +574,9 @@
     <script src="auto-sync.js?v=9"></script>
     <script src="account-gate.js?v=1"></script>
     <script src="plans.js?v=2"></script>
-    <script src="finance-helpers.js?v=6"></script>
+    <script src="finance-helpers.js?v=9"></script>
     <script src="sales-helpers.js?v=5"></script>
-    <script src="finance.js?v=5"></script>
+    <script src="finance.js?v=10"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

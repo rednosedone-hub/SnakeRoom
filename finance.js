@@ -18,7 +18,8 @@
         tab: "overview",
         year: "",
         editingExpoId: "",
-        releaseSnakeId: ""
+        releaseSnakeId: "",
+        expoOtherSales: []
     };
 
     let snakes = [];
@@ -379,6 +380,7 @@
         const sizes = new Set(F.FEEDER_SIZES);
 
         Object.keys(settings.feederPrices || {}).forEach(size => sizes.add(size));
+        (settings.feederTypes || []).forEach(size => sizes.add(size));
 
         snakes.forEach(snake => {
             (Array.isArray(snake.feedingHistory) ? snake.feedingHistory : []).forEach(entry => {
@@ -403,17 +405,44 @@
         container.innerHTML = collectFeederSizes().map(size => {
             const price = settings.feederPrices[size];
             const inputId = `feederPrice-${size.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}`;
+            const custom = !F.FEEDER_SIZES.includes(size);
 
             return `
-                <label class="feeder-price-row" for="${escapeHtml(inputId)}">
-                    <span>${escapeHtml(size)}</span>
+                <div class="feeder-price-row${custom ? " is-custom" : ""}">
+                    <label for="${escapeHtml(inputId)}">${escapeHtml(size)}${custom ? "<small>your size</small>" : ""}</label>
                     <input type="number" min="0" step="0.01" id="${escapeHtml(inputId)}"
                         data-feeder-size="${escapeHtml(size)}"
-                        value="${price ? escapeHtml(String(price)) : ""}"
+                        value="${price ? Number(price).toFixed(2) : ""}"
                         placeholder="0.00">
-                </label>
+                    ${custom
+                        ? `<button type="button" class="fin-delete-button" data-remove-feeder-type="${escapeHtml(size)}"
+                            title="Remove this feeder type">Remove</button>`
+                        : ""}
+                </div>
             `;
         }).join("");
+    }
+
+    // Names the keeper added themselves, kept even while unpriced so a half-set-up
+    // list survives a reload.
+    function collectCustomFeederTypes() {
+        const custom = [];
+
+        document.querySelectorAll("[data-feeder-size]").forEach(input => {
+            const size = input.getAttribute("data-feeder-size");
+
+            if (size && !F.FEEDER_SIZES.includes(size)) {
+                custom.push(size);
+            }
+        });
+
+        (settings.feederTypes || []).forEach(size => {
+            if (!custom.some(name => name.toLowerCase() === size.toLowerCase())) {
+                custom.push(size);
+            }
+        });
+
+        return custom;
     }
 
     function saveFeederPrices() {
@@ -426,16 +455,70 @@
             if (size && price > 0) {
                 prices[size] = price;
             }
+
+            if (size && price > 0) {
+                input.value = price.toFixed(2);
+            }
         });
 
-        F.saveSettings({ feederPrices: prices });
+        F.saveSettings({ feederPrices: prices, feederTypes: collectCustomFeederTypes() });
         loadAll();
         renderFeederPrices();
         renderOverview();
         renderFeederUsage();
         setStatus("feederPriceStatus", prices && Object.keys(prices).length > 0
-            ? `Saved ${Object.keys(prices).length} feeder price${Object.keys(prices).length === 1 ? "" : "s"}.`
+            ? `Saved ${Object.keys(prices).length} feeder price${Object.keys(prices).length === 1 ? "" : "s"}. New feeds use these; feeds already logged keep the price they were recorded at.`
             : "Prices cleared.");
+    }
+
+    function addFeederType() {
+        const input = $("newFeederTypeInput");
+
+        if (!input) {
+            return;
+        }
+
+        const name = input.value.trim();
+
+        if (!name) {
+            setStatus("feederPriceStatus", "Type a name first — for example ASF Weaner.", true);
+            input.focus();
+            return;
+        }
+
+        const already = collectFeederSizes().some(size => size.toLowerCase() === name.toLowerCase());
+
+        if (already) {
+            setStatus("feederPriceStatus", `${name} is already on the list.`, true);
+            input.select();
+            return;
+        }
+
+        F.saveSettings({ feederTypes: [...(F.getSettings().feederTypes || []), name] });
+        input.value = "";
+        loadAll();
+        renderFeederPrices();
+        setStatus("feederPriceStatus", `Added ${name}. Set its price, then save.`);
+    }
+
+    function removeFeederType(name) {
+        const current = F.getSettings();
+        const prices = { ...(current.feederPrices || {}) };
+
+        Object.keys(prices).forEach(key => {
+            if (key.toLowerCase() === name.toLowerCase()) {
+                delete prices[key];
+            }
+        });
+
+        const types = (current.feederTypes || []).filter(type => type.toLowerCase() !== name.toLowerCase());
+
+        F.saveSettings({ feederPrices: prices, feederTypes: types });
+        loadAll();
+        renderFeederPrices();
+        renderOverview();
+        renderFeederUsage();
+        setStatus("feederPriceStatus", `Removed ${name}. Meals already logged under it keep their price.`);
     }
 
     function renderFeederUsage() {
@@ -473,6 +556,10 @@
             notes.push(`${usage.unpricedFeedings} feeding${usage.unpricedFeedings === 1 ? " has" : "s have"} no price set for that size.`);
         }
 
+        if (usage.recordedPriceFeedings > 0) {
+            notes.push(`${usage.recordedPriceFeedings} feeding${usage.recordedPriceFeedings === 1 ? " was" : "s were"} costed at the price on the day, so changing a price only affects new feeds.`);
+        }
+
         note.textContent = notes.join(" ");
     }
 
@@ -481,18 +568,35 @@
             .filter(expense => expense.category === "Feeders")
             .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
 
-        $("finFeederOrdersBody").innerHTML = orders.map(expense => `
+        $("finFeederOrdersBody").innerHTML = orders.map(expense => {
+            const money = F.getFeederOrderBreakdown(expense);
+            const split = [];
+
+            if (money.shipping > 0) {
+                split.push(`Shipping ${formatMoney(money.shipping)}`);
+            }
+
+            if (money.tax > 0) {
+                split.push(`Tax ${formatMoney(money.tax)}`);
+            }
+
+            const splitLine = split.length > 0
+                ? `<small class="fin-muted">Feeders ${formatMoney(money.feeders)} · ${split.join(" · ")}</small>`
+                : "";
+
+            return `
             <tr>
                 <td>${formatDate(expense.date)}</td>
                 <td>${escapeHtml(expense.vendor || "—")}</td>
-                <td>${escapeHtml(expense.note || "—")}</td>
+                <td>${escapeHtml(expense.note || "—")}${splitLine}</td>
                 <td class="fin-amount-cell">${formatMoney(expense.amount)}</td>
                 <td class="fin-row-action">
                     <button type="button" class="fin-delete-button" data-delete-expense="${escapeHtml(expense.id)}"
                         title="Delete this feeder order">Delete</button>
                 </td>
             </tr>
-        `).join("");
+        `;
+        }).join("");
 
         const total = orders.reduce((sum, expense) => sum + expense.amount, 0);
 
@@ -503,6 +607,82 @@
     }
 
     // ---- Shows -------------------------------------------------------------
+
+    // A show's dates as one readable span: a single day, or a range when it ran
+    // over a weekend.
+    function formatExpoDates(expo) {
+        if (!expo.date) {
+            return expo.endDate ? formatDate(expo.endDate) : "Date not set";
+        }
+
+        if (!expo.endDate || expo.endDate === expo.date) {
+            return formatDate(expo.date);
+        }
+
+        return `${formatDate(expo.date)} – ${formatDate(expo.endDate)}`;
+    }
+
+    function expoOtherSaleId() {
+        return `sale-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    }
+
+    function renderExpoOtherSalesRows() {
+        const host = $("expoOtherSalesRows");
+
+        if (!host) {
+            return;
+        }
+
+        if (state.expoOtherSales.length === 0) {
+            state.expoOtherSales.push({ id: expoOtherSaleId(), label: "", amount: "" });
+        }
+
+        host.innerHTML = state.expoOtherSales.map(item => `
+            <div class="expo-sale-row" data-sale-row="${escapeHtml(item.id)}">
+                <input type="text" class="expo-sale-label" placeholder="e.g. Hats"
+                    aria-label="Item sold" value="${escapeHtml(item.label || "")}">
+                <input type="number" class="expo-sale-amount" min="0" step="0.01" placeholder="0.00"
+                    aria-label="Amount taken" value="${escapeHtml(item.amount === 0 || item.amount ? item.amount : "")}">
+                <button type="button" class="fin-delete-button" data-sale-remove="${escapeHtml(item.id)}"
+                    aria-label="Remove this item">Remove</button>
+            </div>
+        `).join("");
+    }
+
+    // Read straight from the inputs: the keeper may type and save without ever
+    // causing a re-render, so the DOM is the truth at submit time.
+    function readExpoOtherSales(keepEmpty) {
+        const host = $("expoOtherSalesRows");
+
+        if (!host) {
+            return [];
+        }
+
+        return [...host.querySelectorAll(".expo-sale-row")].map(row => ({
+            id: row.getAttribute("data-sale-row") || expoOtherSaleId(),
+            label: row.querySelector(".expo-sale-label").value.trim(),
+            amount: F.toMoney(row.querySelector(".expo-sale-amount").value)
+        })).filter(item => keepEmpty || item.label || item.amount > 0);
+    }
+
+    function addExpoOtherSale() {
+        // Keep the rows already on screen, empty or not: pressing Add on a blank
+        // row should give a second blank row, not look like nothing happened.
+        const rows = readExpoOtherSales(true);
+        state.expoOtherSales = [...rows, { id: expoOtherSaleId(), label: "", amount: "" }];
+        renderExpoOtherSalesRows();
+        const inputs = document.querySelectorAll("#expoOtherSalesRows .expo-sale-label");
+        const last = inputs[inputs.length - 1];
+
+        if (last) {
+            last.focus();
+        }
+    }
+
+    function removeExpoOtherSale(rowId) {
+        state.expoOtherSales = readExpoOtherSales(true).filter(item => item.id !== rowId);
+        renderExpoOtherSalesRows();
+    }
 
     function renderExpoList() {
         const list = $("expoList");
@@ -531,6 +711,16 @@
                 `).join("")
                 : `<li class="fin-empty-line">No snakes are linked to this show yet. Set a snake's Sold At to this show on its record.</li>`;
 
+            const otherSalesRows = totals.otherSales.length > 0
+                ? `<p class="fin-muted expo-sales-head">Other sales</p>
+                    <ul class="expo-sales-list">${totals.otherSales.map(item => `
+                        <li>
+                            <span>${escapeHtml(item.label || "Unnamed item")}</span>
+                            <strong>${formatMoney(item.amount)}</strong>
+                        </li>
+                    `).join("")}</ul>`
+                : "";
+
             const costLines = [
                 { label: "Booth", amount: expo.boothCost },
                 { label: "Travel", amount: expo.travelCost },
@@ -545,7 +735,7 @@
                         <div>
                             <h4>${escapeHtml(expo.name)}</h4>
                             <p class="fin-muted">
-                                ${expo.date ? formatDate(expo.date) : "Date not set"}
+                                ${formatExpoDates(expo)}
                                 ${expo.location ? ` · ${escapeHtml(expo.location)}` : ""}
                             </p>
                         </div>
@@ -566,6 +756,7 @@
                     <details class="expo-details">
                         <summary>Sold at this show (${totals.sales.length})${totals.costs > 0 ? ` · costs ${formatMoney(totals.costs)}` : ""}</summary>
                         <ul class="expo-sales-list">${salesRows}</ul>
+                        ${otherSalesRows}
                         ${costLines ? `<p class="expo-costs">${costLines}</p>` : ""}
                         ${expo.notes ? `<p class="fin-muted">${escapeHtml(expo.notes)}</p>` : ""}
                     </details>
@@ -578,7 +769,7 @@
         state.editingExpoId = "";
 
         ["expoNameInput", "expoLocationInput", "expoNotesInput", "expoBoothInput", "expoTravelInput",
-            "expoOtherCostInput", "expoOtherRevenueInput", "expoIdInput"].forEach(id => {
+            "expoOtherCostInput", "expoEndDateInput", "expoIdInput"].forEach(id => {
             const input = $(id);
 
             if (input) {
@@ -592,6 +783,9 @@
             dateInput.value = F.getTodayText();
         }
 
+        state.expoOtherSales = [];
+        renderExpoOtherSalesRows();
+
         $("expoSubmitButton").textContent = "Add Show";
         $("expoCancelButton").style.display = "none";
         setStatus("expoStatus", "");
@@ -603,12 +797,21 @@
         $("expoIdInput").value = expo.id;
         $("expoNameInput").value = expo.name;
         $("expoDateInput").value = expo.date || "";
+        $("expoEndDateInput").value = expo.endDate || "";
         $("expoLocationInput").value = expo.location || "";
         $("expoBoothInput").value = expo.boothCost > 0 ? expo.boothCost : "";
         $("expoTravelInput").value = expo.travelCost > 0 ? expo.travelCost : "";
         $("expoOtherCostInput").value = expo.otherCost > 0 ? expo.otherCost : "";
-        $("expoOtherRevenueInput").value = expo.otherRevenue > 0 ? expo.otherRevenue : "";
         $("expoNotesInput").value = expo.notes || "";
+
+        // A show recorded before items existed keeps its single figure as one
+        // named line, so editing it does not silently drop the money.
+        state.expoOtherSales = expo.otherSales.length > 0
+            ? expo.otherSales.map(item => ({ ...item }))
+            : (expo.otherRevenue > 0
+                ? [{ id: expoOtherSaleId(), label: "Other revenue", amount: expo.otherRevenue }]
+                : []);
+        renderExpoOtherSalesRows();
 
         $("expoSubmitButton").textContent = "Update Show";
         $("expoCancelButton").style.display = "";
@@ -627,15 +830,33 @@
             return;
         }
 
+        const date = $("expoDateInput").value;
+        const endDate = $("expoEndDateInput").value;
+
+        if (date && endDate && endDate < date) {
+            setStatus("expoStatus", "The last day cannot be before the first day.", true);
+            $("expoEndDateInput").focus();
+            return;
+        }
+
+        const otherSales = readExpoOtherSales();
+        const otherRevenue = Math.round(
+            otherSales.reduce((sum, item) => sum + item.amount, 0) * 100
+        ) / 100;
+
         const entry = {
             id: state.editingExpoId || F.createId("expo"),
             name,
-            date: $("expoDateInput").value,
+            date,
+            endDate,
             location: $("expoLocationInput").value.trim(),
             boothCost: F.toMoney($("expoBoothInput").value),
             travelCost: F.toMoney($("expoTravelInput").value),
             otherCost: F.toMoney($("expoOtherCostInput").value),
-            otherRevenue: F.toMoney($("expoOtherRevenueInput").value),
+            // Kept alongside the itemised list so anything still reading the old
+            // single figure (exports, older pages) shows the same total.
+            otherRevenue,
+            otherSales,
             notes: $("expoNotesInput").value.trim()
         };
 
@@ -1152,11 +1373,50 @@
         });
 
         $("saveFeederPricesButton").addEventListener("click", saveFeederPrices);
+
+        $("addFeederTypeButton").addEventListener("click", addFeederType);
+
+        $("newFeederTypeInput").addEventListener("keydown", event => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                addFeederType();
+            }
+        });
+
+        $("feederPriceRows").addEventListener("click", event => {
+            const removeButton = event.target.closest("[data-remove-feeder-type]");
+
+            if (removeButton) {
+                removeFeederType(removeButton.getAttribute("data-remove-feeder-type"));
+            }
+        });
+
+        // Prices read as money once the keeper leaves the field: 4 becomes 4.00.
+        $("feederPriceRows").addEventListener("blur", event => {
+            const input = event.target.closest("[data-feeder-size]");
+
+            if (!input) {
+                return;
+            }
+
+            const price = F.toMoney(input.value);
+            input.value = price > 0 ? price.toFixed(2) : "";
+        }, true);
         $("holdGraceForm").addEventListener("submit", saveHoldGraceSetting);
         $("feederOrderForm").addEventListener("submit", saveFeederOrder);
         $("expenseForm").addEventListener("submit", saveExpense);
         $("expoForm").addEventListener("submit", saveExpoFromForm);
         $("expoCancelButton").addEventListener("click", resetExpoForm);
+
+        $("expoAddSaleButton").addEventListener("click", addExpoOtherSale);
+
+        $("expoOtherSalesRows").addEventListener("click", event => {
+            const removeButton = event.target.closest("[data-sale-remove]");
+
+            if (removeButton) {
+                removeExpoOtherSale(removeButton.getAttribute("data-sale-remove"));
+            }
+        });
 
         $("expoList").addEventListener("click", event => {
             const editButton = event.target.closest("[data-expo-edit]");
@@ -1221,6 +1481,7 @@
         initDates();
         renderFeederPrices();
         renderAll();
+        renderExpoOtherSalesRows();
         bindEvents();
 
         const hashTab = window.location.hash.replace("#", "");

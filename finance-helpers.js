@@ -152,7 +152,28 @@
             });
         }
 
-        return { currency, feederPrices: prices, holdGraceDays };
+        // Any sizes the keeper named themselves (ASF, a mouse size of their own).
+        // They live beside the prices so a type can be listed before it is priced.
+        const types = Array.isArray(stored.feederTypes)
+            ? stored.feederTypes.map(type => String(type || "").trim()).filter(Boolean)
+            : [];
+
+        return { currency, feederPrices: prices, feederTypes: dedupeTypes(types), holdGraceDays };
+    }
+
+    function dedupeTypes(types) {
+        const seen = {};
+
+        return types.filter(type => {
+            const key = type.toLowerCase();
+
+            if (seen[key]) {
+                return false;
+            }
+
+            seen[key] = true;
+            return true;
+        });
     }
 
     function saveSettings(settings) {
@@ -169,6 +190,9 @@
         writeObject(KEYS.settings, {
             currency: next.currency,
             feederPrices: next.feederPrices || {},
+            feederTypes: dedupeTypes((Array.isArray(next.feederTypes) ? next.feederTypes : [])
+                .map(type => String(type || "").trim())
+                .filter(Boolean)),
             holdGraceDays: normalizeHoldGraceDays(next.holdGraceDays)
         });
     }
@@ -244,6 +268,11 @@
                 vendor: String(expense.vendor || ""),
                 amount: toMoney(expense.amount),
                 note: String(expense.note || ""),
+                // Shipping and tax are paid to the courier and the tax office,
+                // not for the feeders themselves, so a frozen order keeps them
+                // as their own lines inside the one amount paid.
+                shipping: toMoney(expense.shipping),
+                tax: toMoney(expense.tax),
                 feederType: normalizeFeederType(expense.feederType),
                 feederLines: normalizeFeederLines(expense.feederLines)
             }));
@@ -262,6 +291,8 @@
             vendor: String(expense.vendor || "").trim(),
             amount: toMoney(expense.amount),
             note: String(expense.note || "").trim(),
+            shipping: toMoney(expense.shipping),
+            tax: toMoney(expense.tax),
             feederType: normalizeFeederType(expense.feederType),
             feederLines: normalizeFeederLines(expense.feederLines)
         };
@@ -270,6 +301,21 @@
         saveExpenses(expenses);
 
         return entry;
+    }
+
+    // What an order's total is actually made of. The feeders are whatever is
+    // left once the courier and the tax come out of the amount paid.
+    function getFeederOrderBreakdown(expense) {
+        const total = toMoney(expense && expense.amount);
+        const shipping = toMoney(expense && expense.shipping);
+        const tax = toMoney(expense && expense.tax);
+
+        return {
+            total,
+            shipping,
+            tax,
+            feeders: Math.round((total - shipping - tax) * 100) / 100
+        };
     }
 
     function removeExpense(expenseId) {
@@ -285,17 +331,50 @@
                 id: expo.id || createId("expo"),
                 name: String(expo.name || "Unnamed show"),
                 date: expo.date || "",
+                // Shows run more than one day often enough that a single date
+                // was hiding the Sunday takings. Empty means a one-day show.
+                endDate: expo.endDate || "",
                 location: String(expo.location || ""),
                 boothCost: toMoney(expo.boothCost),
                 travelCost: toMoney(expo.travelCost),
                 otherCost: toMoney(expo.otherCost),
                 otherRevenue: toMoney(expo.otherRevenue),
+                otherSales: normalizeOtherSales(expo.otherSales),
                 notes: String(expo.notes || "")
             }));
     }
 
     function saveExpos(expos) {
         writeArray(KEYS.expos, expos);
+    }
+
+    // What sold besides snakes: hats, shirts, stickers, spare tubs. One line per
+    // thing tried, so a keeper can see which item is worth restocking instead of
+    // one lump sum that says nothing. Older shows only carry a single number,
+    // which stays usable as a fallback.
+    function normalizeOtherSales(items) {
+        if (!Array.isArray(items)) {
+            return [];
+        }
+
+        return items
+            .filter(item => item && typeof item === "object")
+            .map(item => ({
+                id: String(item.id || createId("sale")),
+                label: String(item.label || "").trim(),
+                amount: toMoney(item.amount)
+            }))
+            .filter(item => item.label || item.amount > 0);
+    }
+
+    function getExpoOtherSalesTotal(expo) {
+        const items = normalizeOtherSales(expo && expo.otherSales);
+
+        if (items.length === 0) {
+            return toMoney(expo && expo.otherRevenue);
+        }
+
+        return Math.round(items.reduce((sum, item) => sum + item.amount, 0) * 100) / 100;
     }
 
     function findExpo(expos, expoId) {
@@ -371,12 +450,43 @@
         return true;
     }
 
+    function getFeederPrice(size, prices) {
+        const list = prices || getSettings().feederPrices;
+        const clean = String(size || "").trim().toLowerCase();
+        const key = Object.keys(list || {}).find(name => name.toLowerCase() === clean);
+
+        return key ? toMoney(list[key]) : 0;
+    }
+
+    // Stamp the price onto the feeding record as it is logged. Without this, a
+    // keeper raising a feeder price rewrites the cost of every meal already
+    // eaten, and last season's figures change every time a price moves.
+    function priceFeedingEntry(entry, prices) {
+        if (!entry || typeof entry !== "object") {
+            return entry;
+        }
+
+        const stored = entry.feederPrice;
+        const hasStored = stored !== undefined && stored !== null && String(stored) !== "";
+
+        if (!hasStored) {
+            const price = getFeederPrice(entry.feederSize, prices);
+
+            if (price > 0) {
+                entry.feederPrice = price;
+            }
+        }
+
+        return entry;
+    }
+
     function getFeederUsage(snakes, prices, year) {
         const priceList = prices || getSettings().feederPrices;
         const sizes = {};
         let unpricedFeedings = 0;
         let unrecordedSizeFeedings = 0;
         let acceptedFeedings = 0;
+        let recordedPriceFeedings = 0;
 
         (snakes || []).forEach(snake => {
             (Array.isArray(snake.feedingHistory) ? snake.feedingHistory : []).forEach(entry => {
@@ -401,26 +511,37 @@
                     return;
                 }
 
-                if (!sizes[size]) {
-                    sizes[size] = 0;
+                const stored = entry.feederPrice;
+                const hasStored = stored !== undefined && stored !== null && String(stored) !== "";
+                const entryPrice = hasStored ? toMoney(stored) : toMoney(priceList[size]);
+
+                if (hasStored) {
+                    recordedPriceFeedings += 1;
                 }
 
-                sizes[size] += 1;
+                if (!sizes[size]) {
+                    sizes[size] = { count: 0, cost: 0, unpriced: 0 };
+                }
+
+                sizes[size].count += 1;
+                sizes[size].cost += entryPrice;
+
+                if (entryPrice <= 0) {
+                    sizes[size].unpriced += 1;
+                }
             });
         });
 
         const rows = Object.keys(sizes)
             .sort((a, b) => a.localeCompare(b))
             .map(size => {
-                const count = sizes[size];
+                const bucket = sizes[size];
                 const price = toMoney(priceList[size]);
-                const cost = Math.round(count * price * 100) / 100;
+                const cost = Math.round(bucket.cost * 100) / 100;
 
-                if (price <= 0) {
-                    unpricedFeedings += count;
-                }
+                unpricedFeedings += bucket.unpriced;
 
-                return { size, count, price, cost };
+                return { size, count: bucket.count, price, cost, unpriced: bucket.unpriced };
             });
 
         const total = Math.round(rows.reduce((sum, row) => sum + row.cost, 0) * 100) / 100;
@@ -430,7 +551,8 @@
             total,
             acceptedFeedings,
             unpricedFeedings,
-            unrecordedSizeFeedings
+            unrecordedSizeFeedings,
+            recordedPriceFeedings
         };
     }
 
@@ -449,13 +571,15 @@
         });
 
         const snakeRevenue = Math.round(sales.reduce((sum, item) => sum + item.sale.amount, 0) * 100) / 100;
-        const otherRevenue = toMoney(expo.otherRevenue);
+        const otherSales = normalizeOtherSales(expo && expo.otherSales);
+        const otherRevenue = getExpoOtherSalesTotal(expo);
         const revenue = Math.round((snakeRevenue + otherRevenue) * 100) / 100;
 
         return {
             costs,
             sales,
             snakeRevenue,
+            otherSales,
             otherRevenue,
             revenue,
             net: Math.round((revenue - costs) * 100) / 100
@@ -695,6 +819,7 @@
         saveExpenses,
         addExpense,
         removeExpense,
+        getFeederOrderBreakdown,
         getExpos,
         saveExpos,
         findExpo,
@@ -704,6 +829,10 @@
         isRealizedSale,
         getSnakeLabel,
         getFeederUsage,
+        getFeederPrice,
+        priceFeedingEntry,
+        normalizeOtherSales,
+        getExpoOtherSalesTotal,
         getExpoTotals,
         getEvents,
         summarize,

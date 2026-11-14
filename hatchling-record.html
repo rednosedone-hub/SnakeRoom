@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Snake Room - Hatchling Record</title>
+    <link rel="stylesheet" href="style.css?v=101">
+</head>
+
+<body>
+    <div class="page-container record-page">
+        <div class="hero-section print-hidden">
+            <img src="Images/TheSnakeRoom.jpg" class="hero-image" alt="The Snake Room logo">
+
+            <div class="container">
+                <h1>The Snake Room</h1>
+                <h2>Hatchling Record</h2>
+            </div>
+        </div>
+
+        <div class="button-row print-hidden">
+            <a href="index.html" class="main-button">Home</a>
+            <a href="snakes.html" class="main-button">Collection</a>
+            <a href="breeding.html" class="main-button">Breeding</a>
+            <a href="bin-cards.html" class="main-button">Bin Cards</a>
+        </div>
+
+        <div class="divider print-hidden"></div>
+
+        <section class="form-section print-hidden">
+            <h3>Choose a hatchling</h3>
+
+            <div class="record-controls">
+                <label class="form-field">
+                    <span>Snake</span>
+                    <select id="recordSnakeSelect"></select>
+                </label>
+
+                <div class="form-field">
+                    <span>&nbsp;</span>
+                    <button type="button" class="main-button" id="printRecordButton">Print Record</button>
+                </div>
+            </div>
+
+            <p class="empty-message" id="recordHint">
+                A record shows the hatchling's parents with their photos and genes, its own genes and
+                dates, its birth weight and current weight, and its last three meals.
+            </p>
+        </section>
+
+        <main class="record-sheet" id="recordSheet"></main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script src="data-helpers.js?v=3"></script>
+    <script src="backup-helpers.js?v=1"></script>
+    <script src="cloud-sync.js?v=21"></script>
+    <script src="auto-sync.js?v=9"></script>
+    <script src="account-gate.js?v=1"></script>
+    <script src="geneCatalog.js?v=7"></script>
+    <script src="genes.js?v=13"></script>
+    <script src="hatchling-record.js?v=1"></script>
+    <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
+    <script src="nav-scroll.js?v=1"></script>
+</body>
+
+</html>

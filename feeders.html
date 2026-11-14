@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Feeders</title>
-    <link rel="stylesheet" href="style.css?v=96">
+    <link rel="stylesheet" href="style.css?v=101">
 </head>
 
 <body>
@@ -223,8 +223,19 @@
                 </label>
 
                 <label class="form-field">
-                    <span>Amount paid (optional)</span>
+                    <span>Total paid (optional)</span>
                     <input type="number" id="feederOrderAmount" min="0" step="0.01" placeholder="0.00">
+                    <small class="form-hint">Everything on the invoice, shipping and tax included.</small>
+                </label>
+
+                <label class="form-field">
+                    <span>Shipping (optional)</span>
+                    <input type="number" id="feederOrderShipping" min="0" step="0.01" placeholder="0.00">
+                </label>
+
+                <label class="form-field">
+                    <span>Tax (optional)</span>
+                    <input type="number" id="feederOrderTax" min="0" step="0.01" placeholder="0.00">
                 </label>
 
                 <label class="form-field">
@@ -273,10 +284,10 @@
     <script src="cloud-sync.js?v=21"></script>
     <script src="auto-sync.js?v=9"></script>
     <script src="account-gate.js?v=1"></script>
-    <script src="finance-helpers.js?v=6"></script>
+    <script src="finance-helpers.js?v=9"></script>
     <script src="feed-helpers.js?v=5"></script>
     <script src="feeder-inventory.js?v=10"></script>
-    <script src="feeders.js?v=10"></script>
+    <script src="feeders.js?v=11"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () { }); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>
