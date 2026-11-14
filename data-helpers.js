@@ -425,7 +425,32 @@ function getHatchlingRecordUrl(snake) {
     return `${window.location.origin}${path}?id=${encodeURIComponent((snake && snake.id) || "")}`;
 }
 
+// The record as a buyer should meet it: a public page on the shop's own site,
+// which needs no account. Empty when the keeper has not set their address.
+function getHatchlingRecordPublicUrl(snake) {
+    const contact = window.StorefrontContact && typeof window.StorefrontContact.read === "function"
+        ? window.StorefrontContact.read()
+        : {};
+    const base = String((contact && contact.siteUrl) || "").replace(/\/+$/, "");
+
+    if (!base) {
+        return "";
+    }
+
+    // The listing's public id is its inventory code, which is what the site
+    // publishes and what its record link matches on.
+    const id = String((snake && snake.ID) || (snake && snake.id) || "").trim();
+
+    return `${base}/available.html?record=${encodeURIComponent(id)}`;
+}
+
 function getHatchlingRecordQrData(snake) {
+    const publicUrl = getHatchlingRecordPublicUrl(snake);
+
+    if (publicUrl) {
+        return publicUrl;
+    }
+
     if (window.location.protocol === "http:" || window.location.protocol === "https:") {
         return getHatchlingRecordUrl(snake);
     }
@@ -473,5 +498,6 @@ window.SnakeData = {
     getSnakeQrImageUrl,
     getQrImageUrl,
     getHatchlingRecordUrl,
-    getHatchlingRecordQrImageUrl
+    getHatchlingRecordQrImageUrl,
+    getHatchlingRecordPublicUrl
 };

@@ -275,6 +275,10 @@ function renderRecord(snake) {
     const hatchYear = text(snake.hatchYear);
     const clutch = text(snake.clutchId);
     const identity = window.SnakeData.getSnakeIdentityText(snake);
+    // With a storefront address set, the code can send a phone to a page anyone
+    // may read. Without one, it can only open the app, which asks to sign in.
+    const publicRecord = Boolean(window.SnakeData.getHatchlingRecordPublicUrl
+        && window.SnakeData.getHatchlingRecordPublicUrl(snake));
 
     elements.sheet.innerHTML = `
         <article class="record-card">
@@ -290,7 +294,9 @@ function renderRecord(snake) {
                     <figure class="record-qr">
                         <img src="${escapeHtml(window.SnakeData.getHatchlingRecordQrImageUrl(snake, 160))}"
                             alt="QR code for this hatchling record">
-                        <figcaption>Scan for this record</figcaption>
+                        <figcaption>${publicRecord
+                            ? "Scan to view the record"
+                            : "Scan to open in the app"}</figcaption>
                     </figure>
                 </div>
             </header>

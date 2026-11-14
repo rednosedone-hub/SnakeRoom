@@ -143,5 +143,14 @@
         });
 
         render();
+
+        // A QR code on a printed record points here: available.html?record=ID.
+        // The record opens on its own so a buyer scans and reads, with no click
+        // and no sign-in.
+        var wantedRecord = params.get("record");
+
+        if (wantedRecord && SS.openRecord) {
+            SS.openRecord(wantedRecord);
+        }
     });
 })();

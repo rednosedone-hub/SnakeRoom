@@ -257,6 +257,30 @@
             "</div>";
     }
 
+    // Closing is done here rather than in a "close" listener: the page has to
+    // unlock and the address bar has to lose ?record, and both should happen
+    // whichever way the dialog was dismissed.
+    function closeRecord() {
+        if (recordDialog && recordDialog.open) {
+            recordDialog.close();
+        }
+
+        document.body.classList.remove("record-open");
+
+        if (page === "available.html") {
+            try {
+                var url = new URL(window.location.href);
+
+                if (url.searchParams.has("record")) {
+                    url.searchParams.delete("record");
+                    history.replaceState(null, "", "available.html" + url.search);
+                }
+            } catch (error) {
+                // A file:// page cannot rewrite its URL; closing still works.
+            }
+        }
+    }
+
     function openRecord(id) {
         var snake = listings.filter(function (item) {
             return String(item.id) === String(id);
@@ -269,11 +293,14 @@
             recordDialog.className = "record-modal";
             recordDialog.addEventListener("click", function (event) {
                 if (event.target === recordDialog || event.target.closest("[data-record-close]")) {
-                    recordDialog.close();
+                    closeRecord();
                 }
             });
-            recordDialog.addEventListener("close", function () {
-                document.body.classList.remove("record-open");
+            // Escape closes the dialog natively; take that path too so the page
+            // unlocks and the deep link goes away.
+            recordDialog.addEventListener("cancel", function (event) {
+                event.preventDefault();
+                closeRecord();
             });
             document.body.appendChild(recordDialog);
         }
@@ -287,6 +314,15 @@
         }
 
         document.body.classList.add("record-open");
+
+        // A record link is worth sharing, so the open record becomes the address.
+        if (page === "available.html") {
+            try {
+                history.replaceState(null, "", "available.html?record=" + encodeURIComponent(id));
+            } catch (error) {
+                // A file:// page cannot rewrite its URL; the modal still opens.
+            }
+        }
     }
 
     document.addEventListener("click", function (event) {
@@ -510,6 +546,7 @@
         money: money,
         monthYear: monthYear,
         card: card,
+        openRecord: openRecord,
         isLive: function (snake) {
             return snake.status !== "sold";
         }

@@ -10,7 +10,7 @@
 // (SNAPSHOT_KEYS in cloud-sync.js) carries it to the keeper's other devices.
 (function () {
     const STORAGE_KEY = "storefrontContact";
-    const EMPTY = { name: "", email: "", phone: "", instagram: "", slug: "" };
+    const EMPTY = { name: "", email: "", phone: "", instagram: "", slug: "", siteUrl: "" };
 
     function text(value) {
         return String(value === undefined || value === null ? "" : value).trim();
@@ -35,7 +35,11 @@
             email: text(source.email),
             phone: text(source.phone),
             instagram: text(source.instagram).replace(/^@+/, ""),
-            slug: slugify(source.slug || source.name)
+            slug: slugify(source.slug || source.name),
+            // Where the shop actually lives on the web. A QR code on a printed
+            // record has to send a phone to a public page, not to this app's
+            // sign-in screen, so the keeper's own address is what it uses.
+            siteUrl: text(source.siteUrl).replace(/\/+$/, "")
         };
     }
 
@@ -96,7 +100,8 @@
         email: "sellerEmailInput",
         phone: "sellerPhoneInput",
         instagram: "sellerInstagramInput",
-        slug: "sellerSlugInput"
+        slug: "sellerSlugInput",
+        siteUrl: "sellerSiteUrlInput"
     };
 
     function fieldValue(id) {
@@ -148,7 +153,8 @@
             email: fieldValue(FIELD_IDS.email),
             phone: fieldValue(FIELD_IDS.phone),
             instagram: fieldValue(FIELD_IDS.instagram),
-            slug: fieldValue(FIELD_IDS.slug) || fieldValue(FIELD_IDS.name)
+            slug: fieldValue(FIELD_IDS.slug) || fieldValue(FIELD_IDS.name),
+            siteUrl: fieldValue(FIELD_IDS.siteUrl)
         };
         const missing = problems(draft);
 
