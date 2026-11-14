@@ -136,7 +136,81 @@
         return line.charAt(0).toUpperCase() + line.slice(1) + ".";
     }
 
-    function publicListing(snake, shop) {
+    // ---- The hatchling record ---------------------------------------------
+    //
+    // A buyer should see where an animal came from without having to ask: its
+    // parents, genes, dates, birth and current weight, and the last three meals.
+    // Only record material goes out — no prices paid, no buyers, no notes.
+
+    // A photo only travels if it already lives on the web. A file path on the
+    // keeper's own machine would render as a broken image on the storefront.
+    function webPhoto(snake) {
+        const image = text(snake && snake.image);
+
+        return /^https?:\/\//i.test(image) ? image : "";
+    }
+
+    function weightPin(snake, which) {
+        const entries = (Array.isArray(snake && snake.weightHistory) ? snake.weightHistory : [])
+            .map(entry => ({
+                date: text(entry && entry.date).slice(0, 10),
+                weight: Number(entry && (entry.weight ?? entry.value))
+            }))
+            .filter(entry => Number.isFinite(entry.weight) && entry.weight > 0)
+            .sort((a, b) => a.date.localeCompare(b.date));
+
+        if (entries.length > 0) {
+            return which === "birth" ? entries[0] : entries[entries.length - 1];
+        }
+
+        const stored = Number(snake && snake.weight);
+
+        return which === "current" && stored > 0 ? { date: "", weight: stored } : null;
+    }
+
+    function parentOf(snake, kind, all) {
+        const id = text(kind === "sire" ? snake.sireId : snake.damId);
+        const match = id ? (all || []).find(candidate => text(candidate.id) === id) : null;
+
+        if (match) {
+            return {
+                name: text(match.name),
+                id: text(match.ID),
+                sex: text(match.sex),
+                genes: genesOf(match),
+                image: webPhoto(match)
+            };
+        }
+
+        // A parent that has left the collection keeps only its name on the record.
+        const label = text(snake[kind]);
+
+        return label ? { name: label, id: "", sex: "", genes: [], image: "" } : null;
+    }
+
+    function recordOf(snake, all) {
+        const meals = (Array.isArray(snake.feedingHistory) ? snake.feedingHistory : [])
+            .filter(entry => text(entry && entry.date))
+            .slice(-3)
+            .reverse()
+            .map(entry => ({
+                date: text(entry.date).slice(0, 10),
+                prey: text(entry.feederSize),
+                result: text(entry.result)
+            }));
+
+        return {
+            hatchDate: text(snake.hatchDate).slice(0, 10),
+            sex: text(snake.sex),
+            birthWeight: weightPin(snake, "birth"),
+            currentWeight: weightPin(snake, "current"),
+            sire: parentOf(snake, "sire", all),
+            dam: parentOf(snake, "dam", all),
+            meals
+        };
+    }
+
+    function publicListing(snake, shop, all) {
         const status = text(snake.status).toLowerCase() === "on hold"
             ? "hold"
             : text(snake.status).toLowerCase() === "sold" ? "sold" : "available";
@@ -157,6 +231,7 @@
             image: image && image !== DEFAULT_IMAGE ? image : "",
             notes: notesOf(snake, status),
             feeding: feedingOf(snake),
+            record: recordOf(snake, all),
             contactName: shop.name,
             contactEmail: shop.email,
             contactPhone: shop.phone,
@@ -167,7 +242,7 @@
     function listingsFor(snakes, shop) {
         const published = snakes
             .filter(snake => LIVE_STATUSES.indexOf(text(snake.status)) !== -1)
-            .map(snake => publicListing(snake, shop))
+            .map(snake => publicListing(snake, shop, snakes))
             .sort((a, b) => String(b.hatchDate).localeCompare(String(a.hatchDate)));
 
         return {

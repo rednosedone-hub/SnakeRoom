@@ -147,6 +147,157 @@
         }).join("") + "</p>";
     }
 
+    /* ---------- Hatchling record ---------- */
+
+    // A buyer can open the record the keeper published with the listing: parents,
+    // genes, dates, weights and the last three meals. Listings without one simply
+    // do not offer the link, so the site still works with older published data.
+    var listings = [];
+    var recordDialog = null;
+
+    function recordButton(snake) {
+        if (!snake || !snake.record) return "";
+
+        return '<button type="button" class="record-link" data-record="' +
+            escapeHtml(snake.id) + '">Hatchling record</button>';
+    }
+
+    function recordDate(iso) {
+        var clean = String(iso || "").slice(0, 10);
+
+        if (!clean) return "Not recorded";
+
+        var date = new Date(clean + "T00:00:00");
+
+        if (isNaN(date.getTime())) return clean;
+
+        return date.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+    }
+
+    function recordWeight(point) {
+        if (!point || !point.weight) return "Not recorded";
+
+        var grams = Math.round(Number(point.weight) * 10) / 10;
+
+        return escapeHtml(grams + " g") +
+            (point.date ? " <small>" + escapeHtml(recordDate(point.date)) + "</small>" : "");
+    }
+
+    function parentCard(label, parent) {
+        var kicker = '<p class="record-kicker">' + label + "</p>";
+
+        if (!parent) {
+            return '<div class="record-parent record-parent--empty">' + kicker +
+                "<p>Not recorded on this animal's file.</p></div>";
+        }
+
+        var photo = parent.image
+            ? '<span class="record-parent-photo"><img src="' + escapeHtml(parent.image) +
+              '" alt="' + escapeHtml(parent.name || label) + '" loading="lazy"></span>'
+            : '<span class="record-parent-photo is-empty">' +
+              escapeHtml(String(parent.name || label).charAt(0).toUpperCase()) + "</span>";
+
+        var genes = Array.isArray(parent.genes) && parent.genes.length
+            ? '<p class="record-parent-genes">' + parent.genes.map(function (gene) {
+                return "<span>" + escapeHtml(gene) + "</span>";
+            }).join("") + "</p>"
+            : "";
+
+        var sub = [parent.id, parent.sex].filter(Boolean).join(" · ");
+
+        return '<div class="record-parent">' + photo +
+            '<div class="record-parent-body">' + kicker +
+            "<h4>" + escapeHtml(parent.name || "Unnamed") + "</h4>" +
+            (sub ? '<p class="record-parent-id">' + escapeHtml(sub) + "</p>" : "") +
+            genes +
+            "</div></div>";
+    }
+
+    function mealTable(record) {
+        var meals = Array.isArray(record.meals) ? record.meals : [];
+
+        if (!meals.length) {
+            return '<p class="record-empty">No feedings published.</p>';
+        }
+
+        return '<table class="record-meals"><thead><tr><th>Date</th><th>Prey</th><th>Result</th></tr></thead><tbody>' +
+            meals.map(function (meal) {
+                return "<tr><td>" + escapeHtml(recordDate(meal.date)) + "</td><td>" +
+                    escapeHtml(meal.prey || "Not recorded") + "</td><td>" +
+                    escapeHtml(meal.result || "Not recorded") + "</td></tr>";
+            }).join("") + "</tbody></table>";
+    }
+
+    function recordHtml(snake) {
+        var record = snake.record || {};
+        var genes = Array.isArray(snake.genes) ? snake.genes : [];
+
+        return '<div class="record-modal__inner">' +
+            '<button type="button" class="record-close" data-record-close aria-label="Close record">&times;</button>' +
+            '<p class="record-kicker">Hatchling record</p>' +
+            "<h2>" + escapeHtml(snake.name || "Unnamed") + "</h2>" +
+            '<p class="record-sub">' + escapeHtml(snake.morph) + " · " + escapeHtml(snake.id) + "</p>" +
+            '<dl class="record-facts">' +
+                "<div><dt>Sex</dt><dd>" + escapeHtml(record.sex || snake.sex || "Unknown") + "</dd></div>" +
+                "<div><dt>Hatched</dt><dd>" + escapeHtml(recordDate(record.hatchDate || snake.hatchDate)) + "</dd></div>" +
+                "<div><dt>Birth weight</dt><dd>" + recordWeight(record.birthWeight) + "</dd></div>" +
+                "<div><dt>Current weight</dt><dd>" + recordWeight(record.currentWeight) + "</dd></div>" +
+            "</dl>" +
+            '<p class="record-kicker">Genes</p>' +
+            (genes.length
+                ? '<p class="record-genes">' + genes.map(function (gene) {
+                    return "<span>" + escapeHtml(gene) + "</span>";
+                }).join("") + "</p>"
+                : '<p class="record-empty">No genes recorded.</p>') +
+            "<h3>Parents</h3>" +
+            '<div class="record-parents">' + parentCard("Sire", record.sire) + parentCard("Dam", record.dam) + "</div>" +
+            "<h3>Last three meals</h3>" +
+            mealTable(record) +
+            '<p class="record-foot">Recorded by ' + escapeHtml(shopName) + ".</p>" +
+            "</div>";
+    }
+
+    function openRecord(id) {
+        var snake = listings.filter(function (item) {
+            return String(item.id) === String(id);
+        })[0];
+
+        if (!snake || !snake.record) return;
+
+        if (!recordDialog) {
+            recordDialog = document.createElement("dialog");
+            recordDialog.className = "record-modal";
+            recordDialog.addEventListener("click", function (event) {
+                if (event.target === recordDialog || event.target.closest("[data-record-close]")) {
+                    recordDialog.close();
+                }
+            });
+            recordDialog.addEventListener("close", function () {
+                document.body.classList.remove("record-open");
+            });
+            document.body.appendChild(recordDialog);
+        }
+
+        recordDialog.innerHTML = recordHtml(snake);
+
+        if (typeof recordDialog.showModal === "function") {
+            recordDialog.showModal();
+        } else {
+            recordDialog.setAttribute("open", "");
+        }
+
+        document.body.classList.add("record-open");
+    }
+
+    document.addEventListener("click", function (event) {
+        var button = event.target.closest("[data-record]");
+
+        if (!button) return;
+
+        event.preventDefault();
+        openRecord(button.getAttribute("data-record"));
+    });
+
     /* ---------- Snake card ---------- */
 
     function card(snake) {
@@ -185,6 +336,7 @@
                     "</dl>" +
                     (snake.notes ? '<p class="snake-note">' + escapeHtml(snake.notes) + "</p>" : "") +
                     contactHtml(snake) +
+                    recordButton(snake) +
                     '<div class="snake-foot">' + priceHtml + action + "</div>" +
                 "</div>" +
             "</article>";
@@ -339,7 +491,12 @@
     var ready = new Promise(function (resolve) { resolveReady = resolve; });
 
     loadLiveListings().then(function (live) {
-        resolveReady(live || staticData);
+        var data = live || staticData;
+
+        // Kept for the record modal: a card only carries the animal's id, and the
+        // full record is looked up here by that id.
+        listings = Array.isArray(data.snakes) ? data.snakes : [];
+        resolveReady(data);
     });
 
     /* ---------- Public helpers ---------- */
