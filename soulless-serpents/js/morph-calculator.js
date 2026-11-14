@@ -224,7 +224,92 @@
         }, {});
     }
 
-    function getWarnings(geneCopies) {
+    // A "super form" note describes the homozygous animal, not every carrier. It
+    // is shown when the pairing can actually produce that super -- both parents
+    // carrying the gene, or two different genes of the same complex, which is how
+    // an 8-Ball carries the same risk -- or when the animal itself has two copies.
+    // A Cinnamon x Normal litter is a carrier litter, not a risk litter.
+    const SUPER_FORM_NOTE = /^super form/i;
+
+    function pairingCarriesSuper(name, gene, pairing) {
+        if (!pairing) {
+            return false;
+        }
+
+        const carries = map => {
+            if (!map) {
+                return false;
+            }
+
+            if (map.has(name) && (map.get(name).copies || 0) > 0) {
+                return true;
+            }
+
+            // Only the eight-ball group stacks this way. Cinnamon x Black Pastel
+            // makes an 8-Ball, which carries the same kinking risk even though
+            // neither parent can make a super alone. Everywhere else the note is
+            // about one gene's super form, so it takes that gene on both sides --
+            // a Spotnose x Spider pairing cannot make a Super Spotnose.
+            const group = gene && (gene.allelicGroup || gene.complex);
+
+            if (group !== "eightBall") {
+                return false;
+            }
+
+            return Array.from(map.keys()).some(other => {
+                const otherGene = getGene(other);
+                const otherGroup = otherGene && (otherGene.allelicGroup || otherGene.complex);
+
+                return otherGroup === group && (map.get(other).copies || 0) > 0;
+            });
+        };
+
+        return carries(pairing.femaleMap) && carries(pairing.maleMap);
+    }
+
+    // Two alleles on one locus decide the outcome, not either gene alone. The
+    // catalog keeps two tables: pairs that do not survive (Spider x Spider,
+    // Spider x Champagne, Champagne x Champagne, Woma x Woma, HGW x Woma,
+    // HGW x HGW) and pairs that hatch with a severe wobble. Both are checked here
+    // so a keeper edits knowledge in one place, not in the calculator.
+    function getPairWarnings(geneCopies) {
+        const tools = window.GeneTools || {};
+        const lethalCombos = tools.lethalCombos || {};
+        const severeCombos = tools.severeWobbleCombos || {};
+        const alleles = [];
+
+        Object.entries(geneCopies).forEach(([name, record]) => {
+            const copies = record.copies || 0;
+
+            if (copies <= 0) {
+                return;
+            }
+
+            alleles.push(name);
+
+            if (copies >= 2) {
+                alleles.push(name);
+            }
+        });
+
+        const found = [];
+
+        for (let i = 0; i < alleles.length; i += 1) {
+            for (let j = i + 1; j < alleles.length; j += 1) {
+                const key = [alleles[i], alleles[j]].sort().join(",");
+
+                if (lethalCombos[key]) {
+                    found.push(lethalCombos[key] + " is lethal");
+                } else if (severeCombos[key]) {
+                    found.push(severeCombos[key] + ": severe wobble.");
+                }
+            }
+        }
+
+        return found;
+    }
+
+    function getWarnings(geneCopies, pairing) {
         return Object.entries(geneCopies)
             .flatMap(([name, record]) => {
                 const gene = getGene(name);
@@ -237,26 +322,32 @@
 
                 const warnings = [];
 
-                if (copies === 2 && gene.superType === "lethal") {
-                    warnings.push(`${name} super is marked lethal`);
-                }
-
                 if (gene.health) {
-                    warnings.push(`${name}: ${gene.health}`);
+                    const superOnly = SUPER_FORM_NOTE.test(String(gene.health).trim());
+
+                    if (!superOnly || copies >= 2 || pairingCarriesSuper(name, gene, pairing)) {
+                        warnings.push(`${name}: ${gene.health}`);
+                    }
                 }
 
                 return warnings;
             });
     }
 
-    function summarizeOutcomes(outcomes) {
+    function summarizeOutcomes(outcomes, pairing) {
         const summarized = new Map();
 
         outcomes.forEach(outcome => {
             const geneDetails = getOutcomeGeneDetails(outcome.genes);
             const descriptions = geneDetails.map(gene => gene.label);
             const morphName = getComboName(descriptions);
-            const warnings = getWarnings(outcome.genes);
+            const warnings = getWarnings(outcome.genes, pairing);
+            const pairWarnings = getPairWarnings(outcome.genes);
+
+            if (pairWarnings.length) {
+                warnings.unshift(...pairWarnings);
+            }
+
             const key = `${morphName}|${descriptions.join(";")}|${warnings.join(";")}`;
             const existing = summarized.get(key);
 
@@ -297,12 +388,19 @@
         const geneDetails = getOutcomeGeneDetails(geneCopies);
         const descriptions = geneDetails.map(gene => gene.label);
 
+        const warnings = getWarnings(geneCopies);
+        const pairWarnings = getPairWarnings(geneCopies);
+
+        if (pairWarnings.length) {
+            warnings.unshift(...pairWarnings);
+        }
+
         return {
             morphName: getComboName(descriptions),
             genes: descriptions,
             geneDetails,
             morphCount: geneDetails.length,
-            warnings: getWarnings(geneCopies)
+            warnings
         };
     }
 
@@ -324,7 +422,7 @@
             )
         }));
 
-        return summarizeOutcomes(combineDistributions(distributions));
+        return summarizeOutcomes(combineDistributions(distributions), { femaleMap, maleMap });
     }
 
     window.MorphCalculator = {

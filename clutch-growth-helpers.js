@@ -193,6 +193,9 @@
             ageDays: Number.isFinite(ageDays) ? ageDays : null,
             ratePerWeek,
             status: text(snake && snake.status),
+            // Sex rides along so the chart can colour by it: females usually
+            // pull ahead, and that is why two siblings drift apart.
+            sex: text(snake && snake.sex),
             // Age-aligned points for the chart; a hatchling with no hatch date
             // still keeps its real series for the table.
             agePoints: series

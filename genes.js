@@ -1,6 +1,8 @@
 const sharedGeneCatalog = window.SnakeGeneCatalog.geneCatalog;
 const sharedComboNames = window.SnakeGeneCatalog.comboNames;
 const sharedGeneAliases = window.SnakeGeneCatalog.aliasCatalog || {};
+const sharedLethalCombos = window.SnakeGeneCatalog.lethalCombos || {};
+const sharedSevereWobbleCombos = window.SnakeGeneCatalog.severeWobbleCombos || {};
 
 function normalizeGeneType(type) {
     if (type === "recessive") {
@@ -790,6 +792,8 @@ function describeGene(geneRecord) {
 window.GeneTools = {
     catalog: geneCatalog,
     comboNames: sharedComboNames,
+    lethalCombos: sharedLethalCombos,
+    severeWobbleCombos: sharedSevereWobbleCombos,
     findGene: findGene,
     searchGenes: searchGenes,
     parseGeneInput: parseGeneInput,

@@ -23,7 +23,7 @@ const geneCatalog = {
     "Hidden Gene Woma": { type: "codominant", complex: "spider", health: "Inner ear deformity (wobble).", lethalSuper: true },
     "Sable": { type: "codominant", complex: "spider", health: "Inner ear deformity (wobble)." },
     "Spotnose": { type: "codominant", complex: "spider", health: "Super form prone to wobble." },
-    "Woma": { type: "codominant", complex: "spider", health: "Inner ear deformity (wobble)." },
+    "Woma": { type: "codominant", complex: "spider", health: "Inner ear deformity (wobble).", lethalSuper: true },
     "Wookie": { type: "codominant", complex: "spider" },
     "Chocolate": { type: "codominant", complex: "spider" },
 
@@ -233,9 +233,40 @@ const geneAliases = {
     "og": "Orange Ghost"
 };
 
+// Spider-locus combinations that do not survive. Being one gene's super is not
+// the whole story: Spider x Champagne and HGW x Woma kill the compound too, so
+// the table names the two alleles rather than trusting a per-gene flag. Keys are
+// the two gene names in alphabetical order, the same order the calculator sorts
+// an outcome's alleles into.
+const lethalCombos = {
+    "Champagne,Champagne": "Champagne x Champagne",
+    "Champagne,Spider": "Spider x Champagne",
+    "Hidden Gene Woma,Hidden Gene Woma": "Hidden Gene Woma x Hidden Gene Woma",
+    "Hidden Gene Woma,Woma": "Hidden Gene Woma x Woma",
+    "Spider,Spider": "Spider x Spider",
+    "Woma,Woma": "Woma x Woma"
+};
+
+// Pairs that hatch but wobble severely rather than mildly. Kept apart from the
+// lethal table because the outcome is a living animal that has to be described
+// honestly, not one that never arrives.
+const severeWobbleCombos = {
+    "Champagne,Cypress": "Champagne x Cypress",
+    "Champagne,Hidden Gene Woma": "Champagne x Hidden Gene Woma",
+    "Champagne,Sable": "Champagne x Sable",
+    "Champagne,Spotnose": "Champagne x Spotnose",
+    "Champagne,Woma": "Champagne x Woma",
+    "Sable,Spider": "Spider x Sable",
+    "Hidden Gene Woma,Spider": "Spider x Hidden Gene Woma",
+    "Spider,Spotnose": "Spider x Spotnose",
+    "Cypress,Woma": "Woma x Cypress"
+};
+
 window.SnakeGeneCatalog = {
     geneCatalog: geneCatalog,
     comboNames: comboNames,
-    aliasCatalog: geneAliases
+    aliasCatalog: geneAliases,
+    lethalCombos: lethalCombos,
+    severeWobbleCombos: severeWobbleCombos
 };
 })();

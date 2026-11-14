@@ -106,18 +106,71 @@ function printWeightSheet() {
 // hatchling that is behind its siblings stands out even if they were weighed
 // on different days. The maths live in clutch-growth-helpers.js.
 
-const CLUTCH_GROWTH_COLORS = [
-    "#ffd700",
-    "#7fd1ff",
-    "#9ce37d",
-    "#ff9f6e",
-    "#d7a4ff",
-    "#6ee7d7",
-    "#ff8fb1",
-    "#c9b458",
-    "#8ab4ff",
-    "#b5e61d"
-];
+// Colour carries sex, because that is the story the chart tells: females tend
+// to pull ahead of their brothers, so a female line running high is expected
+// rather than a problem. Warm shades are female, cool shades are male, grey is
+// unknown. Within a sex the shade and the dash pattern keep individuals apart.
+const CLUTCH_GROWTH_SEX_COLORS = {
+    female: ["#ff8fb1", "#e36f8e", "#ffb3c7", "#c85f7d"],
+    male: ["#7fd1ff", "#4fb8d9", "#a8ddff", "#3a9fc4"],
+    unknown: ["#9aa6b2", "#8f9aa5", "#b7bfc7", "#787f88"]
+};
+
+function clutchGrowthSexKey(row) {
+    const sex = String((row && row.sex) || "").trim().toLowerCase();
+
+    if (sex.startsWith("f")) {
+        return "female";
+    }
+
+    if (sex.startsWith("m")) {
+        return "male";
+    }
+
+    return "unknown";
+}
+
+function clutchGrowthSexShort(sexKey) {
+    if (sexKey === "female") {
+        return "F";
+    }
+
+    if (sexKey === "male") {
+        return "M";
+    }
+
+    return "?";
+}
+
+// One colour per snake, chosen inside its sex's palette. The second, third and
+// fourth animal of a sex get a different shade and, from the second on, a
+// dashed line, so a five-female clutch is still readable.
+function clutchGrowthColors(rows) {
+    const seen = { female: 0, male: 0, unknown: 0 };
+    const map = new Map();
+
+    (Array.isArray(rows) ? rows : []).forEach(row => {
+        const sexKey = clutchGrowthSexKey(row);
+        const palette = CLUTCH_GROWTH_SEX_COLORS[sexKey];
+        const index = seen[sexKey];
+
+        map.set(row, {
+            color: palette[index % palette.length],
+            // An unknown sex is always dashed: it should look like a gap in the
+            // data, not like a third colour with a meaning of its own.
+            dash: sexKey === "unknown" ? "4 3" : (index % 2 === 1 ? "6 4" : ""),
+            sex: sexKey
+        });
+
+        seen[sexKey] += 1;
+    });
+
+    return map;
+}
+
+function clutchGrowthStyle(palette, row) {
+    return palette.get(row) || { color: "#9aa6b2", dash: "", sex: "unknown" };
+}
 const CLUTCH_GROWTH_EMPTY = `<p class="empty-message">No clutch selected.</p>`;
 
 const clutchGrowthState = { clutchId: "" };
@@ -308,7 +361,8 @@ function renderClutchGrowthChart(result) {
         return;
     }
 
-    const colorFor = row => CLUTCH_GROWTH_COLORS[Math.max(0, plotRows.indexOf(row)) % CLUTCH_GROWTH_COLORS.length];
+    const palette = clutchGrowthColors(plotRows);
+    const styleFor = row => clutchGrowthStyle(palette, row);
     const innerHeight = laidOut.height - laidOut.padding * 2;
     const midWeight = Math.round((laidOut.min + laidOut.max) / 2);
     const yFor = weight => laidOut.height - laidOut.padding
@@ -332,7 +386,9 @@ function renderClutchGrowthChart(result) {
     }).join("");
     const lines = plotRows.map((row, index) => {
         const points = laidOut.series[index] ? laidOut.series[index].points : [];
-        const color = CLUTCH_GROWTH_COLORS[index % CLUTCH_GROWTH_COLORS.length];
+        const style = styleFor(row);
+        const color = style.color;
+        const dash = style.dash ? ` stroke-dasharray="${style.dash}"` : "";
         const path = points.map(point => `${point.x},${point.y}`).join(" ");
         const dots = points.map(point => `
             <circle class="clutch-growth-dot" cx="${point.x}" cy="${point.y}" r="3"
@@ -342,16 +398,25 @@ function renderClutchGrowthChart(result) {
         `).join("");
 
         return `
-            ${points.length > 1 ? `<polyline class="clutch-growth-line" points="${path}" style="stroke: ${color};" />` : ""}
+            ${points.length > 1 ? `<polyline class="clutch-growth-line" points="${path}" style="stroke: ${color};"${dash} />` : ""}
             ${dots}
         `;
     }).join("");
-    const legend = plotRows.map(row => `
+    const legend = plotRows.map(row => {
+        const style = styleFor(row);
+
+        return `
         <span class="clutch-growth-key">
-            <i class="clutch-growth-swatch" style="background-color: ${colorFor(row)};"></i>
+            <i class="clutch-growth-swatch" style="background-color: ${style.color};"></i>
+            <span class="clutch-growth-sex is-${style.sex}">${clutchGrowthSexShort(style.sex)}</span>
             ${escapeHtml(row.label)}${row.ageDays !== null ? ` · ${formatAge(row.ageDays)}` : ""}
         </span>
-    `).join("");
+    `;
+    }).join("");
+    const sexes = new Set(plotRows.map(row => clutchGrowthSexKey(row)));
+    const sexNote = sexes.has("female") && sexes.has("male")
+        ? " · pink is female, blue is male"
+        : "";
     const aria = `Weight by age for ${plotRows.length} hatchling${plotRows.length === 1 ? "" : "s"} of clutch ${result.clutchId}`;
 
     elements.clutchChart.innerHTML = `
@@ -363,7 +428,7 @@ function renderClutchGrowthChart(result) {
             ${lines}
             ${xLabels}
         </svg>
-        <p class="clutch-growth-axis-note">Days since hatching · grams</p>
+        <p class="clutch-growth-axis-note">Days since hatching · grams${sexNote}</p>
     `;
 }
 
@@ -383,12 +448,18 @@ function renderClutchGrowthTable(result) {
         return;
     }
 
+    const tablePalette = clutchGrowthColors(result.rows);
+
     elements.clutchBody.innerHTML = result.rows.map(row => {
-        const colorIndex = plotRows.indexOf(row);
-        const swatch = colorIndex >= 0
-            ? `<i class="clutch-growth-swatch" style="background-color: ${CLUTCH_GROWTH_COLORS[colorIndex % CLUTCH_GROWTH_COLORS.length]};"></i>`
+        const plotted = plotRows.indexOf(row) >= 0;
+        const style = clutchGrowthStyle(tablePalette, row);
+        const swatch = plotted
+            ? `<i class="clutch-growth-swatch" style="background-color: ${style.color};"></i>`
             : `<i class="clutch-growth-swatch is-empty"></i>`;
         const idText = row.ID ? `<small>${escapeHtml(row.ID)}</small>` : "";
+        const sexTag = style.sex === "unknown"
+            ? ""
+            : `<small class="clutch-growth-sex is-${style.sex}">${clutchGrowthSexShort(style.sex)}</small>`;
         const latest = row.latest
             ? `<strong>${row.latest.weight} g</strong><small>${row.latest.date ? escapeHtml(row.latest.date) : "no weigh-in date"}</small>`
             : "—";
@@ -396,7 +467,7 @@ function renderClutchGrowthTable(result) {
 
         return `
             <tr class="${row.flag === "lagging" ? "is-lagging" : ""}">
-                <td class="clutch-growth-name">${swatch}<span>${escapeHtml(row.label)}${idText}</span></td>
+                <td class="clutch-growth-name">${swatch}<span>${escapeHtml(row.label)}${idText}${sexTag}</span></td>
                 <td data-label="Latest">${latest}</td>
                 <td data-label="Age">${formatAge(row.ageDays)}</td>
                 <td data-label="Growth">${formatRate(row.ratePerWeek)}</td>

@@ -7690,6 +7690,33 @@ body.has-sync-banner .collection-notice {
     border: 1px solid #4a4335;
 }
 
+/* Sex, spelled out where a colour alone would be a guess. */
+.clutch-growth-sex {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 1.5;
+    padding: 0 5px;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+}
+
+.clutch-growth-sex.is-female {
+    color: #ff8fb1;
+}
+
+.clutch-growth-sex.is-male {
+    color: #7fd1ff;
+}
+
+.clutch-growth-sex.is-unknown {
+    color: var(--silver-color);
+}
+
+.clutch-growth-table td small.clutch-growth-sex {
+    margin-left: 6px;
+}
+
 .clutch-growth-line {
     fill: none;
     stroke-width: 2;
