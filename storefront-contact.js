@@ -12,6 +12,11 @@
     const STORAGE_KEY = "storefrontContact";
     const EMPTY = { name: "", email: "", phone: "", instagram: "", slug: "", siteUrl: "" };
 
+    // The shop as it is actually published. A keeper who has typed their address
+    // is believed; anyone who has not still gets a working public link, because
+    // a printed QR code must never send a buyer to the app's sign-in screen.
+    const DEFAULT_SITE_URL = "https://soulless-serpents.red-nosed-one.workers.dev";
+
     function text(value) {
         return String(value === undefined || value === null ? "" : value).trim();
     }
@@ -41,6 +46,11 @@
             // sign-in screen, so the keeper's own address is what it uses.
             siteUrl: text(source.siteUrl).replace(/\/+$/, "")
         };
+    }
+
+    // The address a phone should be sent to: the keeper's own if they set one.
+    function siteUrl(record) {
+        return clean(record).siteUrl || DEFAULT_SITE_URL;
     }
 
     function read() {
@@ -181,8 +191,10 @@
 
     window.StorefrontContact = {
         STORAGE_KEY,
+        DEFAULT_SITE_URL,
         read,
         save,
+        siteUrl,
         problems,
         isComplete,
         instagramUrl,

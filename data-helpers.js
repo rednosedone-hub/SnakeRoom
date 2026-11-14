@@ -426,12 +426,17 @@ function getHatchlingRecordUrl(snake) {
 }
 
 // The record as a buyer should meet it: a public page on the shop's own site,
-// which needs no account. Empty when the keeper has not set their address.
+// which needs no account. Empty only when there is no shop address to use at all.
 function getHatchlingRecordPublicUrl(snake) {
     const contact = window.StorefrontContact && typeof window.StorefrontContact.read === "function"
         ? window.StorefrontContact.read()
         : {};
-    const base = String((contact && contact.siteUrl) || "").replace(/\/+$/, "");
+    // The shop's own address wins; otherwise the published shop's live address is
+    // used, so a code printed before anyone typed it in still works.
+    const base = String(window.StorefrontContact
+        && typeof window.StorefrontContact.siteUrl === "function"
+        ? window.StorefrontContact.siteUrl(contact)
+        : (contact && contact.siteUrl) || "").replace(/\/+$/, "");
 
     if (!base) {
         return "";
