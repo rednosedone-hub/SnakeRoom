@@ -410,9 +410,38 @@ function getSnakeQrData(snake) {
     ].join("\n");
 }
 
+function getQrImageUrl(data, size = 160) {
+    return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}`;
+}
+
 function getSnakeQrImageUrl(snake, size = 160) {
-    const data = encodeURIComponent(getSnakeQrData(snake));
-    return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${data}`;
+    return getQrImageUrl(getSnakeQrData(snake), size);
+}
+
+// The hatchling record is what a buyer is handed, so its QR points at the
+// record rather than the keeper's edit page.
+function getHatchlingRecordUrl(snake) {
+    const path = window.location.pathname.replace(/[^/]*$/, "hatchling-record.html");
+    return `${window.location.origin}${path}?id=${encodeURIComponent((snake && snake.id) || "")}`;
+}
+
+function getHatchlingRecordQrData(snake) {
+    if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+        return getHatchlingRecordUrl(snake);
+    }
+
+    // Opened from a file, a URL would be useless to a phone, so the code carries
+    // the animal's details instead.
+    return [
+        "The Snake Room",
+        `Hatchling record: ${(snake && snake.name) || "Unnamed"}`,
+        `ID: ${getSnakeIdentityText(snake)}`,
+        `Sex: ${(snake && snake.sex) || "Unknown"}`
+    ].join("\n");
+}
+
+function getHatchlingRecordQrImageUrl(snake, size = 160) {
+    return getQrImageUrl(getHatchlingRecordQrData(snake), size);
 }
 
 window.SnakeData = {
@@ -441,5 +470,8 @@ window.SnakeData = {
     getSnakeProfileUrl,
     getSnakeLinkHtml,
     getSnakeQrData,
-    getSnakeQrImageUrl
+    getSnakeQrImageUrl,
+    getQrImageUrl,
+    getHatchlingRecordUrl,
+    getHatchlingRecordQrImageUrl
 };

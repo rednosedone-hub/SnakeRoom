@@ -663,6 +663,11 @@ function renderSnakes() {
                         Edit
                     </button>
 
+                    <a class="record-button" href="hatchling-record.html?id=${encodeURIComponent(snake.id || "")}"
+                        target="_blank" rel="noopener">
+                        Record
+                    </a>
+
                     ${retireButtons}
 
                     <button class="delete-button" onclick="deleteSnake(${snake.originalIndex})">
@@ -689,6 +694,7 @@ function renderSnakeTableHeader() {
         { label: "Status", sortKey: "status" },
         { label: "Breeding" },
         { label: "QR" },
+        { label: "Record" },
         { label: "" }
     ];
 
@@ -739,6 +745,14 @@ function renderSnakeTable(snakeList) {
                     <a href="${window.SnakeData.getSnakeQrImageUrl(snake, 220)}" target="_blank" rel="noopener">
                         QR
                     </a>
+                </td>
+                <td class="record-cell">
+                    <a href="hatchling-record.html?id=${encodeURIComponent(snake.id || "")}"
+                        target="_blank" rel="noopener">
+                        Record
+                    </a>
+                    <a class="record-qr-link" href="${window.SnakeData.getHatchlingRecordQrImageUrl(snake, 260)}"
+                        target="_blank" rel="noopener" title="QR code that opens this record">QR</a>
                 </td>
                 <td>
                     <button class="edit-button table-action-button" onclick="goToSnakeForm(${snake.originalIndex})">

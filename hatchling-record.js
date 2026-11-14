@@ -284,7 +284,15 @@ function renderRecord(snake) {
                     <h2>${escapeHtml(snake.name || "Unnamed")}</h2>
                     <p class="record-id">${escapeHtml(identity)}${clutch ? ` · Clutch ${escapeHtml(clutch)}` : ""}</p>
                 </div>
-                <img class="record-logo" src="Images/TheSnakeRoom.jpg" alt="The Snake Room">
+                <div class="record-head-marks">
+                    <img class="record-logo" src="Images/TheSnakeRoom.jpg" alt="The Snake Room">
+
+                    <figure class="record-qr">
+                        <img src="${escapeHtml(window.SnakeData.getHatchlingRecordQrImageUrl(snake, 160))}"
+                            alt="QR code for this hatchling record">
+                        <figcaption>Scan for this record</figcaption>
+                    </figure>
+                </div>
             </header>
 
             <div class="record-body">

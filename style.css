@@ -8565,6 +8565,14 @@ td .maker-pill {
         border-color: #666;
     }
 
+    .record-qr img {
+        border-color: #666;
+    }
+
+    .record-qr figcaption {
+        color: #444;
+    }
+
     .record-photo,
     .record-parent-photo {
         border-color: #999;
@@ -8597,4 +8605,61 @@ td .maker-pill {
 
 .scorecard-explainer .fin-panel-lead {
     margin-top: 0;
+}
+
+.record-button {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid var(--black-color);
+    border-radius: 5px;
+    background-color: var(--deepskyblue-color);
+    color: var(--black-color);
+    box-shadow: 2px 2px 1px 2px var(--black-color);
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 15px;
+    text-align: center;
+    text-decoration: none;
+}
+
+.card-buttons .record-button {
+    flex: 1 1 calc(50% - 8px);
+    padding: 7px 4px;
+    font-size: 13px;
+}
+
+.record-head-marks {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.record-qr {
+    margin: 0;
+    text-align: center;
+}
+
+.record-qr img {
+    width: 84px;
+    height: 84px;
+    padding: 3px;
+    border: 1px solid var(--goldenrod-color);
+    border-radius: 4px;
+    background-color: #fff;
+}
+
+.record-qr figcaption {
+    margin-top: 3px;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--silver-color);
+}
+
+.record-cell {
+    white-space: nowrap;
+}
+
+.record-cell .record-qr-link {
+    margin-left: 6px;
+    font-size: 12px;
 }
