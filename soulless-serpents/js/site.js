@@ -253,7 +253,9 @@
             '<div class="record-parents">' + parentCard("Sire", record.sire) + parentCard("Dam", record.dam) + "</div>" +
             "<h3>Last three meals</h3>" +
             mealTable(record) +
-            '<p class="record-foot">Recorded by ' + escapeHtml(shopName) + ".</p>" +
+            '<p class="record-foot">Recorded by ' + escapeHtml(shopName) + "." +
+                '<span class="record-plug">Kept in The Snake Room app.</span>' +
+            "</p>" +
             "</div>";
     }
 

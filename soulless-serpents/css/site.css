@@ -1052,6 +1052,15 @@ body.record-open {
     color: var(--muted);
 }
 
+/* The app that made the record, under the breeder's own name: a plug, not a
+   claim, so it sits quieter than the line above it. */
+.record-plug {
+    display: block;
+    margin-top: 5px;
+    color: var(--gold, #d7b258);
+    opacity: 0.75;
+}
+
 @media (max-width: 620px) {
     .record-modal__inner {
         padding: 20px 18px;
