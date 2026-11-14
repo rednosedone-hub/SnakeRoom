@@ -31,7 +31,28 @@ The **available count** is not on that list on purpose: it is counted from `data
 
 One thing `site-config.js` cannot reach is the raw HTML that search engines and link previews read before any JavaScript runs: the four `<title>` tags, the three `<meta name="description">` tags, and the crest `alt` text. Do a find-and-replace on "Soulless Serpents" in the four `.html` files to change those too. The page headings and footers update themselves.
 
-## 2. Your animals — `data/snakes.js`
+## 2. Your animals — live from Supabase (no build step)
+
+Once live publishing is set up, the storefront reads your published list straight from your Supabase project: mark a snake **Available** in The Snake Room, save it, and it is on the shop at the next page load. No CSV, no build, no upload.
+
+**One-time setup, in Supabase:** open the SQL Editor and run `site-tools/storefront-setup.sql` (the For Sale page in the app also shows it with a Copy button). It creates one table, `storefront_shops`, where each shop is a single row: the handle and the public listing document. Row level security means anyone can read a published shop, and only its owner can write it. Nothing else from the collection is in that row.
+
+**In the app:** For Sale page → Storefront contact → fill the name, email, Instagram and the **storefront handle** (for example `soulless-serpents`) → save. Then set the same handle, project URL and publishable key in `js/site-config.js`:
+
+```js
+shop: {
+    live: true,
+    slug: "soulless-serpents",
+    supabaseUrl: "https://your-project.supabase.co",
+    supabaseKey: "sb_publishable_..."
+}
+```
+
+The publishable (anon) key is public by design: row level security is what protects the data. Setting `live: false` turns live reading off.
+
+### The static fallback — `data/snakes.js`
+
+Without live publishing (or while the cloud is unreachable, slow, or unconfigured) the site falls back to `data/snakes.js`, which you generate from an export. That route still works and needs no Supabase at all:
 
 Do not write this by hand. In The Snake Room, mark animals **Available** or **On Hold**, fill in the asking price, set your Storefront contact on the For Sale page, export the CSV, then:
 
@@ -39,7 +60,7 @@ Do not write this by hand. In The Snake Room, mark animals **Available** or **On
 node site-tools/build-available.js snake-room-collection-YYYY-MM-DD.csv --out soulless-serpents/data/snakes.js
 ```
 
-That writes one object per animal: morph, genes, sex, hatch date, weight, price, status, notes, feeding, photo path and **your contact details for that listing**. An animal with no contact email is skipped rather than published, so nobody's enquiry lands in the wrong inbox.
+That writes one object per animal: morph, genes, sex, hatch date, weight, price, status, notes, feeding, photo path and **your contact details for that listing**. An animal with no contact email is skipped rather than published, so nobody's enquiry lands in the wrong inbox. The live publisher builds exactly the same object in the browser, so both routes produce identical pages.
 
 Different morphs need no code changes. The gene chips, the `?gene=` filter, the search and the "closest available" suggestions all read whatever genes your animals carry. Only a gene the calculator has never heard of needs adding — one line in `js/gene-catalog.js` (the app shares that catalog).
 

@@ -12,6 +12,7 @@
     var shopName = String(config.shopName || "The Snake Room").trim();
     var CONTACT_EMAIL = String(contact.email || "").trim();
     var CONTACT_INSTAGRAM = String(contact.instagramUrl || "").trim();
+    var shop = config.shop || {};
 
     /* ---------- Navigation ---------- */
 
@@ -293,11 +294,60 @@
 
     applyBrand();
 
+    /* ---------- Live listings ---------- */
+
+    // The shop's published document is written by The Snake Room whenever a
+    // snake is saved, so the site never needs a rebuild to show new stock. The
+    // static JSON in data/snakes.js stays as the fallback for a slow, blocked
+    // or unconfigured cloud, so the page can never render empty by accident.
+    function loadLiveListings() {
+        var slug = String(shop.slug || "").trim();
+
+        if (!shop.live || !slug || !shop.supabaseUrl || !shop.supabaseKey) {
+            return Promise.resolve(null);
+        }
+
+        var url = String(shop.supabaseUrl).replace(/\/+$/, "") +
+            "/rest/v1/storefront_shops?select=listings,updated_at&shop_slug=eq." +
+            encodeURIComponent(slug);
+
+        var request = fetch(url, {
+            headers: {
+                apikey: shop.supabaseKey,
+                Authorization: "Bearer " + shop.supabaseKey
+            },
+            cache: "no-store"
+        }).then(function (response) {
+            if (!response.ok) throw new Error("HTTP " + response.status);
+            return response.json();
+        }).then(function (rows) {
+            var payload = Array.isArray(rows) && rows.length ? rows[0].listings : null;
+
+            if (!payload || !Array.isArray(payload.snakes)) return null;
+
+            return { updated: payload.updated || "", snakes: payload.snakes };
+        });
+
+        return Promise.race([
+            request.catch(function () { return null; }),
+            new Promise(function (resolve) { setTimeout(function () { resolve(null); }, 6000); })
+        ]);
+    }
+
+    var staticData = window.SOULLESS_DATA || { snakes: [] };
+    var resolveReady;
+    var ready = new Promise(function (resolve) { resolveReady = resolve; });
+
+    loadLiveListings().then(function (live) {
+        resolveReady(live || staticData);
+    });
+
     /* ---------- Public helpers ---------- */
 
     window.SS = {
         email: CONTACT_EMAIL,
-        data: window.SOULLESS_DATA || { snakes: [] },
+        data: staticData,
+        ready: ready,
         escapeHtml: escapeHtml,
         contactFor: contactFor,
         money: money,

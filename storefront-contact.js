@@ -10,10 +10,21 @@
 // (SNAPSHOT_KEYS in cloud-sync.js) carries it to the keeper's other devices.
 (function () {
     const STORAGE_KEY = "storefrontContact";
-    const EMPTY = { name: "", email: "", phone: "", instagram: "" };
+    const EMPTY = { name: "", email: "", phone: "", instagram: "", slug: "" };
 
     function text(value) {
         return String(value === undefined || value === null ? "" : value).trim();
+    }
+
+    // The shop handle is what the storefront address and its published row are
+    // keyed on, so it is derived from the shop name unless the keeper sets it.
+    function slugify(value) {
+        return text(value)
+            .toLowerCase()
+            .replace(/&/g, " and ")
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .slice(0, 60);
     }
 
     function clean(record) {
@@ -23,7 +34,8 @@
             name: text(source.name),
             email: text(source.email),
             phone: text(source.phone),
-            instagram: text(source.instagram).replace(/^@+/, "")
+            instagram: text(source.instagram).replace(/^@+/, ""),
+            slug: slugify(source.slug || source.name)
         };
     }
 
@@ -83,7 +95,8 @@
         name: "sellerNameInput",
         email: "sellerEmailInput",
         phone: "sellerPhoneInput",
-        instagram: "sellerInstagramInput"
+        instagram: "sellerInstagramInput",
+        slug: "sellerSlugInput"
     };
 
     function fieldValue(id) {
@@ -114,6 +127,12 @@
             }
         });
 
+        const slugField = document.getElementById(FIELD_IDS.slug);
+
+        if (slugField && !slugField.value && contact.name) {
+            slugField.placeholder = slugify(contact.name);
+        }
+
         const missing = problems(contact);
 
         if (missing.length) {
@@ -128,7 +147,8 @@
             name: fieldValue(FIELD_IDS.name),
             email: fieldValue(FIELD_IDS.email),
             phone: fieldValue(FIELD_IDS.phone),
-            instagram: fieldValue(FIELD_IDS.instagram)
+            instagram: fieldValue(FIELD_IDS.instagram),
+            slug: fieldValue(FIELD_IDS.slug) || fieldValue(FIELD_IDS.name)
         };
         const missing = problems(draft);
 
@@ -159,7 +179,8 @@
         save,
         problems,
         isComplete,
-        instagramUrl
+        instagramUrl,
+        slugify
     };
 
     if (document.readyState === "loading") {

@@ -41,5 +41,17 @@ window.SS_CONFIG = {
     stats: {
         genesInCollection: "34",
         quarantine: "60 d"
+    },
+
+    // Live listings. The site reads this shop's published document from Supabase
+    // on every page load, so marking an animal Available in The Snake Room is the
+    // whole publish step. The key below is the publishable (anon) key: it is
+    // public by design, and row level security on the table is what protects the
+    // data. Set live:false to fall back to data/snakes.js (the CSV build route).
+    shop: {
+        live: true,
+        slug: "soulless-serpents",
+        supabaseUrl: "https://frspbmxtymonlfbfzfpr.supabase.co",
+        supabaseKey: "sb_publishable_csOyxq6yvn4o4M1tkgikzg_-bRd3PBS"
     }
 };

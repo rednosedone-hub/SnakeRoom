@@ -67,6 +67,11 @@
                     <span>Instagram (optional)</span>
                     <input type="text" id="sellerInstagramInput" placeholder="@yourshop" />
                 </label>
+
+                <label class="form-field">
+                    <span>Storefront handle (used in the site address)</span>
+                    <input type="text" id="sellerSlugInput" placeholder="soulless-serpents" />
+                </label>
             </div>
 
             <div class="button-row" style="margin-top: 16px;">
@@ -76,6 +81,32 @@
             </div>
 
             <p class="empty-message" id="storefrontContactStatus"></p>
+        </section>
+
+        <section class="form-section" style="max-width: 820px; margin: 26px auto 0;">
+            <h3>Live publishing</h3>
+
+            <p class="empty-message">
+                Saving an animal publishes it. The storefront reads your published list from your
+                cloud account whenever a page loads, so there is no export, no build step and no
+                upload &mdash; mark a snake <strong>Available</strong> and it is on the shop.
+            </p>
+
+            <div class="button-row" style="margin-top: 16px;">
+                <button type="button" class="main-button" id="publishStorefrontButton">
+                    Publish now
+                </button>
+                <button type="button" class="main-button" id="copyStorefrontSqlButton">
+                    Copy setup SQL
+                </button>
+            </div>
+
+            <p class="empty-message" id="storefrontPublishStatus"></p>
+
+            <details style="margin-top: 14px;">
+                <summary>First-time setup &mdash; run this SQL once in Supabase</summary>
+                <pre id="storefrontSetupSql" style="white-space: pre-wrap; font-size: 12px; line-height: 1.5; overflow-x: auto; margin-top: 10px;"></pre>
+            </details>
         </section>
 
         <p class="empty-message" id="storefrontNotice" hidden style="text-align: center;"></p>
@@ -90,18 +121,22 @@
             <h3>Push these animals to Soulless Serpents</h3>
 
             <ol>
-                <li>Fill in the <strong>Storefront contact</strong> above &mdash; animals without
-                    it are skipped by the build.</li>
+                <li>Fill in the <strong>Storefront contact</strong> above and press
+                    <strong>Save contact details</strong> &mdash; it republishes the shop immediately.</li>
                 <li>Set each animal's Status to <strong>Available</strong> and fill its
-                    <strong>Asking price</strong> on the snake's record. On Hold animals publish too,
-                    at their agreed price.</li>
-                <li>Open <a href="data-tools.html">Data Tools</a> and press
-                    <strong>Export snakes</strong>.</li>
-                <li>From the repository root, run
-                    <code>node site-tools/build-available.js snake-room-collection-YYYY-MM-DD.csv</code>
-                    (add <code>--include-sold</code> to keep sold animals as reference).</li>
-                <li>Upload the <code>soulless-serpents</code> folder to the site.</li>
+                    <strong>Asking price</strong> on the snake's record, then save. On Hold animals
+                    publish too, at their agreed price.</li>
+                <li>Done. The site loads the published list on its next page view. Use
+                    <strong>Publish now</strong> above if you change something outside the snake
+                    form, such as the shop contact.</li>
             </ol>
+
+            <p class="empty-message">
+                The old CSV route still works as a fallback: <strong>Export snakes</strong> in
+                <a href="data-tools.html">Data Tools</a>, then
+                <code>node site-tools/build-available.js snake-room-collection-YYYY-MM-DD.csv</code>,
+                and upload the site folder. Use it if you would rather not publish from the cloud.
+            </p>
 
             <p class="empty-message">
                 Photos on an animal that is marked Available are also published to the shared Morph
@@ -119,7 +154,8 @@
     <script src="account-gate.js?v=1"></script>
     <script src="geneCatalog.js?v=5"></script>
     <script src="genes.js?v=11"></script>
-    <script src="storefront-contact.js?v=1"></script>
+    <script src="storefront-contact.js?v=2"></script>
+    <script src="storefront-sync.js?v=1"></script>
     <script src="available.js?v=3"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>

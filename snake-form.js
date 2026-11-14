@@ -3933,6 +3933,13 @@ async function saveSnakeFromPage() {
 
     saveSnakes();
     await publishListingPhotos(snake);
+
+    // The storefront reads this shop's published document, so saving here is
+    // the publish step. It never blocks the save or the navigation.
+    if (window.StorefrontSync) {
+        window.StorefrontSync.publishQuietly();
+    }
+
     window.location.href = "snakes.html";
 }
 
