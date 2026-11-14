@@ -8569,7 +8569,8 @@ td .maker-pill {
         border-color: #666;
     }
 
-    .record-qr figcaption {
+    .record-qr figcaption,
+    .record-qr-url {
         color: #444;
     }
 
@@ -8653,6 +8654,21 @@ td .maker-pill {
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--silver-color);
+}
+
+/* The address under the code, for anyone who would rather type it than scan it.
+   Broken anywhere so a long one still fits beside the QR instead of stretching
+   the card. */
+.record-qr-url {
+    margin: 4px 0 0;
+    max-width: 132px;
+    font-family: ui-monospace, "Courier New", monospace;
+    font-size: 8px;
+    line-height: 1.35;
+    text-align: left;
+    color: var(--silver-color);
+    word-break: break-all;
+    user-select: all;
 }
 
 .record-cell {

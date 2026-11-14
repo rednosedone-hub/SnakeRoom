@@ -277,8 +277,10 @@ function renderRecord(snake) {
     const identity = window.SnakeData.getSnakeIdentityText(snake);
     // With a storefront address set, the code can send a phone to a page anyone
     // may read. Without one, it can only open the app, which asks to sign in.
-    const publicRecord = Boolean(window.SnakeData.getHatchlingRecordPublicUrl
-        && window.SnakeData.getHatchlingRecordPublicUrl(snake));
+    const publicUrl = window.SnakeData.getHatchlingRecordPublicUrl
+        ? window.SnakeData.getHatchlingRecordPublicUrl(snake)
+        : "";
+    const publicRecord = Boolean(publicUrl);
 
     elements.sheet.innerHTML = `
         <article class="record-card">
@@ -297,6 +299,12 @@ function renderRecord(snake) {
                         <figcaption>${publicRecord
                             ? "Scan to view the record"
                             : "Scan to open in the app"}</figcaption>
+                        ${publicRecord
+                            // A printed sheet outlives the phone that scanned it, so
+                            // the address is spelled out for anyone who would rather
+                            // type it than scan it.
+                            ? `<p class="record-qr-url">${escapeHtml(publicUrl.replace(/^https?:\/\//, ""))}</p>`
+                            : ""}
                     </figure>
                 </div>
             </header>
