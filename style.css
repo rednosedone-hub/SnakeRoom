@@ -6464,6 +6464,12 @@ body.has-sync-banner .collection-notice {
     border-left-color: #7fe0a8;
 }
 
+/* The keeper's own jobs, in their own colour so a glance tells a tub clean from
+   something the app worked out for itself. */
+.calendar-chip.is-event {
+    border-left-color: #b9a6ff;
+}
+
 .calendar-more {
     font-size: 11px;
     color: #c9c2a6;
@@ -6509,6 +6515,10 @@ body.has-sync-banner .collection-notice {
     background: #7fe0a8;
 }
 
+.calendar-legend-item.is-event::before {
+    background: #b9a6ff;
+}
+
 .calendar-task-list {
     list-style: none;
     margin: 14px 0 0;
@@ -6547,6 +6557,27 @@ body.has-sync-banner .collection-notice {
 
 .calendar-task.is-pickup {
     border-left-color: #7fe0a8;
+}
+
+.calendar-task.is-event {
+    border-left-color: #b9a6ff;
+}
+
+.calendar-event-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+    margin: 4px 0 6px;
+}
+
+.calendar-event-form .form-field {
+    flex: 1 1 180px;
+    margin: 0;
+}
+
+.calendar-event-form .main-button {
+    margin: 0;
 }
 
 .calendar-task.is-overdue {

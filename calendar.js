@@ -13,7 +13,8 @@
         selected: today,
         tasks: [],
         summaryTasks: [],
-        grouped: new Map()
+        grouped: new Map(),
+        events: []
     };
 
     const elements = {
@@ -29,7 +30,11 @@
         todayCount: document.getElementById("calendarKpiToday"),
         weekCount: document.getElementById("calendarKpiWeek"),
         overdueCount: document.getElementById("calendarKpiOverdue"),
-        status: document.getElementById("calendarStatus")
+        status: document.getElementById("calendarStatus"),
+        eventTitle: document.getElementById("eventTitleInput"),
+        eventDate: document.getElementById("eventDateInput"),
+        addEventButton: document.getElementById("addEventButton"),
+        eventStatus: document.getElementById("eventStatus")
     };
 
     function escapeHtml(value) {
@@ -96,12 +101,17 @@
         const startDate = grid[0].date;
         const endDate = grid[grid.length - 1].date;
 
+        // The keeper's own jobs are read here rather than at load, so one added
+        // on another device appears as soon as the cloud snapshot lands.
+        state.events = C.readEvents();
+
         const base = {
             snakes: data.snakes,
             clutches: data.clutches,
             pairs: data.pairs,
             forecast: data.forecast,
             buyers: data.buyers,
+            events: state.events,
             health: window.SnakeHealth,
             today
         };
@@ -180,7 +190,9 @@
                     ${task.detail ? `<span class="calendar-task-detail">${escapeHtml(task.detail)}</span>` : ""}
                     ${task.overdue ? `<span class="calendar-task-overdue">Overdue</span>` : ""}
                 </div>
-                <a class="small-link-button" href="${escapeHtml(task.href)}">Open</a>
+                ${task.eventId
+                    ? `<button type="button" class="small-link-button" data-event-remove="${escapeHtml(task.eventId)}">Remove</button>`
+                    : (task.href ? `<a class="small-link-button" href="${escapeHtml(task.href)}">Open</a>` : "")}
             </li>
         `).join("");
     }
@@ -197,8 +209,50 @@
         }
 
         state.selected = date;
+
+        // A new event defaults to the day being looked at, which is almost
+        // always the day it belongs to.
+        if (elements.eventDate) {
+            elements.eventDate.value = date;
+        }
+
         renderMonth();
         renderDay();
+    }
+
+    function setEventStatus(message, isError) {
+        if (!elements.eventStatus) {
+            return;
+        }
+
+        elements.eventStatus.textContent = message;
+        elements.eventStatus.style.color = isError ? "#ffb4a8" : "";
+    }
+
+    function addEventFromForm() {
+        const title = elements.eventTitle ? elements.eventTitle.value : "";
+        const date = elements.eventDate ? elements.eventDate.value : state.selected;
+        const result = C.addEvent({ title, date, notes: "" });
+
+        if (result.error) {
+            setEventStatus(result.error, true);
+            return;
+        }
+
+        elements.eventTitle.value = "";
+        selectDate(result.event.date);
+        refreshTasks();
+        renderAll();
+        setEventStatus(`Added \u201c${result.event.title}\u201d on ${formatShort(result.event.date)}.`);
+    }
+
+    function removeEventById(id) {
+        const events = C.removeEvent(id);
+
+        state.events = events;
+        refreshTasks();
+        renderAll();
+        setEventStatus("Event removed.");
     }
 
     function changeMonth(delta) {
@@ -253,6 +307,28 @@
                 selectDate(day.dataset.date);
             }
         });
+
+        if (elements.addEventButton) {
+            elements.addEventButton.addEventListener("click", addEventFromForm);
+        }
+
+        if (elements.eventTitle) {
+            // Enter is the obvious way to add a one-line job from a keyboard.
+            elements.eventTitle.addEventListener("keydown", event => {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    addEventFromForm();
+                }
+            });
+        }
+
+        elements.dayList.addEventListener("click", event => {
+            const remove = event.target.closest("[data-event-remove]");
+
+            if (remove) {
+                removeEventById(remove.dataset.eventRemove);
+            }
+        });
     }
 
     function applyUrlDate() {
@@ -271,6 +347,11 @@
 
     function init() {
         applyUrlDate();
+
+        if (elements.eventDate) {
+            elements.eventDate.value = state.selected;
+        }
+
         bindEvents();
         refreshTasks();
         renderAll();

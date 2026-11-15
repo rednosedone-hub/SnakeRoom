@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Calendar</title>
-    <link rel="stylesheet" href="style.css?v=103">
+    <link rel="stylesheet" href="style.css?v=104">
 </head>
 
 <body>
@@ -26,7 +26,8 @@
                 Every job the app already knows about, on one calendar: pickups with a three-day
                 reminder to reach out and make the final arrangements, meals coming due, health
                 follow-ups and quarantine releases, clutch hatch windows and feeder orders. Overdue
-                work is pinned to today so it cannot hide in the past.
+                work is pinned to today so it cannot hide in the past. Add your own jobs too — a tub
+                clean, a weighing day — and they sit on the same calendar.
             </p>
         </div>
 
@@ -95,6 +96,7 @@
                     <span class="calendar-legend-item is-health">Health</span>
                     <span class="calendar-legend-item is-breeding">Breeding</span>
                     <span class="calendar-legend-item is-order">Order</span>
+                    <span class="calendar-legend-item is-event">Event</span>
                 </div>
             </section>
 
@@ -102,6 +104,32 @@
                 <div class="section-heading-row">
                     <h3 id="calendarDayTitle">Today</h3>
                 </div>
+
+                <div class="calendar-event-form">
+                    <label class="form-field">
+                        <span>Add an event</span>
+                        <input type="text" id="eventTitleInput" list="calendarEventSuggestions"
+                            maxlength="60" placeholder="Cleaning" />
+                        <datalist id="calendarEventSuggestions">
+                            <option value="Cleaning"></option>
+                            <option value="Weighing"></option>
+                            <option value="Misting"></option>
+                            <option value="Water change"></option>
+                        </datalist>
+                    </label>
+
+                    <label class="form-field">
+                        <span>Date</span>
+                        <input type="date" id="eventDateInput" />
+                    </label>
+
+                    <div class="form-field">
+                        <span>&nbsp;</span>
+                        <button type="button" class="main-button" id="addEventButton">Add event</button>
+                    </div>
+                </div>
+
+                <p class="fin-status" id="eventStatus" role="status"></p>
 
                 <p class="empty-message" id="calendarDayEmpty" hidden>
                     Nothing scheduled for this day.
@@ -118,7 +146,7 @@
 
     <script src="data-helpers.js?v=6"></script>
     <script src="backup-helpers.js?v=1"></script>
-    <script src="cloud-sync.js?v=21"></script>
+    <script src="cloud-sync.js?v=22"></script>
     <script src="auto-sync.js?v=9"></script>
     <script src="account-gate.js?v=1"></script>
     <script src="feed-helpers.js?v=5"></script>
@@ -128,8 +156,8 @@
     <script src="buyer-helpers.js?v=3"></script>
     <script src="incubation-helpers.js?v=2"></script>
     <script src="breeding-timeline.js?v=1"></script>
-    <script src="calendar-helpers.js?v=5"></script>
-    <script src="calendar.js?v=4"></script>
+    <script src="calendar-helpers.js?v=6"></script>
+    <script src="calendar.js?v=5"></script>
 
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>

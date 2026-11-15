@@ -10,6 +10,7 @@
 //   breeding - a clutch's hatch window and first candling, plus a pair's
 //              estimated ovulation and egg date after a pre-lay shed
 //   order    - a feeder size that has reached its re-order date
+//   event    - a job the keeper wrote in themselves (cleaning, weighing)
 //
 // Overdue work is pinned to today: the app treats "was due last week" as "do it
 // now", so the calendar shows it on today rather than burying it in the past.
@@ -17,6 +18,7 @@
 (function () {
     const TASK_TYPES = {
         pickup: { label: "Pickup", rank: 1 },
+        event: { label: "Event", rank: 1.5 },
         feeding: { label: "Feeding", rank: 2 },
         health: { label: "Health", rank: 3 },
         breeding: { label: "Breeding", rank: 4 },
@@ -570,6 +572,98 @@
         });
     }
 
+    // ---- The keeper's own jobs ---------------------------------------------
+    // Tubs get cleaned and snakes get weighed on a rhythm no record on an animal
+    // knows about, so those jobs are kept as a small list the keeper writes.
+    // They live in the cloud snapshot with everything else, so a note written on
+    // the phone shows up on the laptop.
+
+    const EVENTS_KEY = "calendarEvents";
+    const EVENT_SUGGESTIONS = ["Cleaning", "Weighing", "Misting", "Water change"];
+
+    function createEventId() {
+        return `event-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    }
+
+    // Anything saved without a date or a name is dropped rather than shown as a
+    // blank row; a job with no words on it is not a job.
+    function normalizeEvent(raw) {
+        const source = raw && typeof raw === "object" ? raw : {};
+        const title = text(source.title);
+        const date = text(source.date).slice(0, 10);
+
+        if (!title || !parseDate(date)) {
+            return null;
+        }
+
+        return {
+            id: text(source.id) || createEventId(),
+            date,
+            title,
+            notes: text(source.notes)
+        };
+    }
+
+    function readEvents() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(EVENTS_KEY) || "[]");
+
+            return (Array.isArray(saved) ? saved : []).map(normalizeEvent).filter(Boolean);
+        } catch (error) {
+            return [];
+        }
+    }
+
+    function saveEvents(events) {
+        const cleaned = (Array.isArray(events) ? events : []).map(normalizeEvent).filter(Boolean);
+
+        localStorage.setItem(EVENTS_KEY, JSON.stringify(cleaned));
+
+        return cleaned;
+    }
+
+    function addEvent(draft) {
+        const event = normalizeEvent(draft);
+
+        if (!event) {
+            return { events: readEvents(), event: null, error: "An event needs a name and a date." };
+        }
+
+        const events = readEvents();
+
+        events.push(event);
+
+        return { events: saveEvents(events), event, error: "" };
+    }
+
+    function removeEvent(id) {
+        const wanted = text(id);
+
+        return saveEvents(readEvents().filter(event => event.id !== wanted));
+    }
+
+    // A keeper's own job stays on the day it was written for, even once that day
+    // has passed: a cleaning that was not done is not made truer by moving it to
+    // today, and the month view is where the gap shows.
+    function collectEventTasks(events, options, push) {
+        (Array.isArray(events) ? events : []).forEach(event => {
+            const normalized = normalizeEvent(event);
+
+            if (!normalized) {
+                return;
+            }
+
+            push({
+                date: normalized.date,
+                type: "event",
+                title: normalized.title,
+                detail: normalized.notes,
+                href: "",
+                eventId: normalized.id
+            });
+        });
+    }
+
     function compareTasks(left, right) {
         return String(left.date).localeCompare(String(right.date))
             || (TASK_TYPES[left.type] ? TASK_TYPES[left.type].rank : 9) - (TASK_TYPES[right.type] ? TASK_TYPES[right.type].rank : 9)
@@ -607,6 +701,7 @@
         collectBreedingTasks(opts.clutches, context, push);
         collectPairTasks(opts.pairs, opts.snakes, context, push);
         collectOrderTasks(opts.forecast, context, push);
+        collectEventTasks(opts.events, context, push);
 
         return tasks.sort(compareTasks);
     }
@@ -645,6 +740,13 @@
         TASK_TYPES,
         HATCH_DAYS,
         PICKUP_REMINDER_DAYS,
+        EVENTS_KEY,
+        EVENT_SUGGESTIONS,
+        normalizeEvent,
+        readEvents,
+        saveEvents,
+        addEvent,
+        removeEvent,
         parseDate,
         dateText,
         todayText,
