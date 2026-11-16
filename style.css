@@ -1084,9 +1084,13 @@ h4 .snake-link {
 
 /* Divider Styles */
 
+/* A divider is a rule between things, so it needs air on both sides. Without a
+   margin here the buttons that follow one sit flush against the gold line; the
+   row's own 40px bottom margin only spaces what comes after the next line. */
 .divider {
     position: relative;
     height: 3px;
+    margin: 0 0 24px;
     background-color: var(--gold-color);
 }
 
