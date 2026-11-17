@@ -9,6 +9,9 @@ let pendingFeedingHold = null;
 
 const editingIndex = getEditingIndex();
 const requestedUid = new URLSearchParams(window.location.search).get("uid") || null;
+// Set by a scan from the scan session, so saving goes back to the scanner
+// instead of dropping the keeper into the collection mid-weighing.
+const returnToScanAfterSave = new URLSearchParams(window.location.search).get("from") === "scan";
 const requestedUidMissing = requestedUid !== null && editingIndex === null;
 
 const feederRules = {
@@ -2193,7 +2196,21 @@ function addWeightHistoryEntry() {
         weight: Number(weightValue)
     });
     currentWeightHistory.sort((a, b) => new Date(a.date) - new Date(b.date));
-    renderWeightHistory({ weight: weightValue, weightHistory: getCurrentWeightHistory() });
+
+    // The field above the history is the animal's current weight, so it follows
+    // the newest weigh-in: a backdated record must not drag it backwards.
+    const weightInput = document.getElementById("weightInput");
+    const currentWeight = window.SnakeData.currentWeightOf({
+        weight: weightValue,
+        weightHistory: getCurrentWeightHistory()
+    });
+
+    if (currentWeight !== "" && weightInput.value !== String(currentWeight)) {
+        weightInput.value = String(currentWeight);
+        updateFeederSuggestion();
+    }
+
+    renderWeightHistory({ weight: weightInput.value, weightHistory: getCurrentWeightHistory() });
     document.getElementById("weightDateInput").value = "";
     persistCurrentHistories();
 }
@@ -3286,9 +3303,24 @@ function removeWeightHistoryEntry(index) {
         return;
     }
 
+    const removed = history[index];
     history.splice(index, 1);
+
+    // Removing the newest weigh-in makes the one before it current, as long as
+    // the field was only echoing a weigh-in and not a hand-typed weight.
+    const weightInput = document.getElementById("weightInput");
+    const stored = Number(String(weightInput?.value || "").replace(/[^0-9.]/g, ""));
+    const wasWeighIn = history.concat([removed])
+        .some(entry => Number(entry && (entry.weight ?? entry.value)) === stored);
+    const latest = window.SnakeData.latestWeighIn({ weightHistory: history });
+
+    if (wasWeighIn && latest && weightInput.value !== String(latest.weight)) {
+        weightInput.value = String(latest.weight);
+        updateFeederSuggestion();
+    }
+
     renderWeightHistory({
-        weight: document.getElementById("weightInput")?.value || "",
+        weight: weightInput.value,
         weightHistory: getCurrentWeightHistory()
     });
     persistCurrentHistories();
@@ -3944,7 +3976,9 @@ async function saveSnakeFromPage() {
         window.StorefrontSync.publishQuietly();
     }
 
-    window.location.href = "snakes.html";
+    window.location.href = returnToScanAfterSave
+        ? "scan-session.html?mode=edit&resume=1"
+        : "snakes.html";
 }
 
 window.updateFeederSuggestion = updateFeederSuggestion;
@@ -3972,6 +4006,128 @@ window.resolveHealthFollowUp = resolveHealthFollowUp;
 window.updateQuarantineReleaseFields = updateQuarantineReleaseFields;
 window.removeWeightHistoryEntry = removeWeightHistoryEntry;
 window.removeFeedingHistoryEntry = removeFeedingHistoryEntry;
+
+// ---- Transfer to another keeper -------------------------------------------
+//
+// A saved record can be handed to another Snake Room account by email. The
+// sender's copy stays exactly where it is, carrying the transfer bookkeeping,
+// so nothing disappears if the other side never claims it. Only the animal and
+// its history are sent (see transfer-helpers.js).
+(function wireTransferPanel() {
+    const block = document.getElementById("transferFields");
+
+    if (!block) {
+        return;
+    }
+
+    const emailInput = document.getElementById("transferEmailInput");
+    const noteInput = document.getElementById("transferNoteInput");
+    const sendButton = document.getElementById("sendTransferButton");
+    const cancelButton = document.getElementById("cancelTransferButton");
+    const status = document.getElementById("transferStatus");
+
+    function record() {
+        return editingIndex === null ? null : snakes[editingIndex] || null;
+    }
+
+    function setStatus(message, isError) {
+        status.textContent = message || "";
+        status.style.color = isError ? "var(--goldenrod-color)" : "";
+    }
+
+    function render() {
+        const snake = record();
+
+        if (!snake) {
+            block.hidden = true;
+            return;
+        }
+
+        block.hidden = false;
+
+        const pending = Boolean(snake.transferId && snake.transferTo);
+
+        sendButton.hidden = pending;
+        cancelButton.hidden = !pending;
+        emailInput.disabled = pending;
+        noteInput.disabled = pending;
+
+        if (pending) {
+            setStatus(
+                `Sent to ${snake.transferTo}` +
+                (snake.transferSentAt ? ` on ${snake.transferSentAt}` : "") +
+                ". Waiting for them to accept it."
+            );
+        }
+    }
+
+    sendButton.addEventListener("click", async () => {
+        const snake = record();
+
+        if (!snake) {
+            return;
+        }
+
+        if (!window.TransferSync) {
+            setStatus("Transfers need the cloud scripts. Reload the page.", true);
+            return;
+        }
+
+        sendButton.disabled = true;
+        setStatus("Sending\u2026");
+
+        try {
+            const result = await window.TransferSync.send(snake, emailInput.value, noteInput.value);
+
+            if (!result.ok) {
+                setStatus(result.error, true);
+                return;
+            }
+
+            snake.transferId = result.id;
+            snake.transferTo = result.to;
+            snake.transferSentAt = new Date().toISOString().slice(0, 10);
+
+            snakes[editingIndex] = snake;
+            saveSnakes();
+            render();
+        } finally {
+            sendButton.disabled = false;
+        }
+    });
+
+    cancelButton.addEventListener("click", async () => {
+        const snake = record();
+
+        if (!snake || !snake.transferId) {
+            return;
+        }
+
+        cancelButton.disabled = true;
+
+        try {
+            const result = await window.TransferSync.cancel(snake.transferId);
+
+            if (!result.ok) {
+                setStatus(result.error, true);
+                return;
+            }
+
+            delete snake.transferId;
+            delete snake.transferTo;
+            delete snake.transferSentAt;
+
+            snakes[editingIndex] = snake;
+            saveSnakes();
+            setStatus("Transfer cancelled.");
+            render();
+        } finally {
+            cancelButton.disabled = false;
+        }
+    });
+
+    render();
+})();
 window.removeShedHistoryEntry = removeShedHistoryEntry;
 window.removePhoto = removePhoto;
 window.makePhotoMain = makePhotoMain;

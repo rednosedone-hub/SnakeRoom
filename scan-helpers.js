@@ -176,6 +176,18 @@
         return { ok: true, entry, previousWeight };
     }
 
+    // The edit flow leaves the scanner for the full record page, so the link
+    // carries a route back: saving in the form returns to the scanner.
+    function editUrl(uid) {
+        const id = text(uid).trim();
+
+        if (!id) {
+            return "";
+        }
+
+        return "snake-form.html?uid=" + encodeURIComponent(id) + "&from=scan";
+    }
+
     const api = {
         MAX_WEIGHT,
         HOLD_REASONS,
@@ -183,7 +195,8 @@
         findSnake,
         latestWeight,
         applyFeeding,
-        applyWeight
+        applyWeight,
+        editUrl
     };
 
     if (typeof window !== "undefined") {

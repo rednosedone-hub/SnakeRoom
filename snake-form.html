@@ -380,6 +380,42 @@
                     <div class="hold-history" id="holdHistorySummary" hidden></div>
                 </div>
 
+                <div class="hold-block" id="transferFields" hidden>
+                    <h4>Transfer to another keeper</h4>
+
+                    <p class="empty-message">
+                        Hands this animal to another Snake Room account by email. The record travels
+                        &mdash; genes, weights, feeds, sheds &mdash; but your prices, buyers, bin and
+                        private notes stay here. Save the record before sending.
+                    </p>
+
+                    <div class="form-grid">
+                        <label class="form-field">
+                            <span>Their account email</span>
+                            <input type="email" id="transferEmailInput" autocomplete="off"
+                                placeholder="buyer@example.com">
+                        </label>
+
+                        <label class="form-field">
+                            <span>Message (optional)</span>
+                            <input type="text" id="transferNoteInput"
+                                placeholder="Paid in full, pickup at the show">
+                        </label>
+                    </div>
+
+                    <div class="button-row" style="margin-top: 14px;">
+                        <button type="button" class="secondary-button" id="sendTransferButton">
+                            Send transfer
+                        </button>
+
+                        <button type="button" class="secondary-button" id="cancelTransferButton" hidden>
+                            Cancel pending transfer
+                        </button>
+                    </div>
+
+                    <p class="fin-status" id="transferStatus" role="status"></p>
+                </div>
+
                 <div class="money-summary-line" id="acquisitionSummary"></div>
 
                 <datalist id="sellerOptions"></datalist>
@@ -846,7 +882,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="data-helpers.js?v=6"></script>
+    <script src="data-helpers.js?v=7"></script>
     <script src="backup-helpers.js?v=1"></script>
     <script src="cloud-sync.js?v=22"></script>
     <script src="auto-sync.js?v=9"></script>
@@ -869,7 +905,9 @@
     <script src="breeding-repair-helpers.js?v=1"></script>
     <script src="storefront-contact.js?v=4"></script>
     <script src="storefront-sync.js?v=1"></script>
-    <script src="snake-form.js?v=48"></script>
+    <script src="transfer-helpers.js?v=1"></script>
+    <script src="transfer-sync.js?v=1"></script>
+    <script src="snake-form.js?v=52"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

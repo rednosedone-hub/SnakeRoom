@@ -497,7 +497,175 @@
     }
 
     if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", init);
+        // ---- Animal transfers -------------------------------------------------
+    //
+    // Outgoing transfers live with the animal's record; this page is where a
+    // keeper sees what was sent to them and claims it. Accepting is the only
+    // step that touches the local collection.
+    function wireTransfers() {
+        const section = document.getElementById("transferSection");
+
+        if (!section || !window.TransferSync || !window.TransferHelpers) {
+            return;
+        }
+
+        const refreshButton = document.getElementById("refreshTransfersButton");
+        const statusNode = document.getElementById("transferListStatus");
+        const incomingNode = document.getElementById("transferIncomingList");
+        const sentNode = document.getElementById("transferSentList");
+
+        function esc(value) {
+            return String(value === undefined || value === null ? "" : value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;");
+        }
+
+        function setStatus(message) {
+            statusNode.textContent = message || "";
+        }
+
+        function rowHtml(detail, extra) {
+            return `
+                <div class="scan-session-item">
+                    <span class="scan-session-name">${esc(detail.label)}</span>
+                    <span class="scan-session-kind">${esc(detail.morph)}</span>
+                    <span class="scan-session-summary">${esc(extra)}</span>
+                </div>`;
+        }
+
+        function renderTransfers(data) {
+            const incoming = (data.incoming || []).filter(item => item.status === "pending");
+
+            if (!incoming.length) {
+                incomingNode.innerHTML = `<p class="empty-message">Nothing waiting for ${esc(data.email || "this account")}.</p>`;
+            } else {
+                incomingNode.innerHTML = incoming.map(item => {
+                    const detail = window.TransferHelpers.describe(item);
+                    const from = detail.from ? `from ${detail.from}` : "transfer";
+                    const extra = `${from}${detail.created ? ` \u00b7 ${detail.created}` : ""}`;
+
+                    return `
+                        <div class="scan-session-item">
+                            <span class="scan-session-name">${esc(detail.label)}</span>
+                            <span class="scan-session-kind">${esc(detail.morph)}</span>
+                            <span class="scan-session-summary">${esc(extra)}</span>
+                            <button type="button" class="secondary-button" data-accept-transfer="${esc(item.id)}">
+                                Add to collection
+                            </button>
+                        </div>`;
+                }).join("");
+            }
+
+            const sent = data.outgoing || [];
+
+            sentNode.innerHTML = sent.length
+                ? sent.map(item => {
+                    const detail = window.TransferHelpers.describe(item);
+                    const state = detail.status === "accepted"
+                        ? `accepted${detail.claimed ? ` ${detail.claimed}` : ""}`
+                        : detail.status;
+
+                    return rowHtml(detail, `to ${detail.to} \u00b7 ${state}`);
+                }).join("")
+                : `<p class="empty-message">No animals sent from this account yet.</p>`;
+        }
+
+        async function load() {
+            setStatus("Checking for transfers\u2026");
+
+            try {
+                const data = await window.TransferSync.list();
+
+                if (!data.ok) {
+                    setStatus(data.error);
+                    incomingNode.innerHTML = "";
+                    sentNode.innerHTML = "";
+                    return;
+                }
+
+                setStatus("");
+                renderTransfers(data);
+            } catch (error) {
+                setStatus(window.TransferSync.describeError(error));
+            }
+        }
+
+        async function acceptTransfer(id, button) {
+            button.disabled = true;
+            setStatus("Adding the animal\u2026");
+
+            try {
+                const data = await window.TransferSync.list();
+                const item = data.ok ? (data.incoming || []).find(candidate => candidate.id === id) : null;
+
+                if (!item) {
+                    setStatus("That transfer is no longer available.");
+                    await load();
+                    return;
+                }
+
+                const helpers = window.TransferHelpers;
+                const owned = window.SnakeData.loadSnakesWithIds([]);
+                const already = owned.some(snake => snake.transferId === id);
+
+                if (!already) {
+                    const merged = helpers.mergeIncoming(owned, item.snake, {
+                        fromName: item.from_name || item.from_email,
+                        today: new Date().toISOString().slice(0, 10)
+                    });
+
+                    merged.snake.transferId = id;
+                    window.SnakeData.saveStorageArray("snakes", merged.snakes);
+                }
+
+                const result = await window.TransferSync.accept(id);
+
+                if (!result.ok) {
+                    setStatus(result.error);
+                    return;
+                }
+
+                setStatus(
+                    already
+                        ? "That animal is already in this collection."
+                        : `${helpers.describe(item).label} added to this device's collection.`
+                );
+
+                if (window.CloudSync) {
+                    window.CloudSync.pushCore({ interactive: false }).catch(() => {});
+                }
+
+                await load();
+            } catch (error) {
+                setStatus(window.TransferSync.describeError(error));
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        incomingNode.addEventListener("click", event => {
+            const button = event.target.closest("[data-accept-transfer]");
+
+            if (!button) {
+                return;
+            }
+
+            acceptTransfer(button.getAttribute("data-accept-transfer"), button);
+        });
+
+        refreshButton.addEventListener("click", load);
+        load();
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", wireTransfers);
+    } else {
+        wireTransfers();
+    }
+
+    document.addEventListener("DOMContentLoaded", init);
     } else {
         init();
     }

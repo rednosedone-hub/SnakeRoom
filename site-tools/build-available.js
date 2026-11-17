@@ -188,19 +188,12 @@ function priceFor(record, status) {
     return asking || sale || hold;
 }
 
+// Who bought which animal is the seller's private business. A public listing
+// says held or sold and nothing more: no buyer name, and not the hold note,
+// which usually carries a deposit figure or a pickup plan.
 function notesFor(record, status) {
-    if (status === "hold") {
-        const buyer = cell(record, "holdBuyer");
-        const note = cell(record, "holdNote");
-        if (note) return note;
-        if (buyer) return "Reserved for " + buyer + ".";
-        return "On hold for a buyer.";
-    }
-
-    if (status === "sold") {
-        const buyer = cell(record, "soldTo");
-        return buyer ? "Sold to " + buyer + "." : "Sold.";
-    }
+    if (status === "hold") return "On hold for a buyer.";
+    if (status === "sold") return "Sold.";
 
     return "";
 }

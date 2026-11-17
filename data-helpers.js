@@ -332,15 +332,98 @@ function ensureSnakeIds(snakes) {
     };
 }
 
+function weighInWeight(entry) {
+    if (entry === undefined || entry === null) {
+        return null;
+    }
+
+    const value = typeof entry === "object" ? (entry.weight ?? entry.value) : entry;
+    const weight = Number(String(value).replace(/[^0-9.]/g, ""));
+
+    return Number.isFinite(weight) && weight > 0 ? weight : null;
+}
+
+// The current weight is the newest weigh-in on the record, not just whatever
+// the weight field holds. Every weigh-in is saved twice — as an entry in
+// weightHistory and as the weight field — and the two can drift apart: the
+// cloud merge combines history entry by entry but keeps a single value for the
+// field, so one device can end up with the new weigh-in on the history and the
+// old weight in the field.
+function latestWeighIn(snake) {
+    const history = Array.isArray(snake && snake.weightHistory) ? snake.weightHistory : [];
+    let latest = null;
+
+    history.forEach((entry, index) => {
+        const weight = weighInWeight(entry);
+
+        if (weight === null) {
+            return;
+        }
+
+        const candidate = {
+            date: String((entry && typeof entry === "object" && entry.date) || "").slice(0, 10),
+            weight,
+            index
+        };
+
+        if (!latest
+            || candidate.date > latest.date
+            || (candidate.date === latest.date && candidate.index > latest.index)) {
+            latest = candidate;
+        }
+    });
+
+    return latest ? { date: latest.date, weight: latest.weight } : null;
+}
+
+// A weight typed straight into the field and never recorded as a weigh-in is
+// the keeper's own number, so it is left alone. A stored weight that matches
+// one of the weigh-ins is only an older current weight, so the newest wins.
+function currentWeightOf(snake) {
+    const stored = weighInWeight(snake && snake.weight);
+    const latest = latestWeighIn(snake);
+
+    if (!latest) {
+        return stored === null ? "" : stored;
+    }
+
+    const recorded = (Array.isArray(snake && snake.weightHistory) ? snake.weightHistory : [])
+        .some(entry => weighInWeight(entry) === stored);
+
+    if (stored !== null && !recorded) {
+        return stored;
+    }
+
+    return latest.weight;
+}
+
+function reconcileCurrentWeights(snakes) {
+    let changed = false;
+
+    const reconciled = snakes.map(snake => {
+        const weight = currentWeightOf(snake);
+
+        if (weight === "" || String(weight) === String(snake.weight)) {
+            return snake;
+        }
+
+        changed = true;
+        return { ...snake, weight: String(weight) };
+    });
+
+    return { snakes: reconciled, changed };
+}
+
 function loadSnakesWithIds(fallbackValue = []) {
     const loadedSnakes = readStorageArray("snakes", fallbackValue);
     const migration = ensureSnakeIds(loadedSnakes);
+    const weights = reconcileCurrentWeights(migration.snakes);
 
-    if (migration.changed) {
-        saveStorageArray("snakes", migration.snakes);
+    if (migration.changed || weights.changed) {
+        saveStorageArray("snakes", weights.snakes);
     }
 
-    return migration.snakes;
+    return weights.snakes;
 }
 
 function findSnakeIndexById(snakes, snakeId) {
@@ -493,6 +576,9 @@ window.SnakeData = {
     getSnakeIdentityText,
     createSnakeId,
     ensureSnakeIds,
+    latestWeighIn,
+    currentWeightOf,
+    reconcileCurrentWeights,
     loadSnakesWithIds,
     findSnakeIndexById,
     getSnakeByReference,

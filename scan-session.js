@@ -48,11 +48,13 @@ function scanMode() {
 function initialScanMode() {
     const fromUrl = new URLSearchParams(window.location.search).get("mode");
 
-    if (fromUrl === "feed" || fromUrl === "weight") {
+    if (fromUrl === "feed" || fromUrl === "weight" || fromUrl === "edit") {
         return fromUrl;
     }
 
-    return localStorage.getItem(SCAN_MODE_KEY) === "weight" ? "weight" : "feed";
+    const stored = localStorage.getItem(SCAN_MODE_KEY);
+
+    return stored === "weight" || stored === "edit" ? stored : "feed";
 }
 
 function persistScanSnakes() {
@@ -154,21 +156,33 @@ function updateScanReason() {
 // ---- Mode ----------------------------------------------------------------
 
 function applyScanMode() {
-    const feed = scanMode() === "feed";
+    const mode = scanMode();
+    const feed = mode === "feed";
+    const weight = mode === "weight";
+    const edit = mode === "edit";
     const feedButton = scanEl("scanModeFeed");
     const weightButton = scanEl("scanModeWeight");
+    const editButton = scanEl("scanModeEdit");
 
     feedButton.className = feed ? "main-button is-active" : "secondary-button";
-    weightButton.className = feed ? "secondary-button" : "main-button is-active";
+    weightButton.className = weight ? "main-button is-active" : "secondary-button";
 
-    scanEl("scanModeTitle").textContent = feed ? "Feed by Scan" : "Weigh by Scan";
-    scanEl("scanEntryTitle").textContent = feed ? "Feeding" : "Weighing";
+    if (editButton) {
+        editButton.className = edit ? "main-button is-active" : "secondary-button";
+    }
+
+    scanEl("scanModeTitle").textContent = feed
+        ? "Feed by Scan"
+        : weight
+            ? "Weigh by Scan"
+            : "Edit by Scan";
+    scanEl("scanEntryTitle").textContent = feed ? "Feeding" : weight ? "Weighing" : "Editing";
     scanEl("scanFeedFields").hidden = !feed;
-    scanEl("scanWeightFields").hidden = feed;
+    scanEl("scanWeightFields").hidden = !weight;
 }
 
 function setScanMode(mode) {
-    const next = mode === "weight" ? "weight" : "feed";
+    const next = mode === "weight" ? "weight" : mode === "edit" ? "edit" : "feed";
 
     if (next === scanMode()) {
         return;
@@ -178,6 +192,14 @@ function setScanMode(mode) {
     localStorage.setItem(SCAN_MODE_KEY, next);
 
     if (scanState.active) {
+        // Edit mode opens the full record instead of a quick entry, so there is
+        // nothing on this page to carry over.
+        if (next === "edit") {
+            clearScanEntry();
+            applyScanMode();
+            return;
+        }
+
         // The open animal was scanned for the other job, so show it again in
         // the new mode with the same animal still selected.
         const snake = scanState.active;
@@ -516,7 +538,28 @@ function defaultFeeder(snake) {
     return entry && entry.feederSize ? entry.feederSize : "";
 }
 
+// Edit mode is a shortcut, not a form: scanning a card opens that animal's full
+// record so a shed, health note or breeding change can be logged mid-session.
+function openEditForm(snake) {
+    const url = window.ScanSession.editUrl(snake.id);
+
+    if (!url) {
+        showScanMessage("That animal has no id to open. Find it in the Collection instead.");
+        return;
+    }
+
+    stopScanning();
+    showScanMessage(`Opening ${snake.name || "that animal"}\u2026`);
+    buzz(40);
+    window.location.href = url;
+}
+
 function openScannedSnake(snake) {
+    if (scanMode() === "edit") {
+        openEditForm(snake);
+        return;
+    }
+
     const feed = scanMode() === "feed";
 
     scanState.active = snake;
@@ -860,6 +903,30 @@ function wireScanSession() {
     });
 }
 
+// Saving a scanned edit sends the keeper back here with resume=1: they are
+// standing at the next bin, so reopen the camera instead of asking for another
+// tap. The flag is dropped from the URL so a later reload does not surprise
+// anyone with a camera prompt.
+function resumeScanningIfRequested() {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get("resume") !== "1") {
+        return;
+    }
+
+    params.delete("resume");
+
+    const query = params.toString();
+
+    window.history.replaceState(
+        null,
+        "",
+        window.location.pathname + (query ? `?${query}` : "") + window.location.hash
+    );
+
+    startScanning();
+}
+
 function initScanSession() {
     refreshScanSnakes();
 
@@ -872,6 +939,7 @@ function initScanSession() {
     updateScanReason();
     renderScanSession();
     wireScanSession();
+    resumeScanningIfRequested();
 }
 
 initScanSession();

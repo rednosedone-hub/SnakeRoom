@@ -63,6 +63,35 @@
                 <div class="import-report" id="syncReport"></div>
             </section>
 
+            <section class="form-section" id="transferSection">
+                <h3>Animal Transfers</h3>
+
+                <p class="empty-message">
+                    Send an animal from its record &mdash; <strong>Transfer to another keeper</strong>
+                    &mdash; and it appears here for the account email you named. What travels is the
+                    animal and its history: no prices, no buyers, no private notes. Accepting adds it
+                    to this device's collection.
+                </p>
+
+                <div class="form-page-actions">
+                    <button type="button" class="secondary-button" id="refreshTransfersButton">
+                        Refresh Transfers
+                    </button>
+                </div>
+
+                <p class="empty-message" id="transferListStatus" role="status"></p>
+
+                <div id="transferIncomingList"></div>
+
+                <h4 style="margin-top: 20px;">Sent by this account</h4>
+                <div id="transferSentList"></div>
+
+                <p class="form-hint" style="margin-top: 14px;">
+                    First time only: run <code>site-tools/transfer-setup.sql</code> in the Supabase
+                    SQL Editor to create the transfer table.
+                </p>
+            </section>
+
             <section class="form-section" id="signInSection">
                 <h3>Sign In</h3>
 
@@ -282,12 +311,14 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="data-helpers.js?v=6"></script>
+    <script src="data-helpers.js?v=7"></script>
     <script src="backup-helpers.js?v=1"></script>
     <script src="cloud-sync.js?v=22"></script>
     <script src="auto-sync.js?v=9"></script>
     <script src="plans.js?v=2"></script>
-    <script src="account.js?v=2"></script>
+    <script src="transfer-helpers.js?v=1"></script>
+    <script src="transfer-sync.js?v=1"></script>
+    <script src="account.js?v=3"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

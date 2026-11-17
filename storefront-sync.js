@@ -113,12 +113,14 @@
         return asking || sale || hold;
     }
 
+    // Who bought which animal is the seller's private business. The shop says
+    // an animal is held or sold and nothing more: no buyer name, and none of the
+    // hold note, which usually carries a deposit figure or a pickup plan.
     function notesOf(snake, status) {
-        if (status !== "hold") return text(snake.notes);
+        if (status === "hold") return "On hold for a buyer.";
+        if (status === "sold") return "Sold.";
 
-        if (text(snake.holdNote)) return text(snake.holdNote);
-        if (text(snake.holdBuyer)) return "Reserved for " + text(snake.holdBuyer) + ".";
-        return "On hold for a buyer.";
+        return text(snake.notes);
     }
 
     function feedingOf(snake) {

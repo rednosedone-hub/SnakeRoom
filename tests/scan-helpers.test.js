@@ -34,6 +34,13 @@ test("a typed code is used as it is", () => {
     assert.equal(scan.parseScanPayload(""), "");
 });
 
+test("an edit scan opens the full record with a route back to the scanner", () => {
+    assert.equal(scan.editUrl("snake-1"), "snake-form.html?uid=snake-1&from=scan");
+    assert.equal(scan.editUrl("SS C/1"), "snake-form.html?uid=SS%20C%2F1&from=scan");
+    assert.equal(scan.editUrl("  "), "");
+    assert.equal(scan.editUrl(null), "");
+});
+
 test("a scan finds the animal by id, keeper ID or name", () => {
     const snakes = [snake(), snake({ id: "snake-2", name: "Atlas", ID: "SS-004", morph: "Clown" })];
 

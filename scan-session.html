@@ -36,9 +36,11 @@
                 <h3 id="scanModeTitle">Feed by Scan</h3>
 
                 <p class="gene-help">
-                    Pick feed or weigh, start the camera, then scan each bin-card QR code.
-                    The animal's card opens with the date already on today; change the feeder or
-                    weight if needed and save, then scan the next one. Typing a code or name works
+                    Pick feed, weigh or edit, start the camera, then scan each bin-card QR code.
+                    Feed and weigh open a card with the date already on today: change the feeder or
+                    weight if needed and save, then scan the next one. Edit opens that animal's full
+                    record, so a shed, health note or breeding change can be logged without hunting
+                    through the collection — saving returns you here. Typing a code or name works
                     too when a label is scuffed or the camera is unavailable.
                 </p>
 
@@ -47,6 +49,9 @@
                         onclick="setScanMode('feed')">Feed</button>
                     <button type="button" id="scanModeWeight" class="secondary-button"
                         onclick="setScanMode('weight')">Weigh</button>
+
+                    <button type="button" id="scanModeEdit" class="secondary-button"
+                        onclick="setScanMode('edit')">Edit</button>
                 </div>
 
                 <div class="scan-camera" id="scanCamera">
@@ -171,7 +176,7 @@
     </div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <script src="data-helpers.js?v=6"></script>
+    <script src="data-helpers.js?v=7"></script>
     <script src="backup-helpers.js?v=1"></script>
     <script src="cloud-sync.js?v=22"></script>
     <script src="auto-sync.js?v=9"></script>
@@ -180,8 +185,8 @@
     <script src="feed-helpers.js?v=5"></script>
     <script src="feeder-inventory.js?v=10"></script>
     <script src="finance-helpers.js?v=9"></script>
-    <script src="scan-helpers.js?v=4"></script>
-    <script src="scan-session.js?v=6"></script>
+    <script src="scan-helpers.js?v=5"></script>
+    <script src="scan-session.js?v=8"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>
