@@ -180,18 +180,18 @@
 
     function summarizeHatchling(snake) {
         const name = text(snake.name) || "Unnamed";
-        const morph = text(snake.morph);
-        const identity = text(snake.ID);
-        const clutch = text(snake.clutchId);
+        const genes = Array.isArray(snake.genes) ? snake.genes : [];
+        const geneNames = window.GeneTools && typeof window.GeneTools.describeGenes === "function"
+            ? window.GeneTools.describeGenes(genes)
+            : genes.map(gene => text(gene && gene.name)).filter(Boolean);
         const defects = defectLabels(snake);
 
         return {
             id: text(snake.id),
             name,
-            // The morph field now carries a hatchling's clutch id, and older
-            // records repeated the name there. Neither is a morph worth showing
-            // under that heading; the genes hold the real morph.
-            morph: morph && morph !== name && morph !== identity && morph !== clutch ? morph : "",
+            // Hatchling records store their actual morph composition in genes;
+            // the legacy morph field may only contain a hatchling ID.
+            morph: geneNames.join(", "),
             sex: text(snake.sex) || "Unknown",
             status: text(snake.status) || "No status",
             hatchDate: text(snake.hatchDate).slice(0, 10),
@@ -200,6 +200,7 @@
             defective: defects.length > 0
         };
     }
+
 
     function summarizeClutch(clutch, snakes) {
         const hatchlings = hatchlingsOf(clutch, snakes);
