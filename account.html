@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Account</title>
-    <link rel="stylesheet" href="style.css?v=105">
+    <link rel="stylesheet" href="style.css?v=106">
 </head>
 
 <body data-no-auth-gate>
@@ -24,6 +24,8 @@
         <div class="button-row">
             <a href="index.html" class="main-button">Home</a>
             <a href="snakes.html" class="main-button">Collection</a>
+            <a href="breeding.html" class="main-button">Breeding</a>
+            <a href="morphCalculator.html" class="main-button">Morph Calculator</a>
             <a href="finance.html" class="main-button">Finances</a>
             <a href="data-tools.html" class="main-button">Data Tools</a>
         </div>
@@ -172,16 +174,49 @@
             </section>
 
             <section class="form-section" id="planSection">
-                <h3>Plan</h3>
+                <div class="beta-pricing-banner" role="status">
+                    <strong>BETA TESTER ACCESS</strong> &mdash; You currently have full Pro features unlocked free during beta.
+                    Preview our planned launch pricing below and let us know what you think.
+                </div>
+
+                <h2 class="pricing-headline">Built for the snake room, not a spreadsheet.</h2>
+                <p class="pricing-subheadline">
+                    Start free with basic care logs. Upgrade when your rack grows, your first pairing locks,
+                    or you're ready to run a storefront.
+                </p>
 
                 <div class="plan-card" id="planCard"></div>
 
                 <p class="empty-message" id="planNote">
-                    Billing is not switched on yet, so nothing is charged and no limit is applied.
-                    The plans below are what the app will enforce once subscriptions start.
+                    Breeder Beta accounts have full access to the app at no charge while selected breeders test it.
                 </p>
 
+                <div class="billing-toggle-wrap">
+                    <span>Monthly</span>
+                    <label class="billing-toggle">
+                        <input type="checkbox" id="yearlyBillingToggle" aria-label="Show yearly billing prices">
+                        <span class="billing-toggle-slider"></span>
+                    </label>
+                    <span>Yearly <strong>(Save 2 months)</strong></span>
+                </div>
+
                 <div class="plan-grid" id="planGrid"></div>
+
+                <p class="pricing-footnote">
+                    Prices in CAD (USD equivalent shown at checkout). Cancel or switch plans anytime&mdash;your animal
+                    records are never deleted if you downgrade.
+                </p>
+
+                <div class="pricing-faq">
+                    <details>
+                        <summary>What happens to my snakes if I downgrade?</summary>
+                        <p>Nothing is erased. If you drop below a tier's animal limit, your existing records stay intact and readable&mdash;you just won't be able to add new animals until you're back under the cap.</p>
+                    </details>
+                    <details>
+                        <summary>Does the Storefront replace my website?</summary>
+                        <p>Yes. Pro gives you a branded public page with live available animals, an embedded morph calculator, buyer enquiry forms, and an education guide generated directly from the genes in your room.</p>
+                    </details>
+                </div>
             </section>
 
             <section class="form-section" id="backupHistorySection">
@@ -315,10 +350,10 @@
     <script src="backup-helpers.js?v=1"></script>
     <script src="cloud-sync.js?v=22"></script>
     <script src="auto-sync.js?v=9"></script>
-    <script src="plans.js?v=2"></script>
+    <script src="plans.js?v=3"></script>
     <script src="transfer-helpers.js?v=1"></script>
     <script src="transfer-sync.js?v=1"></script>
-    <script src="account.js?v=3"></script>
+    <script src="account.js?v=4"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

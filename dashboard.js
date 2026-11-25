@@ -538,7 +538,7 @@ function renderDashboard() {
     const females = countByValue(activeSnakes, "sex", "Female");
     const males = countByValue(activeSnakes, "sex", "Male");
     const available = countByValue(activeSnakes, "status", "Available");
-    const activePlans = breedingPairs.filter(pair => !pair.clutchId).length;
+    const activePlans = breedingPairs.filter(pair => !pair.clutchId && !pair.closedAt).length;
     const activeClutches = clutches.filter(clutch => !clutch.convertedToSnakes).length;
     const convertedClutches = clutches.length - activeClutches;
 

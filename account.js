@@ -29,6 +29,7 @@
     function renderPlanCards(session) {
         const currentCard = document.getElementById("planCard");
         const grid = document.getElementById("planGrid");
+        const yearly = document.getElementById("yearlyBillingToggle")?.checked || false;
 
         if (!window.SnakePlans || !currentCard || !grid) {
             return;
@@ -49,24 +50,41 @@
                 <p class="plan-card-tagline">Sign in to see which plan this account is on.</p>
             `;
 
-        grid.innerHTML = Object.values(window.SnakePlans.PLANS)
-            .filter(item => item.id !== "owner")
-            .map(item => {
-                const isCurrent = signedIn && item.id === plan.id;
+        grid.innerHTML = window.SnakePlans.LAUNCH_TIERS.map(item => {
+            const price = item.monthly === 0
+                ? "$0 / mo"
+                : yearly
+                    ? `$${item.yearly} CAD / yr <small>(2 months free)</small>`
+                    : `$${item.monthly} CAD / mo`;
+            const cta = item.id === "free"
+                ? `<a class="secondary-button plan-cta" href="#signInSection">${escapeHtml(item.cta)}</a>`
+                : `<button type="button" class="secondary-button plan-cta" disabled title="Purchases will be available after beta.">${escapeHtml(item.cta)}</button>`;
 
-                return `
-                    <div class="plan-option${isCurrent ? " plan-option-current" : ""}">
-                        <p class="plan-card-name">${escapeHtml(item.name)}</p>
-                        <ul class="plan-lines">
-                            ${window.SnakePlans.describePlan(item.id)
-                                .map(line => `<li>${escapeHtml(line)}</li>`)
-                                .join("")}
-                        </ul>
-                        ${isCurrent ? `<p class="plan-badge">Current plan</p>` : ""}
-                    </div>
-                `;
-            })
-            .join("");
+            return `
+                <article class="plan-option${item.popular ? " plan-option-popular" : ""}">
+                    ${item.popular ? `<p class="plan-badge">Most Popular</p>` : ""}
+                    <h4 class="plan-card-name">${escapeHtml(item.name)}</h4>
+                    <p class="plan-price">${price}</p>
+                    <p class="plan-card-tagline">${escapeHtml(item.tagline)}</p>
+                    <ul class="plan-lines">
+                        <li><strong>${escapeHtml(item.animals)}</strong> (${escapeHtml(item.photos)})</li>
+                        ${item.features.map(line => `<li>${escapeHtml(line)}</li>`).join("")}
+                    </ul>
+                    ${cta}
+                </article>
+            `;
+        }).join("");
+    }
+
+    function wireBillingToggle() {
+        const toggle = document.getElementById("yearlyBillingToggle");
+        if (toggle) {
+            toggle.addEventListener("change", async () => {
+                let session = null;
+                try { session = await window.CloudSync.getSession(); } catch (error) { session = null; }
+                renderPlanCards(session);
+            });
+        }
     }
 
     function renderSignedInEmail(session) {
@@ -105,13 +123,11 @@
 
         if (note) {
             if (!session) {
-                note.textContent = "Sign in to see your plan. Nothing here is charged yet.";
+                note.textContent = "Sign in to join the Breeder Beta. Full access is free while selected breeders test the app.";
             } else if (window.SnakePlans && window.SnakePlans.getPlan().id === "owner") {
-                note.textContent = "This is the owner account, so nothing is limited and nothing is charged. "
-                    + "The plans below are what other accounts will be offered once subscriptions start.";
+                note.textContent = "This is the owner account. Breeder Beta accounts also have full access at no charge while selected breeders test the app.";
             } else {
-                note.textContent = "Billing is not switched on yet, so nothing is charged and no limit is applied. "
-                    + "The plans below are what the app will enforce once subscriptions start.";
+                note.textContent = "You have full access to the app at no charge during the Breeder Beta.";
             }
         }
 
@@ -459,6 +475,7 @@
     }
 
     function init() {
+        wireBillingToggle();
         const emailLine = document.createElement("p");
         emailLine.id = "accountEmail";
         emailLine.className = "empty-message";
