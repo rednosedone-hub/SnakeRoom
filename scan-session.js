@@ -48,6 +48,10 @@ function scanMode() {
 function initialScanMode() {
     const fromUrl = new URLSearchParams(window.location.search).get("mode");
 
+    if (fromUrl === "show") {
+        return "show";
+    }
+
     if (fromUrl === "feed" || fromUrl === "weight" || fromUrl === "edit") {
         return fromUrl;
     }
@@ -157,12 +161,39 @@ function updateScanReason() {
 
 function applyScanMode() {
     const mode = scanMode();
+    const show = mode === "show";
     const feed = mode === "feed";
     const weight = mode === "weight";
     const edit = mode === "edit";
     const feedButton = scanEl("scanModeFeed");
     const weightButton = scanEl("scanModeWeight");
     const editButton = scanEl("scanModeEdit");
+    const showReturn = scanEl("showPlannerReturn");
+
+    if (showReturn) {
+        const expoId = new URLSearchParams(window.location.search).get("expo") || "";
+        showReturn.href = expoId
+            ? `show-day-planner.html?expo=${encodeURIComponent(expoId)}`
+            : "show-day-planner.html";
+    }
+
+    scanEl("scanModeToggle").hidden = show;
+    scanEl("scanEntrySection").hidden = show || !scanState.active;
+
+    if (show) {
+        scanEl("scanModeTitle").textContent = "Show Day Planner";
+        scanEl("scanInstructions").textContent = "Scan the QR code on each animal's Hatchling Record card to add it to the selected show's take list. You can also type the animal's ID or name. Scanning does not change the animal's sale status.";
+        scanEl("scanSessionHeading").textContent = "Added to this show";
+        scanEl("scanUndoButton").textContent = "Remove Last Animal";
+        scanEl("scanFeedFields").hidden = true;
+        scanEl("scanWeightFields").hidden = true;
+        showScanMessage("Scan an animal's Hatchling Record card to add it to this show.");
+        return;
+    }
+
+    scanEl("scanInstructions").textContent = "Pick feed, weigh or edit, start the camera, then scan each bin-card QR code. Feed and weigh open a card with the date already on today: change the feeder or weight if needed and save, then scan the next one. Edit opens that animal's full record, so a shed, health note or breeding change can be logged without hunting through the collection — saving returns you here. Typing a code or name works too when a label is scuffed or the camera is unavailable.";
+    scanEl("scanSessionHeading").textContent = "This Session";
+    scanEl("scanUndoButton").textContent = "Undo Last";
 
     feedButton.className = feed ? "main-button is-active" : "secondary-button";
     weightButton.className = weight ? "main-button is-active" : "secondary-button";
@@ -470,6 +501,11 @@ function handleScanPayload(payload) {
         return;
     }
 
+    if (scanMode() === "show") {
+        addSnakeToShowPlan(snake);
+        return;
+    }
+
     showScanMessage(`${snake.name || "Unnamed"} read.`);
     openScannedSnake(snake);
 }
@@ -490,8 +526,48 @@ function findTypedSnake() {
         return;
     }
 
+    if (scanMode() === "show") {
+        input.value = "";
+        addSnakeToShowPlan(snake);
+        return;
+    }
+
     input.value = "";
     openScannedSnake(snake);
+}
+
+function addSnakeToShowPlan(snake) {
+    const expoId = new URLSearchParams(window.location.search).get("expo") || "";
+    const expos = window.SnakeFinance ? window.SnakeFinance.getExpos() : [];
+    const expo = expos.find(item => item.id === expoId);
+
+    if (!expo) {
+        showScanMessage("Choose a show from Finance before scanning animals.");
+        return;
+    }
+
+    expo.animalIds = Array.isArray(expo.animalIds) ? expo.animalIds : [];
+
+    if (expo.animalIds.includes(snake.id)) {
+        showScanMessage(`${snake.name || "This animal"} is already on the show list.`);
+        scanLastCodeAt = Date.now();
+        return;
+    }
+
+    expo.animalIds.push(snake.id);
+    window.SnakeFinance.saveExpos(expos);
+    scanState.saved.push({
+        snakeId: snake.id,
+        name: snake.name || "Unnamed",
+        kind: "show",
+        summary: `${expo.name} · ready to take`,
+        at: new Date()
+    });
+    scanState.undo = { kind: "show", snakeId: snake.id, expoId };
+    renderScanSession();
+    snack(`${snake.name || "Animal"} added to ${expo.name}.`);
+    showScanMessage(`${snake.name || "Animal"} added. Scan the next card.`);
+    buzz(40);
 }
 
 function lastFeedingEntry(snake) {
@@ -773,6 +849,23 @@ function undoLastScan() {
         return;
     }
 
+    if (undo.kind === "show") {
+        const expos = window.SnakeFinance ? window.SnakeFinance.getExpos() : [];
+        const expo = expos.find(item => item.id === undo.expoId);
+
+        if (expo) {
+            expo.animalIds = (expo.animalIds || []).filter(id => id !== undo.snakeId);
+            window.SnakeFinance.saveExpos(expos);
+        }
+
+        scanState.saved.pop();
+        scanState.undo = null;
+        renderScanSession();
+        scanLastCodeAt = Date.now();
+        snack("Removed the last animal from this show plan.");
+        return;
+    }
+
     const snake = scanSnakes.find(item => item.id === undo.snakeId);
 
     if (!snake) {
@@ -842,7 +935,7 @@ function renderScanSession() {
     list.innerHTML = scanState.saved.map(item => `
         <div class="scan-session-item">
             <span class="scan-session-name">${escapeHtml(item.name)}</span>
-            <span class="scan-session-kind">${item.kind === "feed" ? "Fed" : "Weighed"}</span>
+            <span class="scan-session-kind">${item.kind === "feed" ? "Fed" : item.kind === "show" ? "Added" : "Weighed"}</span>
             <span class="scan-session-summary">${escapeHtml(item.summary)}</span>
         </div>
     `).join("");
@@ -931,7 +1024,9 @@ function initScanSession() {
     refreshScanSnakes();
 
     scanState.mode = initialScanMode();
-    localStorage.setItem(SCAN_MODE_KEY, scanState.mode);
+    if (scanState.mode !== "show") {
+        localStorage.setItem(SCAN_MODE_KEY, scanState.mode);
+    }
 
     renderFeederOptions();
     renderReasonOptions();

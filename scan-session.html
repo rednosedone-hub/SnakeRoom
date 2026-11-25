@@ -27,6 +27,7 @@
             <a href="feeding-session.html" class="main-button">Feeding Session</a>
             <a href="weight-sheet.html" class="main-button">Weight Sheet</a>
             <a href="bin-cards.html" class="main-button">Bin Cards</a>
+            <a href="show-day-planner.html" class="main-button" id="showPlannerReturn">Show Planner</a>
         </div>
 
         <div class="divider"></div>
@@ -35,7 +36,7 @@
             <section class="form-section">
                 <h3 id="scanModeTitle">Feed by Scan</h3>
 
-                <p class="gene-help">
+                <p class="gene-help" id="scanInstructions">
                     Pick feed, weigh or edit, start the camera, then scan each bin-card QR code.
                     Feed and weigh open a card with the date already on today: change the feeder or
                     weight if needed and save, then scan the next one. Edit opens that animal's full
@@ -44,7 +45,7 @@
                     too when a label is scuffed or the camera is unavailable.
                 </p>
 
-                <div class="scan-mode-toggle" role="group" aria-label="Session type">
+                <div class="scan-mode-toggle" id="scanModeToggle" role="group" aria-label="Session type">
                     <button type="button" id="scanModeFeed" class="main-button is-active"
                         onclick="setScanMode('feed')">Feed</button>
                     <button type="button" id="scanModeWeight" class="secondary-button"
@@ -80,7 +81,7 @@
 
                 <div class="scan-manual">
                     <label class="form-field">
-                        <span>Or type a code</span>
+                        <span>Or type a code or name</span>
                         <input type="text" id="scanManualInput" autocomplete="off"
                             placeholder="SS-C26-1-01, a name, or a pasted QR link">
                     </label>
@@ -157,7 +158,7 @@
             </section>
 
             <section class="form-section">
-                <h3>This Session</h3>
+                <h3 id="scanSessionHeading">This Session</h3>
 
                 <p class="empty-message" id="scanSessionStatus">Nothing saved yet.</p>
 
@@ -184,9 +185,9 @@
     <script src="wake-lock.js?v=4"></script>
     <script src="feed-helpers.js?v=5"></script>
     <script src="feeder-inventory.js?v=10"></script>
-    <script src="finance-helpers.js?v=9"></script>
-    <script src="scan-helpers.js?v=5"></script>
-    <script src="scan-session.js?v=8"></script>
+    <script src="finance-helpers.js?v=10"></script>
+    <script src="scan-helpers.js?v=6"></script>
+    <script src="scan-session.js?v=9"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

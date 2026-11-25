@@ -340,6 +340,9 @@
                 otherCost: toMoney(expo.otherCost),
                 otherRevenue: toMoney(expo.otherRevenue),
                 otherSales: normalizeOtherSales(expo.otherSales),
+                animalIds: Array.isArray(expo.animalIds)
+                    ? [...new Set(expo.animalIds.map(id => String(id || "").trim()).filter(Boolean))]
+                    : [],
                 notes: String(expo.notes || "")
             }));
     }

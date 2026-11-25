@@ -741,6 +741,7 @@
                         </div>
 
                         <div class="fin-actions">
+                            <a class="small-link-button" href="show-day-planner.html?expo=${encodeURIComponent(expo.id)}">Plan animals &amp; print cards</a>
                             <button type="button" class="small-link-button" data-expo-edit="${escapeHtml(expo.id)}">Edit</button>
                             <button type="button" class="fin-delete-button" data-expo-delete="${escapeHtml(expo.id)}">Delete</button>
                         </div>
@@ -857,6 +858,9 @@
             // single figure (exports, older pages) shows the same total.
             otherRevenue,
             otherSales,
+            animalIds: state.editingExpoId
+                ? (expos.find(expo => expo.id === state.editingExpoId)?.animalIds || [])
+                : [],
             notes: $("expoNotesInput").value.trim()
         };
 

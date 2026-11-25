@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Snake Room - Show Day Planner</title>
+    <link rel="stylesheet" href="style.css?v=105">
+</head>
+
+<body>
+    <div class="page-container">
+        <div class="hero-section">
+            <img src="Images/TheSnakeRoom.jpg" class="hero-image" alt="The Snake Room logo">
+            <div class="container">
+                <h1>The Snake Room</h1>
+                <h2>Show Day Planner</h2>
+            </div>
+        </div>
+
+        <div class="button-row">
+            <a href="index.html" class="main-button">Home</a>
+            <a href="snakes.html" class="main-button">Collection</a>
+            <a href="breeding.html" class="main-button">Breeding</a>
+            <a href="finance.html" class="main-button">Finances</a>
+            <a href="available.html" class="main-button">Storefront</a>
+            <a href="scan-session.html?mode=edit" class="main-button">Scan to Edit</a>
+            <a href="account.html" class="main-button">Account</a>
+        </div>
+
+        <div class="button-row">
+            <a href="season-review.html" class="main-button">Season Review</a>
+            <a href="feeders.html" class="main-button">Feeders</a>
+            <a href="buyers.html" class="main-button">Buyers</a>
+            <a href="show-day-planner.html" class="main-button" aria-current="page">Show Planner</a>
+        </div>
+
+        <div class="divider"></div>
+
+        <main class="snake-form-page">
+            <section class="form-section">
+                <h3>Animals to take</h3>
+                <p class="empty-message">
+                    Choose a show, then scan the QR code on each animal's Hatchling Record card.
+                    Your take list stays with that show. Scanning does not change sale status.
+                </p>
+
+                <div class="form-grid">
+                    <label class="form-field">
+                        <span>Show</span>
+                        <select id="plannerShowSelect"></select>
+                    </label>
+                    <div class="form-field">
+                        <span>&nbsp;</span>
+                        <a class="main-button" id="plannerScanLink" href="finance.html">Scan Animals</a>
+                    </div>
+                </div>
+
+                <p class="import-report" id="plannerStatus" role="status"></p>
+                <div id="plannerAnimalList"></div>
+                <p class="empty-message" id="plannerEmpty" hidden>
+                    No animals added yet. Start scanning cards to build this show's take list.
+                </p>
+                <p class="empty-message" id="plannerMissing" hidden></p>
+            </section>
+
+            <section class="form-section">
+                <h3>Sale cards</h3>
+                <p class="empty-message">
+                    Print the existing Hatchling Record for any animal on the list. It includes its
+                    photo, genes, weights, feeding history and QR code for buyers.
+                </p>
+                <a href="finance.html" class="secondary-button">Manage Shows in Finances</a>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="data-helpers.js?v=7"></script>
+    <script src="backup-helpers.js?v=1"></script>
+    <script src="cloud-sync.js?v=22"></script>
+    <script src="auto-sync.js?v=9"></script>
+    <script src="account-gate.js?v=1"></script>
+    <script src="finance-helpers.js?v=10"></script>
+    <script src="show-day-planner.js?v=1"></script>
+    <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
+    <script src="nav-scroll.js?v=1"></script>
+</body>
+
+</html>

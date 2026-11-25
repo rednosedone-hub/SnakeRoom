@@ -415,3 +415,22 @@ elements.printButton.addEventListener("click", () => window.print());
 
 fillPicker();
 renderRecord(getInitialSnake());
+
+if (new URLSearchParams(window.location.search).get("print") === "1") {
+    let printed = false;
+    const printOnce = () => {
+        if (printed) return;
+        printed = true;
+        window.print();
+    };
+    const cardImages = Array.from(elements.sheet.querySelectorAll("img"));
+    Promise.race([
+        Promise.all(cardImages.map(image => image.complete
+            ? Promise.resolve()
+            : new Promise(resolve => {
+                image.addEventListener("load", resolve, { once: true });
+                image.addEventListener("error", resolve, { once: true });
+            }))),
+        new Promise(resolve => window.setTimeout(resolve, 4000))
+    ]).then(() => window.setTimeout(printOnce, 120));
+}

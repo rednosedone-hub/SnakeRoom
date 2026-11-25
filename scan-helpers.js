@@ -29,7 +29,9 @@
             return "";
         }
 
-        const match = /[?&]uid=([^&#]+)/i.exec(raw);
+        // Accept bin-card links (uid), private hatchling-record links (id),
+        // and public storefront record links (record).
+        const match = /[?&](?:uid|id|record)=([^&#]+)/i.exec(raw);
 
         if (match) {
             try {
