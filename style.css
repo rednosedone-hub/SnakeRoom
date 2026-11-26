@@ -220,7 +220,8 @@ p {
         display: inline-flex;
     }
 
-    .button-row-scroller .button-row {
+    .button-row-scroller > .button-row,
+    .button-row-scroller > .collection-toolbar {
         flex: 1 1 auto;
         min-width: 0;
         flex-wrap: nowrap;
@@ -236,19 +237,30 @@ p {
         scrollbar-width: none;
     }
 
-    .button-row-scroller .button-row::-webkit-scrollbar {
+    .button-row-scroller > .button-row::-webkit-scrollbar,
+    .button-row-scroller > .collection-toolbar::-webkit-scrollbar {
         display: none;
     }
 
-    .button-row-scroller .button-row > * {
+    .button-row-scroller > .button-row > *,
+    .button-row-scroller > .collection-toolbar > * {
         flex: 0 0 auto;
         scroll-snap-align: start;
     }
 
-    .button-row-scroller .button-row .main-button {
+    .button-row-scroller > .button-row .main-button,
+    .button-row-scroller > .collection-toolbar .main-button {
         min-width: 0;
         padding: 8px 16px;
         font-size: 20px;
+    }
+
+    .button-row-scroller > .collection-toolbar {
+        margin-top: 0;
+    }
+
+    .button-row-scroller > .collection-toolbar .toolbar-spacer {
+        display: none;
     }
 }
 

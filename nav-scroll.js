@@ -1,9 +1,9 @@
 // nav-scroll.js
 //
-// On a phone the page tabs used to stack one per row, which pushed the records
-// the page exists for below the fold. Wrap each tab row in a single strip that
-// scrolls sideways instead, with an arrow at each end while there is more to
-// reach. On wider screens the wrapper disappears and the row wraps as before.
+// On a phone the page tabs and collection tools used to stack one per row,
+// pushing the page's main content below the fold. Wrap them in one strip that
+// scrolls sideways, with arrows at either end while there is more to reach.
+// On wider screens the wrapper disappears and the rows wrap as before.
 
 (function () {
     function buildArrow(direction, label) {
@@ -68,7 +68,7 @@
     }
 
     function init() {
-        document.querySelectorAll(".button-row").forEach(enhance);
+        document.querySelectorAll(".button-row, .collection-toolbar").forEach(enhance);
     }
 
     if (document.readyState === "loading") {

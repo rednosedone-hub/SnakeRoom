@@ -410,11 +410,42 @@ const SORT_COMPARATORS = {
 
 function toggleSortPopover(event) {
     event.stopPropagation();
-    document.getElementById("sortPopover").classList.toggle("open");
+    const popover = document.getElementById("sortPopover");
+
+    if (popover.classList.contains("open")) {
+        closeSortPopover();
+        return;
+    }
+
+    popover.classList.add("open");
+
+    // The mobile collection toolbar scrolls horizontally, which clips its
+    // regular absolutely positioned sort menu. Float it over the page instead.
+    if (window.matchMedia("(max-width: 700px)").matches) {
+        const button = event.currentTarget;
+        const rect = button.getBoundingClientRect();
+        const menuHeight = popover.getBoundingClientRect().height;
+        const menuWidth = Math.min(280, window.innerWidth - 16);
+        const left = Math.max(8, Math.min(rect.left, window.innerWidth - menuWidth - 8));
+        const below = window.innerHeight - rect.bottom - 8;
+        const top = below >= menuHeight
+            ? rect.bottom + 8
+            : rect.top >= menuHeight + 8
+                ? rect.top - menuHeight - 8
+                : Math.max(8, window.innerHeight - menuHeight - 8);
+
+        popover.style.position = "fixed";
+        popover.style.left = `${left}px`;
+        popover.style.top = `${top}px`;
+    }
 }
 
 function closeSortPopover() {
-    document.getElementById("sortPopover").classList.remove("open");
+    const popover = document.getElementById("sortPopover");
+    popover.classList.remove("open");
+    popover.style.position = "";
+    popover.style.left = "";
+    popover.style.top = "";
 }
 
 function renderSortPopover() {
