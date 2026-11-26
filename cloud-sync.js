@@ -2105,17 +2105,15 @@
     }
 
     // ---- Plan limits ------------------------------------------------------
-    // When you start selling the app, store a plan per user (for example a
-    // profiles table with a plan column) and pass that plan into
-    // getPhotoLimit. Until then everyone is treated as the owner, with no
-    // photo limit.
-    const PHOTO_LIMITS = {
-        free: 1,
-        owner: Infinity
-    };
+    // The profile is supplied by plans.js after the signed-in account loads.
+    // The database snapshot trigger separately enforces additions server-side.
+    const PHOTO_LIMITS = { free: 1, keeper: 3, breeder: 8, pro: 20, beta: Infinity, owner: Infinity };
 
     function getPhotoLimit(plan) {
-        return PHOTO_LIMITS[plan] ?? PHOTO_LIMITS.owner;
+        if (window.SnakePlans && !window.SnakePlans.BILLING_LIVE) return Infinity;
+        const planId = plan || (window.SnakePlans && window.SnakePlans.getPlanId());
+        if (window.SnakePlans) return window.SnakePlans.getPlan().photosPerSnake;
+        return PHOTO_LIMITS[planId] ?? Infinity;
     }
 
     async function uploadSnakePhotoBlob(blob, existingImage = "", contentType = "image/jpeg") {

@@ -143,7 +143,11 @@ makes the calculator more useful and the funnel wider over time.
 
 ---
 
-## 8. Turning the app into a product (accounts, plans, billing)
+## 8. Accounts, plans, and billing (historical notes from 2026-10-17)
+
+> The pricing, provider decision, and enforcement plan below are historical. The current
+> launch tiers and Stripe implementation status are recorded in **Current billing status**
+> at the end of this file. Follow `STRIPE-SETUP.md` for setup steps.
 
 *(2026-10-17)*
 
@@ -268,3 +272,18 @@ and a non-EU seller can use **non-Union OSS**.
 2. Whether the free tier keeps the goal planner (currently not included).
 3. When to make sign-in mandatory and remove *Keep this device only*.
 4. Whether public storefront listings are a Pro feature or sold separately.
+
+### Current billing status (2026-11-26)
+
+The post-beta prices are Free ($0), Keeper ($9 monthly / $90 yearly), Breeder ($24 / $240),
+and Pro ($49 / $490), all CAD. The pricing preview is in `plans.js`; beta accounts retain full
+access and checkout stays disabled until Stripe and Supabase are configured.
+
+The project now contains the `billing_profiles` migration, page-level plan locks, snapshot
+limits, Stripe Checkout and customer portal functions, and a signature-verified Stripe
+subscription webhook. Secret keys and Price IDs are intentionally not in the repository.
+`BILLING_LIVE` in `plans.js` and `BILLING_ENABLED` in Supabase Edge Function secrets are both
+off. Do not turn on live checkout until the Stripe prices, customer portal, webhook, selected
+beta tester profiles, and Supabase secrets are ready.
+
+See [STRIPE-SETUP.md](STRIPE-SETUP.md) for the manual Stripe Dashboard and Supabase steps.

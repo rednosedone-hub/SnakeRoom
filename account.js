@@ -38,12 +38,17 @@
         const signedIn = Boolean(session);
         const plan = window.SnakePlans.getPlan();
         const lines = window.SnakePlans.describePlan(plan.id);
+        const betaBanner = document.getElementById("betaPricingBanner");
+        if (betaBanner) betaBanner.hidden = plan.id !== "beta";
 
         currentCard.innerHTML = signedIn
             ? `
                 <p class="plan-card-name">${escapeHtml(plan.name)}</p>
                 <p class="plan-card-tagline">${escapeHtml(plan.tagline)}</p>
                 <ul class="plan-lines">${lines.map(line => `<li>${escapeHtml(line)}</li>`).join("")}</ul>
+                ${window.SnakePlans.getProfile()?.stripe_customer_id
+                    ? `<button type="button" class="secondary-button plan-cta" id="billingPortalButton">Manage Subscription</button>`
+                    : ""}
             `
             : `
                 <p class="plan-card-name">Not signed in</p>
@@ -56,9 +61,16 @@
                 : yearly
                     ? `$${item.yearly} CAD / yr <small>(2 months free)</small>`
                     : `$${item.monthly} CAD / mo`;
-            const cta = item.id === "free"
-                ? `<a class="secondary-button plan-cta" href="#signInSection">${escapeHtml(item.cta)}</a>`
-                : `<button type="button" class="secondary-button plan-cta" disabled title="Purchases will be available after beta.">${escapeHtml(item.cta)}</button>`;
+            const isCurrent = plan.id === item.id;
+            const cta = isCurrent
+                ? `<button type="button" class="secondary-button plan-cta" disabled>Current Plan</button>`
+                : !signedIn
+                    ? `<a class="secondary-button plan-cta" href="#signInSection">${escapeHtml(item.cta)}</a>`
+                    : !window.SnakePlans.BILLING_LIVE || plan.id === "beta"
+                        ? `<button type="button" class="secondary-button plan-cta" disabled title="Purchases are off during beta.">Preview during beta</button>`
+                        : item.id === "free"
+                            ? `<button type="button" class="secondary-button plan-cta" disabled>Free plan</button>`
+                            : `<button type="button" class="secondary-button plan-cta" data-checkout-tier="${item.id}">${escapeHtml(item.cta)}</button>`;
 
             return `
                 <article class="plan-option${item.popular ? " plan-option-popular" : ""}">
@@ -87,6 +99,63 @@
         }
     }
 
+    async function startCheckout(tierId) {
+        const report = document.getElementById("planNote");
+        const button = document.querySelector(`[data-checkout-tier="${tierId}"]`);
+        if (!window.CloudSync || !button) return;
+        const yearly = document.getElementById("yearlyBillingToggle")?.checked || false;
+        button.disabled = true;
+        if (report) report.textContent = "Opening secure Stripe checkout…";
+        try {
+            const client = window.CloudSync._getClient();
+            const profile = window.SnakePlans.getProfile();
+            const hasSubscription = profile?.stripe_customer_id
+                && ["active", "trialing", "past_due"].includes(profile.subscription_status);
+            const { data, error } = await client.functions.invoke(hasSubscription ? "create-portal" : "create-checkout", {
+                body: hasSubscription ? {} : { tier: tierId, interval: yearly ? "year" : "month" }
+            });
+            if (error) throw error;
+            if (!data || !data.url) throw new Error("Stripe did not return a checkout link.");
+            window.location.assign(data.url);
+        } catch (error) {
+            if (report) report.textContent = error && error.message
+                ? `Checkout is not ready: ${error.message}`
+                : "Checkout is not ready. Please try again later.";
+            button.disabled = false;
+        }
+    }
+
+    function wireCheckout() {
+        const grid = document.getElementById("planGrid");
+        if (!grid) return;
+        grid.addEventListener("click", event => {
+            const button = event.target.closest("[data-checkout-tier]");
+            if (button) startCheckout(button.dataset.checkoutTier);
+        });
+        const currentCard = document.getElementById("planCard");
+        currentCard?.addEventListener("click", async event => {
+            if (!event.target.closest("#billingPortalButton")) return;
+            const button = event.target.closest("#billingPortalButton");
+            const note = document.getElementById("planNote");
+            button.disabled = true;
+            try {
+                const client = window.CloudSync._getClient();
+                const { data, error } = await client.functions.invoke("create-portal", { body: {} });
+                if (error) throw error;
+                if (!data || !data.url) throw new Error("Stripe did not return a portal link.");
+                window.location.assign(data.url);
+            } catch (error) {
+                if (note) note.textContent = error && error.message ? error.message : "Could not open subscription management.";
+                button.disabled = false;
+            }
+        });
+        const params = new URLSearchParams(window.location.search);
+        const note = document.getElementById("planNote");
+        if (note && params.get("billing") === "success") {
+            note.textContent = "Checkout complete. Your plan will update as soon as Stripe confirms the subscription.";
+        }
+    }
+
     function renderSignedInEmail(session) {
         const line = document.getElementById("accountEmail");
 
@@ -110,6 +179,7 @@
 
     async function refreshAccountLine() {
         let session = null;
+        let profileError = false;
 
         try {
             session = await window.CloudSync.getSession();
@@ -117,17 +187,29 @@
             session = null;
         }
 
+        if (window.SnakePlans && session) {
+            try {
+                await window.SnakePlans.loadProfile(session);
+            } catch (error) {
+                profileError = true;
+            }
+        }
+
         renderSignedInEmail(session);
 
         const note = document.getElementById("planNote");
 
         if (note) {
-            if (!session) {
-                note.textContent = "Sign in to join the Breeder Beta. Full access is free while selected breeders test the app.";
+            if (profileError) {
+                note.textContent = "Could not load this account's plan. Refresh the page or check the billing setup.";
+            } else if (!session) {
+                note.textContent = "Sign in to choose a plan. Breeder Beta access is available to invited testers.";
             } else if (window.SnakePlans && window.SnakePlans.getPlan().id === "owner") {
                 note.textContent = "This is the owner account. Breeder Beta accounts also have full access at no charge while selected breeders test the app.";
+            } else if (window.SnakePlans && window.SnakePlans.getPlan().id === "beta") {
+                note.textContent = "You have full access at no charge during the Breeder Beta.";
             } else {
-                note.textContent = "You have full access to the app at no charge during the Breeder Beta.";
+                note.textContent = `Current plan: ${window.SnakePlans.getPlan().name}.`;
             }
         }
 
@@ -476,6 +558,7 @@
 
     function init() {
         wireBillingToggle();
+        wireCheckout();
         const emailLine = document.createElement("p");
         emailLine.id = "accountEmail";
         emailLine.className = "empty-message";

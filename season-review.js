@@ -440,9 +440,11 @@
         render();
     }
 
+    const start = () => (window.SnakePlans ? window.SnakePlans.ready : Promise.resolve())
+        .then(init);
     if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", init);
+        document.addEventListener("DOMContentLoaded", start);
     } else {
-        init();
+        start();
     }
 })();

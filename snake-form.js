@@ -915,6 +915,9 @@ function handlePhotoFileChange(event) {
 }
 
 async function processPhotoFile(file) {
+    if (window.SnakePlans && window.SnakePlans.ready) {
+        await window.SnakePlans.ready;
+    }
     const limit = (window.CloudSync && typeof window.CloudSync.getPhotoLimit === "function")
         ? window.CloudSync.getPhotoLimit()
         : Infinity;
@@ -3831,6 +3834,18 @@ async function saveSnakeFromPage() {
         expandSectionContaining(document.getElementById("nameInput"));
         alert("Please enter at least a name and ID.");
         return;
+    }
+
+    if (editingIndex === null && window.SnakePlans && window.SnakePlans.BILLING_LIVE && window.SnakePlans.ready) {
+        await window.SnakePlans.ready;
+        const session = window.CloudSync && await window.CloudSync.getSession().catch(() => null);
+        if (session) {
+            const limit = window.SnakePlans.getPlan().animals;
+            if (Number.isFinite(limit) && snakes.length >= limit) {
+                alert(`Your ${window.SnakePlans.getPlan().name} plan allows up to ${limit} animals. Upgrade to add another animal.`);
+                return;
+            }
+        }
     }
 
     // A phone photo can still be uploading when Save is pressed; finish it, and

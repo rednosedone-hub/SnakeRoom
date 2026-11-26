@@ -1,9 +1,29 @@
 // plans.js
-// Public access while a small group of breeders beta tests the app.
-// Billing and public tier limits are intentionally off during the beta.
+// Client-side entitlement display. The signed-in account's profile is the
+// source of truth; Supabase billing functions and the database enforce access.
 
 (function () {
     const PLANS = {
+        free: {
+            id: "free", name: "Free", tagline: "For pet keepers and first-time racks.",
+            animals: 20, photosPerSnake: 1,
+            features: { breeding: false, planner: false, storefront: false, finance: false, scan: false }
+        },
+        keeper: {
+            id: "keeper", name: "Keeper", tagline: "For growing collections and fast rack-room care.",
+            animals: 40, photosPerSnake: 3,
+            features: { breeding: false, planner: false, storefront: false, finance: false, scan: true }
+        },
+        breeder: {
+            id: "breeder", name: "Breeder", tagline: "For active hobby and multi-gene project breeders.",
+            animals: 100, photosPerSnake: 8,
+            features: { breeding: true, planner: true, storefront: false, finance: false, scan: true }
+        },
+        pro: {
+            id: "pro", name: "Pro", tagline: "For expo vendors and full breeding operations.",
+            animals: Infinity, photosPerSnake: 20,
+            features: { breeding: true, planner: true, storefront: true, finance: true, scan: true }
+        },
         beta: {
             id: "beta",
             name: "Breeder Beta",
@@ -14,7 +34,8 @@
                 breeding: true,
                 planner: true,
                 storefront: true,
-                finance: true
+                finance: true,
+                scan: true
             }
         },
         // The account that runs the app. Not for sale, not shown on a pricing
@@ -29,7 +50,8 @@
                 breeding: true,
                 planner: true,
                 storefront: true,
-                finance: true
+                finance: true,
+                scan: true
             }
         }
     };
@@ -80,37 +102,51 @@
         }
     ];
 
-    const PLAN_KEY = "accountPlan";
+    // Flip this together with the BILLING_ENABLED Supabase secret at launch.
+    // Keeping it false means every existing app page remains open during beta.
+    const BILLING_LIVE = false;
+    const DEFAULT_PLAN = "free";
+    let activePlanId = DEFAULT_PLAN;
+    let profileLoaded = false;
+    let currentProfile = null;
 
-    // New public accounts join the beta with access to every current feature.
-    const DEFAULT_PLAN = "beta";
+    function getPlanId() { return activePlanId; }
 
-    function isKnownPlan(planId) {
-        return Object.prototype.hasOwnProperty.call(PLANS, planId);
+    async function loadProfile(session) {
+        if (!session || !session.user || !window.CloudSync) {
+            activePlanId = DEFAULT_PLAN;
+            profileLoaded = Boolean(!session);
+            currentProfile = null;
+            return getPlan();
+        }
+        const client = window.CloudSync._getClient();
+        if (!client) return getPlan();
+        const { data, error } = await client.from("billing_profiles")
+            .select("plan, subscription_status, beta_access, stripe_customer_id, current_period_end, cancel_at_period_end")
+            .eq("user_id", session.user.id).maybeSingle();
+        if (error) throw error;
+        const candidate = data && data.beta_access ? "beta" : (data && data.plan);
+        activePlanId = Object.prototype.hasOwnProperty.call(PLANS, candidate) ? candidate : DEFAULT_PLAN;
+        currentProfile = data || null;
+        if (activePlanId !== "beta" && activePlanId !== "owner"
+            && !["active", "trialing", "past_due"].includes(data && data.subscription_status)) {
+            activePlanId = DEFAULT_PLAN;
+        }
+        profileLoaded = true;
+        return getPlan();
     }
 
-    function getPlanId() {
-        let stored = "";
-
+    const ready = (async () => {
+        if (!window.CloudSync || typeof window.CloudSync.getSession !== "function") return getPlan();
         try {
-            stored = localStorage.getItem(PLAN_KEY) || "";
+            const session = await window.CloudSync.getSession();
+            if (session) await loadProfile(session);
+            else profileLoaded = true;
         } catch (error) {
-            stored = "";
+            console.error("Could not load billing profile.", error);
         }
-
-        // Old browser state may still contain a pre-beta tier. Ignore it so
-        // beta testers keep full access without needing to clear their storage.
-        return stored === "owner" ? "owner" : DEFAULT_PLAN;
-    }
-
-    function setPlanId(planId) {
-        if (planId !== "owner" && planId !== "beta") {
-            return false;
-        }
-
-        localStorage.setItem(PLAN_KEY, planId);
-        return true;
-    }
+        return getPlan();
+    })();
 
     function getPlan(planId = getPlanId()) {
         return PLANS[planId] || PLANS[DEFAULT_PLAN];
@@ -119,7 +155,7 @@
     // A feature nobody has switched off yet still has to read as "allowed" for
     // an owner, and as false for a plan that does not list it.
     function allows(feature, planId = getPlanId()) {
-        return Boolean(getPlan(planId).features[feature]);
+        return !BILLING_LIVE || Boolean(getPlan(planId).features[feature]);
     }
 
     function describeLimit(value, unit) {
@@ -150,8 +186,12 @@
         PLANS,
         LAUNCH_TIERS,
         DEFAULT_PLAN,
+        BILLING_LIVE,
         getPlanId,
-        setPlanId,
+        loadProfile,
+        ready,
+        getProfile: () => currentProfile,
+        isProfileLoaded: () => profileLoaded,
         getPlan,
         allows,
         describePlan,
