@@ -101,7 +101,11 @@
             return type !== "recessive" || copies >= 2;
         });
 
-        return window.MorphGallery.describeGenotype(visibleGenes);
+        const sortedGenes = window.GeneTools && window.GeneTools.sortGenesForDisplay
+            ? window.GeneTools.sortGenesForDisplay(visibleGenes)
+            : visibleGenes;
+
+        return window.MorphGallery.describeGenotype(sortedGenes);
     }
 
     function photoCountLabel(count) {
@@ -117,6 +121,15 @@
         ].join(" ").toLowerCase();
     }
 
+    function galleryKey(row) {
+        // Older publications may have stored different keys for the same
+        // genotype. Rebuild the key from genes so order and legacy keys do not
+        // split one morph into separate gallery cards.
+        return row.genes && row.genes.length > 0
+            ? window.MorphGallery.morphKeyFromGenes(row.genes)
+            : row.morphKey;
+    }
+
     // One card per genotype. The newest row supplies the display name so a morph
     // renamed in the catalog shows its current name rather than an old one.
     function buildGroups(rows) {
@@ -124,10 +137,11 @@
 
         rows.forEach(row => {
             const described = galleryDescription(row.genes);
+            const key = galleryKey(row);
 
-            if (!groups.has(row.morphKey)) {
-                groups.set(row.morphKey, {
-                    key: row.morphKey,
+            if (!groups.has(key)) {
+                groups.set(key, {
+                    key,
                     morphName: described.morphName,
                     genes: described.geneDetails,
                     photos: [],
@@ -135,7 +149,7 @@
                 });
             }
 
-            const group = groups.get(row.morphKey);
+            const group = groups.get(key);
             group.photos.push(row);
             group.searchText += ` ${rowText(row)}`;
         });
