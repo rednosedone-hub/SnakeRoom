@@ -87,14 +87,33 @@
         }).join("");
     }
 
+    // The gallery is about visible appearance. Recessive carriers are kept in
+    // the animal record and genotype key, but do not appear as morphs here.
+    // Het Red Axanthic is catalogued as codominant, so it remains visible.
+    function galleryDescription(genes) {
+        const visibleGenes = (Array.isArray(genes) ? genes : []).filter(gene => {
+            const catalogGene = window.GeneTools && window.GeneTools.findGene
+                ? window.GeneTools.findGene(gene.name)
+                : null;
+            const type = catalogGene ? catalogGene.type : gene.type;
+            const copies = Number(gene.copies) || 1;
+
+            return type !== "recessive" || copies >= 2;
+        });
+
+        return window.MorphGallery.describeGenotype(visibleGenes);
+    }
+
     function photoCountLabel(count) {
         return `${count} photo${count === 1 ? "" : "s"}`;
     }
 
     function rowText(row) {
+        const described = galleryDescription(row.genes);
+
         return [
-            row.morphName,
-            ...(row.genes || []).map(gene => gene.name)
+            described.morphName,
+            ...described.geneDetails.map(gene => gene.name)
         ].join(" ").toLowerCase();
     }
 
@@ -104,11 +123,13 @@
         const groups = new Map();
 
         rows.forEach(row => {
+            const described = galleryDescription(row.genes);
+
             if (!groups.has(row.morphKey)) {
                 groups.set(row.morphKey, {
                     key: row.morphKey,
-                    morphName: row.morphName,
-                    genes: row.genes,
+                    morphName: described.morphName,
+                    genes: described.geneDetails,
                     photos: [],
                     searchText: ""
                 });
@@ -374,7 +395,7 @@
         }
 
         elements.snakeSelect.innerHTML = list.map((snake, index) => {
-            const described = window.MorphGallery.describeSnake(snake);
+            const described = galleryDescription(snake.genes);
 
             return `<option value="${index}">${escapeHtml(`${snake.name || "Unnamed"} — ${described.morphName}`)}</option>`;
         }).join("");
@@ -405,7 +426,7 @@
             return;
         }
 
-        const described = window.MorphGallery.describeSnake(snake);
+        const described = galleryDescription(snake.genes);
         const labels = described.geneDetails.length > 0
             ? described.geneDetails.map(gene => gene.label).join(" + ")
             : "no genes";
@@ -473,6 +494,7 @@
         // no genes is not published just because another snake uses its picture.
         const note = row.alreadyPublished && !row.reason ? "Published" : row.reason;
         const photo = row.photoUrl || "Images/TheSnakeRoom.jpg";
+        const morphName = galleryDescription(row.snake.genes).morphName;
 
         return `
             <label class="bulk-publish-row${ready ? "" : " is-locked"}">
@@ -482,7 +504,7 @@
                     onerror="this.classList.add('is-broken')">
                 <span class="bulk-publish-name">
                     <strong>${escapeHtml(row.snake.name || "Unnamed")}</strong>
-                    <span>${escapeHtml(row.morphName)}</span>
+                    <span>${escapeHtml(morphName)}</span>
                 </span>
                 ${note ? `<span class="bulk-publish-note">${escapeHtml(note)}</span>` : ""}
             </label>
@@ -623,15 +645,16 @@
 
         elements.mineGrid.innerHTML = rows.map(row => {
             const reports = state.reportCounts.get(row.id) || 0;
+            const morphName = galleryDescription(row.genes).morphName;
 
             return `
                 <article class="morph-gallery-card">
                     <div class="morph-gallery-photo">
-                        <img src="${escapeHtml(row.photoUrl)}" alt="${escapeHtml(row.morphName)}"
+                        <img src="${escapeHtml(row.photoUrl)}" alt="${escapeHtml(morphName)}"
                             loading="lazy" onerror="this.classList.add('is-broken')">
                     </div>
                     <div class="morph-gallery-body">
-                        <h4>${escapeHtml(row.morphName)}</h4>
+                        <h4>${escapeHtml(morphName)}</h4>
                         ${reports ? `<p class="morph-report-badge">
                             Reported ${reports} time${reports === 1 ? "" : "s"} \u2014 review or remove this photo.
                         </p>` : ""}
