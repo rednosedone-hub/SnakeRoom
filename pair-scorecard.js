@@ -122,7 +122,7 @@
                 label: "Healthy hatch",
                 value: totals.cleanRate === null ? "—" : `${totals.cleanRate}%`,
                 note: totals.completedEggs > 0
-                    ? `${totals.healthy} of ${totals.completedEggs} eggs${totals.defective > 0 ? ` · ${totals.defective} with defects` : ""}`
+                    ? `${totals.healthy} of ${totals.completedEggs} eggs${totals.assumedEggs > 0 ? ` · ${totals.assumedEggs} inferred from hatchlings` : ""}${totals.defective > 0 ? ` · ${totals.defective} with defects` : ""}`
                     : "No hatched clutch yet"
             },
             {
@@ -244,8 +244,8 @@
                         row.hatchRate === null ? "—" : `${row.hatchRate}%`,
                         row.completedEggs > 0
                             ? (row.defective > 0
-                                ? `${row.hatched} hatched · ${row.healthy} healthy`
-                                : `${row.hatched} of ${row.completedEggs} eggs`)
+                                ? `${row.hatched} hatched · ${row.healthy} healthy${row.assumedEggs > 0 ? ` · ${row.assumedEggs} eggs inferred from hatchlings` : ""}`
+                                : `${row.hatched} of ${row.completedEggs} eggs${row.assumedEggs > 0 ? ` · ${row.assumedEggs} inferred from hatchlings` : ""}`)
                             : "No eggs counted"
                     )}
                     ${statCell("Clutches", String(row.clutches), clutchNote)}
@@ -353,7 +353,7 @@
                 <td>${clutchPair(clutch)}</td>
                 <td>${formatDate(clutch.laidDate)}</td>
                 <td>${hatched}</td>
-                <td class="fin-amount-cell">${clutch.eggs}</td>
+                <td class="fin-amount-cell"${clutch.eggCountAssumed ? ' title="Inferred from the number of linked hatchling records"' : ""}>${clutch.eggs}${clutch.eggCountAssumed ? "*" : ""}</td>
                 <td class="fin-amount-cell">${clutch.isHatched ? clutch.hatched : "—"}</td>
                 <td class="fin-amount-cell">${clutch.defective > 0 ? clutch.defective : "—"}</td>
                 <td class="fin-amount-cell" title="${clutch.hatchRate === null ? "Not hatched" : `${clutch.hatchRate}% of the eggs hatched`}">
@@ -373,7 +373,7 @@
             ? `Laid ${formatDate(clutch.laidDate)} · hatched ${formatDate(clutch.hatchedDate || clutch.laidDate)}`
             : `Laid ${formatDate(clutch.laidDate)} · incubating`;
         const counts = [
-            `${clutch.eggs} egg${clutch.eggs === 1 ? "" : "s"}`,
+            `${clutch.eggs} egg${clutch.eggs === 1 ? "" : "s"}${clutch.eggCountAssumed ? " (inferred from hatchlings)" : ""}`,
             clutch.isHatched ? `${clutch.hatched} hatched` : "",
             clutch.defective > 0 ? `${clutch.defective} with defects` : "",
             clutch.unhatched > 0 ? `${clutch.unhatched} did not hatch` : "",

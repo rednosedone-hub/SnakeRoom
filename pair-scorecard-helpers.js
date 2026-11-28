@@ -317,29 +317,40 @@
     function clutchRow(clutch, snakes) {
         const R = window.SeasonReview;
         const row = R.summarizeClutch(clutch, snakes);
+        const recordedHatchlings = (row.hatchlings || []).length;
+        // Retro-clutches may have hatchling records without a laid/hatch date
+        // or egg count. Those records prove the clutch hatched, and in the
+        // absence of an egg count each hatchling stands in for one egg.
+        const isHatched = row.isHatched || (row.eggs === 0 && recordedHatchlings > 0);
+        const hatched = row.isHatched ? row.hatched : (isHatched ? recordedHatchlings : 0);
+        const eggCountAssumed = isHatched && row.eggs === 0 && hatched > 0;
+        const eggs = eggCountAssumed ? hatched : row.eggs;
         // cleanRate comes from the season review when it is there. The fallback
         // keeps an older cached script scoring the same way rather than
         // grading a clutch on hatchlings it now knows are defective.
-        const defective = row.defective === undefined
+        const defective = isHatched && !row.isHatched
             ? (row.hatchlings || []).filter(hatchling => hatchling.defective).length
-            : row.defective;
-        const healthy = Math.max(0, row.hatched - defective);
-        const cleanRate = row.cleanRate === undefined
-            ? (row.isHatched && row.eggs > 0 ? roundPercent((healthy / row.eggs) * 100) : null)
-            : row.cleanRate;
+            : (row.defective === undefined
+                ? (row.hatchlings || []).filter(hatchling => hatchling.defective).length
+                : row.defective);
+        const healthy = Math.max(0, hatched - defective);
+        const cleanRate = isHatched && eggs > 0 ? roundPercent((healthy / eggs) * 100) : null;
 
         return {
             ...row,
+            isHatched,
+            eggs,
+            hatched,
+            eggCountAssumed,
             healthy,
             defective,
             cleanRate,
-            defectRate: row.defectRate === undefined
-                ? (row.hatched > 0 ? roundPercent((defective / row.hatched) * 100) : null)
-                : row.defectRate,
+            hatchRate: isHatched && eggs > 0 ? roundPercent((hatched / eggs) * 100) : null,
+            defectRate: hatched > 0 ? roundPercent((defective / hatched) * 100) : null,
             defectBreakdown: defectBreakdown([row]),
             grade: gradeFor(cleanRate),
-            unhatched: row.unhatched,
-            valuePerHatchling: row.isHatched && row.hatched > 0 ? roundMoney(row.revenue / row.hatched) : null
+            unhatched: isHatched ? Math.max(0, eggs - hatched) : 0,
+            valuePerHatchling: isHatched && hatched > 0 ? roundMoney(row.revenue / hatched) : null
         };
     }
 
@@ -501,6 +512,7 @@
         const counts = buildCounts(completed);
         const eggs = rows.reduce((sum, row) => sum + row.eggs, 0);
         const completedEggs = completed.reduce((sum, row) => sum + row.eggs, 0);
+        const assumedEggs = completed.reduce((sum, row) => sum + (row.eggCountAssumed ? row.eggs : 0), 0);
         const hatched = completed.reduce((sum, row) => sum + row.hatched, 0);
         const defective = completed.reduce((sum, row) => sum + (row.defective || 0), 0);
         const healthy = Math.max(0, hatched - defective);
@@ -566,6 +578,7 @@
             incubating: incubating.length,
             eggs,
             completedEggs,
+            assumedEggs,
             hatched,
             healthy,
             defective,
@@ -615,6 +628,7 @@
             incubating: 0,
             eggs: 0,
             completedEggs: 0,
+            assumedEggs: 0,
             hatched: 0,
             healthy: 0,
             defective: 0,
@@ -810,6 +824,7 @@
 
             if (row.isHatched) {
                 totals.completedEggs += row.eggs;
+                totals.assumedEggs += row.eggCountAssumed ? row.eggs : 0;
             } else {
                 totals.incubating += 1;
             }
