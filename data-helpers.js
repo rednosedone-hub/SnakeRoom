@@ -34,116 +34,99 @@ function isActiveSnake(snake) {
     return !isInactiveSnake(snake);
 }
 
+// Clearly labeled demo records for a fresh/empty collection. Existing local or
+// cloud-saved collections are never replaced by these defaults.
 const defaultSnakes = [
     {
-        name: "Narcissa",
-        morph: "SS-038",
-        sex: "Female",
-        weight: 0,
-        hatchDate: "",
-        lastFed: "",
-        feedingIntervalDays: 14,
-        feederSize: "",
-        status: "Holdback",
-        genes: [
-            { name: "Chocolate", type: "codom", copies: 1 },
-            { name: "Asphalt", type: "codom", copies: 1 }
-        ],
-        image: "Images/Narcissa/Narcissa1.jpg"
-    },
-    {
-        name: "Artax",
-        morph: "Pinstripe Enchi",
+        name: "Test Male 1",
+        morph: "Pastel Enchi",
         sex: "Male",
-        weight: 0,
-        hatchDate: "",
+        weight: 1250,
+        hatchDate: "2022-04-12",
         lastFed: "",
         feedingIntervalDays: 7,
         feederSize: "",
-        status: "Breeder",
+        status: "Adult",
         genes: [
-            { name: "Pinstripe", type: "codom", copies: 1 },
+            { name: "Pastel", type: "codom", copies: 1 },
             { name: "Enchi", type: "codom", copies: 1 }
         ],
-        image: "Images/Artax/Artax.jpg"
+        image: "Images/TheSnakeRoom.jpg"
     },
     {
-        name: "Luna",
-        morph: "Banana Lesser",
-        sex: "Female",
-        weight: 0,
-        hatchDate: "",
+        name: "Test Male 2",
+        morph: "100% Het Clown",
+        sex: "Male",
+        weight: 1350,
+        hatchDate: "2021-08-20",
         lastFed: "",
         feedingIntervalDays: 7,
         feederSize: "",
-        status: "Holdback",
+        status: "Adult",
         genes: [
-            { name: "Banana", type: "codom", copies: 1 },
+            { name: "Clown", type: "recessive", copies: 1 }
+        ],
+        image: "Images/TheSnakeRoom.jpg"
+    },
+    {
+        name: "Test Female 1",
+        morph: "Pastel",
+        sex: "Female",
+        weight: 1750,
+        hatchDate: "2022-02-05",
+        lastFed: "",
+        feedingIntervalDays: 7,
+        feederSize: "",
+        status: "Adult",
+        genes: [
+            { name: "Pastel", type: "codom", copies: 1 }
+        ],
+        image: "Images/TheSnakeRoom.jpg"
+    },
+    {
+        name: "Test Female 2",
+        morph: "Lesser",
+        sex: "Female",
+        weight: 1825,
+        hatchDate: "2021-06-18",
+        lastFed: "",
+        feedingIntervalDays: 7,
+        feederSize: "",
+        status: "Adult",
+        genes: [
             { name: "Lesser", type: "codom", copies: 1 }
         ],
-        image: "Images/Luna/Luna.jpg"
+        image: "Images/TheSnakeRoom.jpg"
     },
     {
-        name: "Apple",
-        morph: "Caramel Albino",
+        name: "Test Female 3",
+        morph: "Banana",
         sex: "Female",
-        weight: 0,
-        hatchDate: "",
+        weight: 1680,
+        hatchDate: "2022-09-03",
         lastFed: "",
         feedingIntervalDays: 7,
         feederSize: "",
-        status: "Holdback",
+        status: "Adult",
         genes: [
-            { name: "Caramel Albino", type: "recessive", copies: 2 }
+            { name: "Banana", type: "codom", copies: 1 }
         ],
-        image: "Images/Apple/Apple.jpg"
+        image: "Images/TheSnakeRoom.jpg"
     },
     {
-        name: "Freckles",
-        morph: "Banana Cinnamon",
-        sex: "Male",
-        weight: 0,
-        hatchDate: "",
-        lastFed: "",
-        feedingIntervalDays: 7,
-        feederSize: "",
-        status: "Breeder",
-        genes: [
-            { name: "Banana", type: "codom", copies: 1 },
-            { name: "Cinnamon", type: "codom", copies: 1 }
-        ],
-        image: "Images/Freckles/Freckles.jpg"
-    },
-    {
-        name: "Medusa",
-        morph: "Cinnamon Enchi",
+        name: "Test Female 4",
+        morph: "Het Clown",
         sex: "Female",
-        weight: 0,
-        hatchDate: "",
+        weight: 1900,
+        hatchDate: "2021-03-22",
         lastFed: "",
         feedingIntervalDays: 7,
         feederSize: "",
-        status: "Breeder",
+        status: "Adult",
         genes: [
-            { name: "Cinnamon", type: "codom", copies: 1 },
-            { name: "Enchi", type: "codom", copies: 1 }
+            { name: "Clown", type: "recessive", copies: 1 }
         ],
-        image: "Images/Medusa/Medusa.jpg"
-    },
-    {
-        name: "Mel Gibson",
-        morph: "Ultramel",
-        sex: "Male",
-        weight: 0,
-        hatchDate: "",
-        lastFed: "",
-        feedingIntervalDays: 7,
-        feederSize: "",
-        status: "Breeder",
-        genes: [
-            { name: "Ultramel", type: "recessive", copies: 2 }
-        ],
-        image: "Images/MelGibson/MelGibson.jpg"
+        image: "Images/TheSnakeRoom.jpg"
     }
 ];
 

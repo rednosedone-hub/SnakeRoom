@@ -8,7 +8,11 @@ const elements = {
     select: document.getElementById("recordSnakeSelect"),
     printButton: document.getElementById("printRecordButton"),
     sheet: document.getElementById("recordSheet"),
-    hint: document.getElementById("recordHint")
+    hint: document.getElementById("recordHint"),
+    controls: document.getElementById("recordControlsSection"),
+    askingPriceInput: document.getElementById("recordAskingPriceInput"),
+    savePriceButton: document.getElementById("saveRecordPriceButton"),
+    priceStatus: document.getElementById("recordPriceStatus")
 };
 
 function escapeHtml(value) {
@@ -170,14 +174,18 @@ function findParent(snake, kind) {
         const match = snakes.find(candidate => candidate && String(candidate.id || "") === id);
 
         if (match) {
-            return { snake: match, label: "" };
+            return { snake: match, label: "", recorded: true };
         }
     }
 
     // A parent that has left the collection keeps only its name on the record.
     const label = snake[kind];
 
-    return { snake: null, label: typeof label === "string" ? label : "" };
+    return {
+        snake: null,
+        label: typeof label === "string" ? label : "",
+        recorded: Boolean(id || text(label))
+    };
 }
 
 function renderGenes(snake) {
@@ -202,7 +210,7 @@ function renderParentCard(kind, parent) {
                 <p class="record-parent-kicker">${title}</p>
                 <p class="record-none">${parent.label
                     ? escapeHtml(parent.label)
-                    : "Not recorded on this animal's file"}</p>
+                    : (parent.recorded ? "No longer in this collection" : "Not recorded on this animal's file")}</p>
             </div>
         `;
     }
@@ -262,10 +270,14 @@ function renderRecord(snake) {
     if (!snake) {
         elements.sheet.innerHTML = `<p class="empty-message">No snakes in the collection yet.</p>`;
         elements.printButton.disabled = true;
+        elements.askingPriceInput.value = "";
+        elements.savePriceButton.disabled = true;
         return;
     }
 
     elements.printButton.disabled = false;
+    elements.savePriceButton.disabled = false;
+    elements.askingPriceInput.value = text(snake.askingPrice);
 
     const photo = mainPhoto(snake);
     const birth = getBirthWeight(snake);
@@ -275,6 +287,14 @@ function renderRecord(snake) {
     const hatchYear = text(snake.hatchYear);
     const clutch = text(snake.clutchId);
     const identity = window.SnakeData.getSnakeIdentityText(snake);
+    const amount = Number(snake.askingPrice);
+    const askingPrice = Number.isFinite(amount) && amount > 0
+        ? window.SnakeFinance.formatMoney(amount)
+        : "";
+    const parents = [
+        { kind: "sire", parent: findParent(snake, "sire") },
+        { kind: "dam", parent: findParent(snake, "dam") }
+    ].filter(entry => entry.parent.recorded);
     // With a storefront address set, the code can send a phone to a page anyone
     // may read. Without one, it can only open the app, which asks to sign in.
     const publicUrl = window.SnakeData.getHatchlingRecordPublicUrl
@@ -343,18 +363,24 @@ function renderRecord(snake) {
                         </div>
                     </dl>
 
+                    <div class="record-sale-price">
+                        <span>Asking price</span>
+                        <strong>${askingPrice ? escapeHtml(askingPrice) : `<span class="record-price-write-in">________________</span>`}</strong>
+                    </div>
+
                     <p class="record-label">Genes</p>
                     ${renderGenes(snake)}
                 </div>
             </div>
 
-            <section class="record-section">
-                <h3>Parents</h3>
-                <div class="record-parent-grid">
-                    ${renderParentCard("sire", findParent(snake, "sire"))}
-                    ${renderParentCard("dam", findParent(snake, "dam"))}
-                </div>
-            </section>
+            ${parents.length ? `
+                <section class="record-section">
+                    <h3>Parents</h3>
+                    <div class="record-parent-grid">
+                        ${parents.map(entry => renderParentCard(entry.kind, entry.parent)).join("")}
+                    </div>
+                </section>
+            ` : ""}
 
             <section class="record-section">
                 <h3>Last three meals</h3>
@@ -409,14 +435,58 @@ function fillPicker() {
 elements.select.addEventListener("change", () => {
     const snake = snakes.find(candidate => String(candidate.id) === elements.select.value);
     renderRecord(snake || null);
+    elements.priceStatus.textContent = "";
 });
 
 elements.printButton.addEventListener("click", () => window.print());
+elements.savePriceButton.addEventListener("click", () => {
+    const index = snakes.findIndex(snake => String(snake.id) === elements.select.value);
+    if (index < 0) return;
 
-fillPicker();
-renderRecord(getInitialSnake());
+    const raw = text(elements.askingPriceInput.value);
+    const amount = raw === "" ? 0 : Number(raw);
+    if (!Number.isFinite(amount) || amount < 0) {
+        elements.priceStatus.textContent = "Enter a valid price or leave the field blank.";
+        return;
+    }
 
-if (new URLSearchParams(window.location.search).get("print") === "1") {
+    const updated = { ...snakes[index], askingPrice: amount > 0 ? String(amount) : "" };
+    snakes[index] = updated;
+    window.SnakeData.saveStorageArray("snakes", snakes);
+    renderRecord(updated);
+    elements.priceStatus.textContent = amount > 0
+        ? `Sale-card price saved as ${window.SnakeFinance.formatMoney(amount)}.`
+        : "Sale-card price cleared. The printed card will have a blank price line.";
+});
+
+const recordParams = new URLSearchParams(window.location.search);
+const bulkMode = recordParams.get("bulk") === "1";
+let recordsToPrint = [];
+
+if (bulkMode) {
+    document.body.classList.add("bulk-record-print");
+    elements.controls.hidden = true;
+    const expoId = recordParams.get("expo") || "";
+    const expo = window.SnakeFinance.getExpos().find(candidate => candidate.id === expoId);
+    const ids = expo && Array.isArray(expo.animalIds) ? [...new Set(expo.animalIds)] : [];
+    recordsToPrint = ids.map(id => snakes.find(snake => String(snake.id) === String(id))).filter(Boolean);
+
+    if (!expo) {
+        elements.sheet.innerHTML = `<p class="empty-message">That show could not be found.</p>`;
+    } else if (recordsToPrint.length === 0) {
+        elements.sheet.innerHTML = `<p class="empty-message">There are no animals on this show's take list.</p>`;
+    } else {
+        elements.sheet.innerHTML = recordsToPrint.map(snake => {
+            renderRecord(snake);
+            return elements.sheet.innerHTML;
+        }).join("");
+    }
+} else {
+    fillPicker();
+    renderRecord(getInitialSnake());
+}
+
+if (recordParams.get("print") === "1" && (!bulkMode || recordsToPrint.length > 0)) {
     let printed = false;
     const printOnce = () => {
         if (printed) return;

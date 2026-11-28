@@ -3,6 +3,7 @@
 (function () {
     const select = document.getElementById("plannerShowSelect");
     const scanLink = document.getElementById("plannerScanLink");
+    const printAllLink = document.getElementById("plannerPrintAllCards");
     const list = document.getElementById("plannerAnimalList");
     const empty = document.getElementById("plannerEmpty");
     const status = document.getElementById("plannerStatus");
@@ -46,6 +47,7 @@
             empty.hidden = true;
             scanLink.setAttribute("aria-disabled", "true");
             scanLink.href = "finance.html";
+            printAllLink.hidden = true;
             status.textContent = "Add a show in Finances first, then return here to plan the animals.";
             missing.hidden = true;
             return;
@@ -64,6 +66,9 @@
         missing.textContent = missingIds.length
             ? `${missingIds.length} listed animal${missingIds.length === 1 ? " is" : "s are"} no longer in this collection. The show list entr${missingIds.length === 1 ? "y is" : "ies are"} kept.`
             : "";
+
+        printAllLink.hidden = animals.length === 0;
+        printAllLink.href = `hatchling-record.html?expo=${encodeURIComponent(current.id)}&bulk=1&print=1`;
 
         list.innerHTML = animals.map(snake => {
             const identity = window.SnakeData.getSnakeIdentityText(snake);

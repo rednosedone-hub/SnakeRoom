@@ -8575,6 +8575,38 @@ td .maker-pill {
     color: var(--silver-color);
 }
 
+.record-sale-price {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(230, 217, 134, 0.3);
+}
+
+.record-sale-price span:first-child {
+    color: var(--silver-color);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.record-sale-price strong {
+    color: var(--gold-color);
+    font-size: 22px;
+}
+
+.record-price-write-in {
+    color: var(--silver-color) !important;
+    font-size: 16px !important;
+    letter-spacing: 0.06em;
+}
+
+.record-price-controls {
+    margin-top: 12px;
+}
+
 .record-label {
     margin: 18px 0 6px;
     font-size: 11px;
@@ -8732,6 +8764,23 @@ td .maker-pill {
         margin: 0;
     }
 
+    .bulk-record-print .record-sheet {
+        display: block;
+    }
+
+    .bulk-record-print .record-card {
+        break-after: page;
+        page-break-after: always;
+        break-inside: avoid;
+        page-break-inside: avoid;
+        margin: 0 auto;
+    }
+
+    .bulk-record-print .record-card:last-child {
+        break-after: auto;
+        page-break-after: auto;
+    }
+
     .record-card {
         max-width: none;
         padding: 0;
@@ -8751,6 +8800,10 @@ td .maker-pill {
         border-top-color: #999;
     }
 
+    .record-sale-price {
+        border-top-color: #999;
+    }
+
     .record-kicker,
     .record-id,
     .record-facts dt,
@@ -8767,6 +8820,7 @@ td .maker-pill {
     .record-card h2,
     .record-parent-body h4,
     .record-facts dd,
+    .record-sale-price strong,
     .record-meal-table td {
         color: #000;
     }

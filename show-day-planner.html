@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Show Day Planner</title>
-    <link rel="stylesheet" href="style.css?v=105">
+    <link rel="stylesheet" href="style.css?v=106">
 </head>
 
 <body data-required-feature="finance">
@@ -62,16 +62,19 @@
             <section class="form-section">
                 <h3>Sale cards</h3>
                 <p class="empty-message">
-                    Print the existing Hatchling Record for any animal on the list. It includes its
-                    photo, genes, weights, feeding history and QR code for buyers.
+                    Print one card at a time, or print every animal on this show's take list together.
+                    Set each animal's asking price on its Hatchling Record before printing.
                 </p>
+                <a class="main-button" id="plannerPrintAllCards" href="finance.html" target="_blank" rel="noopener" hidden>
+                    Print All Sale Cards
+                </a>
                 <a href="finance.html" class="secondary-button">Manage Shows in Finances</a>
             </section>
         </main>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="data-helpers.js?v=7"></script>
+    <script src="data-helpers.js?v=8"></script>
     <script src="backup-helpers.js?v=1"></script>
     <script src="cloud-sync.js?v=22"></script>
     <script src="plans.js?v=5"></script>
@@ -79,7 +82,7 @@
     <script src="auto-sync.js?v=9"></script>
     <script src="account-gate.js?v=1"></script>
     <script src="finance-helpers.js?v=10"></script>
-    <script src="show-day-planner.js?v=1"></script>
+    <script src="show-day-planner.js?v=2"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>

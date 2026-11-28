@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0a0a">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Snake Room - Hatchling Record</title>
-    <link rel="stylesheet" href="style.css?v=105">
+    <link rel="stylesheet" href="style.css?v=106">
 </head>
 
 <body>
@@ -33,7 +33,7 @@
 
         <div class="divider print-hidden"></div>
 
-        <section class="form-section print-hidden">
+        <section class="form-section print-hidden" id="recordControlsSection">
             <h3>Choose a hatchling</h3>
 
             <div class="record-controls">
@@ -48,6 +48,19 @@
                 </div>
             </div>
 
+            <div class="form-grid record-price-controls">
+                <label class="form-field">
+                    <span>Sale-card asking price (optional)</span>
+                    <input type="number" id="recordAskingPriceInput" min="0" step="0.01" inputmode="decimal"
+                        placeholder="Leave blank to write a price on the card">
+                </label>
+                <div class="form-field">
+                    <span>&nbsp;</span>
+                    <button type="button" class="secondary-button" id="saveRecordPriceButton">Save Price</button>
+                </div>
+            </div>
+            <p class="import-report" id="recordPriceStatus" role="status"></p>
+
             <p class="empty-message" id="recordHint">
                 A record shows the hatchling's parents with their photos and genes, its own genes and
                 dates, its birth weight and current weight, and its last three meals.
@@ -59,15 +72,16 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <script src="data-helpers.js?v=7"></script>
+    <script src="data-helpers.js?v=8"></script>
     <script src="backup-helpers.js?v=1"></script>
     <script src="cloud-sync.js?v=22"></script>
     <script src="auto-sync.js?v=9"></script>
     <script src="account-gate.js?v=1"></script>
     <script src="storefront-contact.js?v=4"></script>
+    <script src="finance-helpers.js?v=10"></script>
     <script src="geneCatalog.js?v=7"></script>
     <script src="genes.js?v=13"></script>
-    <script src="hatchling-record.js?v=5"></script>
+    <script src="hatchling-record.js?v=6"></script>
     <script>if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js").catch(function () {}); }</script>
     <script src="nav-scroll.js?v=1"></script>
 </body>
