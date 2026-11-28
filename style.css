@@ -3935,7 +3935,7 @@ body.has-sync-banner .page-container {
     border: 1px solid var(--gold-color);
     border-radius: 8px;
     background-color: #0d0b07;
-    font-color: darkgold
+    font-color: darkgold;
     box-shadow: 4px 4px 2px 1px var(--black-color);
 }
 
