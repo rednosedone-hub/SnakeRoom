@@ -44,7 +44,7 @@
     --gene-het: #6a4a1b;
     --gene-prob-het: #555555;
     --gene-custom: #1b6a6a;
-    --muted-text-color: dark gold;
+    --muted-text-color: darkgold;
 }
 
 * {
@@ -2344,7 +2344,7 @@ h4 .snake-link {
 
 .or-divider {
     margin: 4px 0;
-    color: var(--muted-text-color);
+    color: darkgold;
     text-align: center;
 }
 
