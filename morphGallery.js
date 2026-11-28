@@ -145,12 +145,19 @@
                     morphName: described.morphName,
                     genes: described.geneDetails,
                     photos: [],
+                    photoUrls: new Set(),
                     searchText: ""
                 });
             }
 
             const group = groups.get(key);
-            group.photos.push(row);
+            // A photo URL can have multiple publication rows (for example,
+            // when it was bulk-published from duplicate animal records). Keep
+            // only one copy in the public gallery card.
+            if (!group.photoUrls.has(row.photoUrl)) {
+                group.photoUrls.add(row.photoUrl);
+                group.photos.push(row);
+            }
             group.searchText += ` ${rowText(row)}`;
         });
 
@@ -606,11 +613,14 @@
                     elements.bulkPublishStatus.textContent = `Publishing ${done} of ${total}\u2026`;
                 }
             });
-            const published = results.filter(result => result.ok).length;
+            const published = results.filter(result => result.ok && !result.skipped).length;
+            const skipped = results.filter(result => result.skipped).length;
             const failed = results.filter(result => !result.ok);
 
             elements.bulkPublishStatus.textContent = failed.length === 0
-                ? `Published ${published} photo${published === 1 ? "" : "s"}. Every keeper's calculator can use ${published === 1 ? "it" : "them"} now.`
+                ? `Published ${published} photo${published === 1 ? "" : "s"}`
+                    + (skipped ? `; skipped ${skipped} duplicate photo${skipped === 1 ? "" : "s"}` : "")
+                    + (published ? `. Every keeper's calculator can use ${published === 1 ? "it" : "them"} now.` : ".")
                 : `${published} published, ${failed.length} could not be: ${failed[0].error}`;
 
             if (elements.bulkConsentInput) {

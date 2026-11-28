@@ -729,15 +729,25 @@
             session.user.id,
             prepared.map(item => item.row.photo_url)
         );
+        const seenUrls = new Set(known);
         const pending = prepared.filter(item => {
-            if (!known.has(item.row.photo_url)) {
-                return true;
+            const url = item.row.photo_url;
+
+            if (known.has(url)) {
+                results[item.index].ok = true;
+                results[item.index].skipped = true;
+                results[item.index].saved = normalizeRow(item.row);
+                return false;
             }
 
-            results[item.index].ok = true;
-            results[item.index].saved = normalizeRow(item.row);
+            if (seenUrls.has(url)) {
+                results[item.index].ok = true;
+                results[item.index].skipped = true;
+                return false;
+            }
 
-            return false;
+            seenUrls.add(url);
+            return true;
         });
 
         for (let start = 0; start < pending.length; start += PUBLISH_CHUNK_SIZE) {
