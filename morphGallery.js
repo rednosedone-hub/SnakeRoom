@@ -122,11 +122,11 @@
     }
 
     function galleryKey(row) {
-        // Older publications may have stored different keys for the same
-        // genotype. Rebuild the key from genes so order and legacy keys do not
-        // split one morph into separate gallery cards.
+        // The gallery groups by visible appearance. Rebuild the key from the
+        // displayed genes so ordering, legacy keys, and hidden recessive hets
+        // do not split matching morphs into separate cards.
         return row.genes && row.genes.length > 0
-            ? window.MorphGallery.morphKeyFromGenes(row.genes)
+            ? window.MorphGallery.morphKeyFromGenes(galleryDescription(row.genes).geneDetails)
             : row.morphKey;
     }
 
